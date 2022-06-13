@@ -263,6 +263,17 @@ if [[ "make" =~ $(echo ^\(${TASKS}\)$) || "build" =~ $(echo ^\(${TASKS}\)$) ]]; 
   emmake make dist-generic
 fi
 
+#################################
+# Asyncify Advise (find out which imports can be async)
+#################################
+if [[ "asyncify-advise" =~ $(echo ^\(${TASKS}\)$) ]]; then
+  cd "${ROOT_FOLDER}"
+  echo "Running make & configure for all engines with ASYNCIFY_ADVISE=1 "
+  export LDFLAGS="${LDFLAGS} -s ASYNCIFY_ADVISE=1 -s TOTAL_MEMORY=64MB " 
+  emconfigure ./configure --host=wasm32-unknown-emscripten --build=wasm32-unknown-emscripten --enable-all-engines  --enable-debug ${LIBS_FLAGS} 
+  emmake make | tee asyncify-advise.txt
+fi
+
 # The following steps copy stuff to build-emscripten:
 mkdir -p "${ROOT_FOLDER}/build-emscripten/"
 
