@@ -28,7 +28,7 @@ fi
 # exit when any command fails
 set -e
 
-EMSDK_VERSION="3.1.8"
+EMSDK_VERSION="3.1.28"
 ROOT_FOLDER=$(pwd)
 DIST_FOLDER="$ROOT_FOLDER/dists/emscripten"
 LIBS_FOLDER="$DIST_FOLDER/libs"

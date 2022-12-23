@@ -2962,12 +2962,16 @@ EOF
 			append_var LDFLAGS "-O3"
 		fi
 
+		if test "$_verbose_build" = yes; then
+			append_var LDFLAGS "-s ASYNCIFY_ADVISE=1"
+		fi
+
 		# activate emscripten-ports
 		if test "$_freetype2" != no; then
 			append_var LDFLAGS "-s USE_FREETYPE=1 -s SUPPORT_LONGJMP=1" # freetype requires setjmp
 			# neither pkg-config nor freetype-config work, so we setup freetype manually
-			_freetypepath="$EMSCRIPTEN/cache/ports-builds/freetype/"
-			FREETYPE2_CFLAGS="-I$_freetypepath/include" # there were link errors / missing symbols without this
+			_freetypepath="$EMSCRIPTEN/cache/sysroot/include/freetype2/"
+			FREETYPE2_CFLAGS="-I$_freetypepath" # there were link errors / missing symbols without this
 			_freetype_found="true"
 		else
 			#use link time optimization to further reduce exe size (this can't be used with setjmp which freetype requires)
