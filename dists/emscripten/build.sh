@@ -270,8 +270,8 @@ if [[ "asyncify-advise" =~ $(echo ^\(${TASKS}\)$) ]]; then
   cd "${ROOT_FOLDER}"
   echo "Running make & configure for all engines with ASYNCIFY_ADVISE=1 "
   export LDFLAGS="${LDFLAGS} -s ASYNCIFY_ADVISE=1 -s TOTAL_MEMORY=64MB " 
-  emconfigure ./configure --host=wasm32-unknown-emscripten --build=wasm32-unknown-emscripten --enable-all-engines  --enable-debug ${LIBS_FLAGS} 
-  emmake make | tee asyncify-advise.txt
+  emconfigure ./configure --host=wasm32-unknown-emscripten --build=wasm32-unknown-emscripten --disable-all-engines  --enable-verbose-build ${LIBS_FLAGS} 
+  emmake make | tee >( grep '^\[asyncify\]' > "${DIST_FOLDER}/asyncify-advise.txt")
 fi
 
 # The following steps copy stuff to build-emscripten:
