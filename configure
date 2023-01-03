@@ -4363,7 +4363,7 @@ PLUGIN_LDFLAGS		+= -Wl,-T$(srcdir)/backends/plugins/ds/plugin.ld -mthumb -mthumb
 		echo "$asyncify_imports"
 _mak_plugins='
 PLUGIN_EXTRA_DEPS =
-PLUGIN_LDFLAGS  += $(LDFLAGS) -s SIDE_MODULE=1 -s ASYNCIFY_IMPORTS="'"$asyncify_imports"'" -s EXPORT_ALL=1
+PLUGIN_LDFLAGS  += $(LDFLAGS) -s SIDE_MODULE=1 -s ASYNCIFY_IMPORTS='"$asyncify_imports"' -s EXPORT_ALL=1
 PRE_OBJS_FLAGS  := -s MAIN_MODULE=1 -s EXPORT_ALL=1
 POST_OBJS_FLAGS :=
 '
