@@ -73,6 +73,9 @@ ScummVM relies heavily on Asyncify (see note above), and this comes with a quite
 *   Don't use asyncify but rewrite main loop to improve performance
 *   Look into emscripten-core/emscripten#16779 as an alternative
 
+NOTES: 
+- run wasm-objdump -x -j Export scummvm.wasm and demangle to match against what's in asyncify-imports. this should help us get mangled names whcih can be used in asyncify_imports
+
 ### Storage Integration
 *   BrowserFS seems abandoned and never did a stable 2.0.0 release. It's worth replacing it.  
     * `scummvm_fs.js` is an early prototype for a custom FS which can be adopted for ScummVM specific needs, i.e.

@@ -1,7 +1,7 @@
 
 from sqlite3 import connect
 import sys
-
+import json
 
 def string_escape(s, encoding='utf-8'): ## the output is escaped
     replacements=[["20"," "],["28","("],["29",")"],["2c",","],["5b","["],["5d","]"]]
@@ -107,6 +107,12 @@ print(len(callee_namespaces))
 print(i)
 
 print(len(all_callers))
-with open('./dists/emscripten/asyncify-imports.txt', 'w') as f:
-   
-        f.write(f"{all_callers}\n")
+#with open('./dists/emscripten/asyncify-imports.txt', 'w') as f:
+#        asyncify_import_str = "'[\"" + "\",\"".join(all_callers) + "\"]'"
+#        f.write(f"{asyncify_import_str}")
+
+
+with open('./dists/emscripten/asyncify-imports.json', 'w') as f:
+    # indent=2 is not needed but makes the file human-readable 
+    # if the data is nested
+    json.dump(all_callers, f, indent=2) 

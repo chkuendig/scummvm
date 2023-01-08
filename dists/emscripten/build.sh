@@ -28,7 +28,8 @@ fi
 # exit when any command fails
 set -e
 
-EMSDK_VERSION="3.1.28"
+EMSDK_VERSION="tot"
+EMSCRIPTEN_VERSION="sdk-upstream-main-64bit"
 ROOT_FOLDER=$(pwd)
 DIST_FOLDER="$ROOT_FOLDER/dists/emscripten"
 LIBS_FOLDER="$DIST_FOLDER/libs"
@@ -36,7 +37,6 @@ TASKS=()
 CONFIGURE_ARGS=()
 _bundle_games=()
 _verbose=false
-EMSCRIPTEN_VERSION=$EMSDK_VERSION
 
 usage="\
 Usage: ./dists/emscripten/build.sh [TASKS] [OPTIONS]
