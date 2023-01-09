@@ -88,8 +88,6 @@ fi
 # Setup Toolchain
 #################################
 
-if [[ "setup" =~ $(echo ^\(${TASKS}\)$) || "build" =~ $(echo ^\(${TASKS}\)$) ]]; then
-
   # Activate Emscripten
   if [[ ! -d "$DIST_FOLDER/emsdk-$EMSDK_VERSION" ]]; then
     echo "$DIST_FOLDER/emsdk-$EMSDK_VERSION not found. Installing Emscripten"
@@ -102,20 +100,6 @@ if [[ "setup" =~ $(echo ^\(${TASKS}\)$) || "build" =~ $(echo ^\(${TASKS}\)$) ]];
     fi
     cd "$DIST_FOLDER/emsdk-${EMSDK_VERSION}"
     ./emsdk install ${EMSCRIPTEN_VERSION}
-    # We currently require a few patches for unreleased changes Emscripten, see https://github.com/chkuendig/scummvm-demo/tree/main/patches
-    if [[ "$EMSCRIPTEN_VERSION" == "3.1.8" ]]; then
-      echo "Patching Emscripten"
-      cd upstream/emscripten
-      # until https://github.com/emscripten-core/emscripten/pull/15893 gets merged and released, we need to manually patch it
-      wget -nc https://raw.githubusercontent.com/chkuendig/scummvm-demo/main/patches/emscripten-15893.patch  -O "$DIST_FOLDER/emscripten-15893.patch" || true 
-      patch -p1 --verbose <"$DIST_FOLDER/emscripten-15893.patch"
-      # until https://github.com/emscripten-core/emscripten/pull/16559 gets merged and released, we need to manually patch it
-      wget -nc https://raw.githubusercontent.com/chkuendig/scummvm-demo/main/patches/emscripten-16559.patch  -O "$DIST_FOLDER/emscripten-16559.patch" || true 
-      patch -p1 --verbose <"$DIST_FOLDER/emscripten-16559.patch"
-      # until https://github.com/emscripten-core/emscripten/pull/16687 gets merged and released, we need to manually patch it
-      wget -nc https://raw.githubusercontent.com/chkuendig/scummvm-demo/main/patches/emscripten-16687.patch  -O "$DIST_FOLDER/emscripten-16687.patch" || true 
-      patch -p1 --verbose <"$DIST_FOLDER/emscripten-16687.patch"
-    fi
 
     cd "$DIST_FOLDER/emsdk-${EMSDK_VERSION}"
     ./emsdk activate ${EMSCRIPTEN_VERSION}
@@ -127,8 +111,11 @@ if [[ "setup" =~ $(echo ^\(${TASKS}\)$) || "build" =~ $(echo ^\(${TASKS}\)$) ]];
     "$EMSDK_NPM" -g install "puppeteer@13.5.1"
     "$EMSDK_NPM" -g install "request@2.88.2"
     "$EMSDK_NPM" -g install "node-static@0.7.11"
+
+    # install some requried pip packages
+    "${EMSDK_PYTHON:-'python3'}" -m pip install install cxxfilt==0.3.0 
   fi
-fi
+
 source "$DIST_FOLDER/emsdk-$EMSDK_VERSION/emsdk_env.sh"
 
 # export node_path - so we can use all node_modules bundled with emscripten (e.g. requests)
@@ -272,6 +259,11 @@ if [[ "asyncify-advise" =~ $(echo ^\(${TASKS}\)$) ]]; then
   export LDFLAGS="${LDFLAGS} -s ASYNCIFY_ADVISE=1 -s TOTAL_MEMORY=64MB " 
   emconfigure ./configure --host=wasm32-unknown-emscripten --build=wasm32-unknown-emscripten --disable-all-engines  --enable-verbose-build ${LIBS_FLAGS} 
   emmake make | tee >( grep '^\[asyncify\]' > "${DIST_FOLDER}/asyncify-advise.txt")
+  wasm-objdump -x -j Export build-emscripten/scummvm.wasm > dists/emscripten/main-module-exports.txt
+  "${EMSDK_PYTHON:-'python3'}" dists/emscripten/asyncify-advise.py
+  "${EMSDK_PYTHON:-'python3'}" dists/emscripten/main-module-exports.py
+  emmake make clean 
+  rm "${ROOT_FOLDER}"/scummvm.* "${ROOT_FOLDER}"/scummvm-conf.*
 fi
 
 # The following steps copy stuff to build-emscripten:
@@ -354,7 +346,7 @@ if [[ "icons" =~ $(echo ^\(${TASKS}\)$) || "build" =~ $(echo ^\(${TASKS}\)$) ]];
     echo "Adding files from icons repository "
     cp "${ROOT_FOLDER}/gui/themes/gui-icons.dat" "${ROOT_FOLDER}/build-emscripten/data"
     cd "${ROOT_FOLDER}/../scummvm-icons/"
-    ${EMSDK_PYTHON:-'python3'} gen-set.py
+    "${EMSDK_PYTHON:-'python3'}" gen-set.py
     echo "add icons"
     zip -q -u "${ROOT_FOLDER}/build-emscripten/data/gui-icons.dat" icons/*
     echo "add xml"

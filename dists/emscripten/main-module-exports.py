@@ -4,7 +4,7 @@ a_file = open("./dists/emscripten/main-module-exports.txt")
 import re
 import sys
 import json
-from demangler import demangle
+from cxxfilt import demangle
 lines = a_file.readlines()
 callees = {}
 all_callers = []

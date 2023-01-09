@@ -3,4 +3,5 @@
 wasm-objdump -x -j Function build-emscripten/scummvm.wasm > dists/emscripten/main-module-exports.txt
 cat dists/emscripten/main-module-exports.txt
 
+
 python3 dists/emscripten/main-module-exports.py
