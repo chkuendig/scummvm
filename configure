@@ -2958,8 +2958,8 @@ EOF
 			_optimization_level=-O2
 			append_var LDFLAGS "-O2 -g3 -s ASSERTIONS=2"
 		else
-			_optimization_level=-O3
-			append_var LDFLAGS "-O3"
+			_optimization_level=-Oz
+			append_var LDFLAGS "-Oz"
 		fi
 
 		if test "$_verbose_build" = yes; then

@@ -28,8 +28,6 @@ fi
 # exit when any command fails
 set -e
 
-EMSDK_VERSION="tot"
-EMSCRIPTEN_VERSION="sdk-upstream-main-64bit"
 ROOT_FOLDER=$(pwd)
 DIST_FOLDER="$ROOT_FOLDER/dists/emscripten"
 LIBS_FOLDER="$DIST_FOLDER/libs"
@@ -37,6 +35,8 @@ TASKS=()
 CONFIGURE_ARGS=()
 _bundle_games=()
 _verbose=false
+EMSDK_VERSION="3.1.28"
+EMSCRIPTEN_VERSION=$EMSDK_VERSION
 
 usage="\
 Usage: ./dists/emscripten/build.sh [TASKS] [OPTIONS]
@@ -181,7 +181,7 @@ if [[ "libs" =~ $(echo ^\(${TASKS}\)$) || "build" =~ $(echo ^\(${TASKS}\)$) ]]; 
     wget -nc "https://downloads.xiph.org/releases/theora/libtheora-1.1.1.tar.xz"
     tar -xf libtheora-1.1.1.tar.xz
     cd "$LIBS_FOLDER/libtheora-1.1.1/"
-    CFLAGS="-fPIC -s USE_OGG=1" emconfigure ./configure --host=wasm32-unknown-none --build=wasm32-unknown-none --prefix="$LIBS_FOLDER/build/" --disable-asm
+    CFLAGS="-fPIC -s USE_OGG=1 -Oz" emconfigure ./configure --host=wasm32-unknown-none --build=wasm32-unknown-none --prefix="$LIBS_FOLDER/build/" --disable-asm
     emmake make -j 3
     emmake make install
   fi
@@ -193,7 +193,7 @@ if [[ "libs" =~ $(echo ^\(${TASKS}\)$) || "build" =~ $(echo ^\(${TASKS}\)$) ]]; 
     wget -nc "https://sourceforge.net/projects/faac/files/faad2-src/faad2-2.8.0/faad2-2.8.8.tar.gz"
     tar -xf faad2-2.8.8.tar.gz
     cd "$LIBS_FOLDER/faad2-2.8.8/"
-    CFLAGS="-fPIC" emconfigure ./configure --host=wasm32-unknown-none --build=wasm32-unknown-none --prefix="$LIBS_FOLDER/build/"
+    CFLAGS="-fPIC -Oz" emconfigure ./configure --host=wasm32-unknown-none --build=wasm32-unknown-none --prefix="$LIBS_FOLDER/build/"
     emmake make
     emmake make install
   fi
@@ -209,7 +209,7 @@ if [[ "libs" =~ $(echo ^\(${TASKS}\)$) || "build" =~ $(echo ^\(${TASKS}\)$) ]]; 
     tar -xf libmad-0.15.1b.tar.gz
     cd "$LIBS_FOLDER/libmad-0.15.1b/"
     patch -Np1 -i "$DIST_FOLDER/libmad-0.15.1b-fixes-1.patch"
-    emconfigure ./configure --host=wasm32-unknown-none --build=wasm32-unknown-none --prefix="$LIBS_FOLDER/build/" --with-pic --enable-fpm=no
+    CFLAGS="-Oz" emconfigure ./configure --host=wasm32-unknown-none --build=wasm32-unknown-none --prefix="$LIBS_FOLDER/build/" --with-pic --enable-fpm=no
     emmake make
     emmake make install
   fi
@@ -221,7 +221,7 @@ if [[ "libs" =~ $(echo ^\(${TASKS}\)$) || "build" =~ $(echo ^\(${TASKS}\)$) ]]; 
     wget -nc "http://libmpeg2.sourceforge.net/files/libmpeg2-0.5.1.tar.gz"
     tar -xf libmpeg2-0.5.1.tar.gz
     cd "$LIBS_FOLDER/libmpeg2-0.5.1/"
-    CFLAGS="-fPIC" emconfigure ./configure --host=wasm32-unknown-none --prefix="$LIBS_FOLDER/build/" --disable-sdl
+    CFLAGS="-fPIC -Oz" emconfigure ./configure --host=wasm32-unknown-none --prefix="$LIBS_FOLDER/build/" --disable-sdl
     emmake make
     emmake make install
   fi
@@ -233,7 +233,7 @@ if [[ "libs" =~ $(echo ^\(${TASKS}\)$) || "build" =~ $(echo ^\(${TASKS}\)$) ]]; 
     wget -nc "https://liba52.sourceforge.io/files/a52dec-0.7.4.tar.gz"
     tar -xf a52dec-0.7.4.tar.gz
     cd "$LIBS_FOLDER/a52dec-0.7.4/"
-    CFLAGS="-fPIC" emconfigure ./configure --host=wasm32-unknown-none --build=wasm32-unknown-none --prefix="$LIBS_FOLDER/build/"
+    CFLAGS="-fPIC -Oz" emconfigure ./configure --host=wasm32-unknown-none --build=wasm32-unknown-none --prefix="$LIBS_FOLDER/build/"
     emmake make -j 3
     emmake make install
   fi
