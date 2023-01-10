@@ -95,7 +95,7 @@ fi
     if [[ "$EMSDK_VERSION" = "tot" ]]; then
       git clone "https://github.com/emscripten-core/emsdk/" emsdk-tot
     else
-      wget -nc --content-disposition "https://github.com/emscripten-core/emsdk/archive/refs/tags/${EMSDK_VERSION}.tar.gz"
+      wget -nc --content-disposition --no-check-certificate "https://github.com/emscripten-core/emsdk/archive/refs/tags/${EMSDK_VERSION}.tar.gz"
       tar -xf "emsdk-${EMSDK_VERSION}.tar.gz"
     fi
     cd "$DIST_FOLDER/emsdk-${EMSDK_VERSION}"
@@ -255,15 +255,15 @@ fi
 #################################
 if [[ "asyncify-advise" =~ $(echo ^\(${TASKS}\)$) ]]; then
   cd "${ROOT_FOLDER}"
-  echo "Running make & configure for all engines with ASYNCIFY_ADVISE=1 "
-  export LDFLAGS="${LDFLAGS} -s ASYNCIFY_ADVISE=1 -s TOTAL_MEMORY=64MB " 
-  emconfigure ./configure --host=wasm32-unknown-emscripten --build=wasm32-unknown-emscripten --disable-all-engines  --enable-verbose-build ${LIBS_FLAGS} 
-  emmake make | tee >( grep '^\[asyncify\]' > "${DIST_FOLDER}/asyncify-advise.txt")
-  wasm-objdump -x -j Export build-emscripten/scummvm.wasm > dists/emscripten/main-module-exports.txt
-  "${EMSDK_PYTHON:-'python3'}" dists/emscripten/asyncify-advise.py
-  "${EMSDK_PYTHON:-'python3'}" dists/emscripten/main-module-exports.py
   emmake make clean 
-  rm "${ROOT_FOLDER}"/scummvm.* "${ROOT_FOLDER}"/scummvm-conf.*
+  emconfigure ./configure --host=wasm32-unknown-emscripten --build=wasm32-unknown-emscripten --disable-all-engines  --enable-plugins --enable-verbose-build ${LIBS_FLAGS} 
+  emmake make | tee >( grep '^\[asyncify\]' > "${DIST_FOLDER}/asyncify-advise.txt")
+ # wasm-objdump -x -j Function ./scummvm.wasm > "${DIST_FOLDER}/main-module-exports.txt"
+  wasm-objdump -x -j Export ./scummvm.wasm > "${DIST_FOLDER}/main-module-exports.txt"
+  #"${EMSDK_PYTHON:-'python3'}" dists/emscripten/asyncify-advise.py
+  #"${EMSDK_PYTHON:-'python3'}" dists/emscripten/main-module-exports.py
+  #emmake make clean 
+  #rm "${ROOT_FOLDER}"/scummvm.* "${ROOT_FOLDER}"/scummvm-conf.*
 fi
 
 # The following steps copy stuff to build-emscripten:
