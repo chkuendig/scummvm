@@ -36,7 +36,7 @@ CONFIGURE_ARGS=()
 _bundle_games=()
 _verbose=false
 EMSDK_VERSION="3.1.28"
-EMSCRIPTEN_VERSION=$EMSDK_VERSION
+EMSCRIPTEN_VERSION="$EMSDK_VERSION"
 
 usage="\
 Usage: ./dists/emscripten/build.sh [TASKS] [OPTIONS]
@@ -88,34 +88,42 @@ fi
 # Setup Toolchain
 #################################
 
-  # Activate Emscripten
-  if [[ ! -d "$DIST_FOLDER/emsdk-$EMSDK_VERSION" ]]; then
-    echo "$DIST_FOLDER/emsdk-$EMSDK_VERSION not found. Installing Emscripten"
-    cd "$DIST_FOLDER"
-    if [[ "$EMSDK_VERSION" = "tot" ]]; then
-      git clone "https://github.com/emscripten-core/emsdk/" emsdk-tot
-    else
-      wget -nc --content-disposition --no-check-certificate "https://github.com/emscripten-core/emsdk/archive/refs/tags/${EMSDK_VERSION}.tar.gz"
-      tar -xf "emsdk-${EMSDK_VERSION}.tar.gz"
-    fi
-    cd "$DIST_FOLDER/emsdk-${EMSDK_VERSION}"
-    ./emsdk install ${EMSCRIPTEN_VERSION}
-
-    cd "$DIST_FOLDER/emsdk-${EMSDK_VERSION}"
-    ./emsdk activate ${EMSCRIPTEN_VERSION}
-
-    # install some required npm packages
-    source "$DIST_FOLDER/emsdk-$EMSDK_VERSION/emsdk_env.sh"
-    EMSDK_NPM=$(dirname $EMSDK_NODE)/npm
-    export NODE_PATH=$(dirname $EMSDK_NODE)/../lib/node_modules/
-    "$EMSDK_NPM" -g install "puppeteer@13.5.1"
-    "$EMSDK_NPM" -g install "request@2.88.2"
-    "$EMSDK_NPM" -g install "node-static@0.7.11"
-
-    # install some requried pip packages
-    "${EMSDK_PYTHON:-'python3'}" -m pip install install cxxfilt==0.3.0 
+# Activate Emscripten
+if [[ ! -d "$DIST_FOLDER/emsdk-$EMSDK_VERSION" ]]; then
+  echo "$DIST_FOLDER/emsdk-$EMSDK_VERSION not found. Installing Emscripten"
+  cd "$DIST_FOLDER"
+  if [[ "$EMSDK_VERSION" = "tot" ]]; then
+    git clone "https://github.com/emscripten-core/emsdk/" emsdk-tot
+  else
+    wget -nc --content-disposition --no-check-certificate "https://github.com/emscripten-core/emsdk/archive/refs/tags/${EMSDK_VERSION}.tar.gz"
+    tar -xf "emsdk-${EMSDK_VERSION}.tar.gz"
   fi
 
+fi
+
+cd "$DIST_FOLDER/emsdk-${EMSDK_VERSION}"
+ret=0 # https://stackoverflow.com/questions/18621990/bash-get-exit-status-of-command-when-set-e-is-active
+./emsdk activate ${EMSCRIPTEN_VERSION} || ret=$?
+if [[ $ret != 0 ]]; then
+  echo "install missing emscripten version"
+  cd "$DIST_FOLDER/emsdk-${EMSDK_VERSION}"
+  ./emsdk install ${EMSCRIPTEN_VERSION}
+
+  cd "$DIST_FOLDER/emsdk-${EMSDK_VERSION}"
+  ./emsdk activate ${EMSCRIPTEN_VERSION}
+
+  # install some required npm packages
+  source "$DIST_FOLDER/emsdk-$EMSDK_VERSION/emsdk_env.sh"
+  EMSDK_NPM=$(dirname $EMSDK_NODE)/npm
+  export NODE_PATH=$(dirname $EMSDK_NODE)/../lib/node_modules/
+  "$EMSDK_NPM" -g install "puppeteer@13.5.1"
+  "$EMSDK_NPM" -g install "request@2.88.2"
+  "$EMSDK_NPM" -g install "node-static@0.7.11"
+
+  # install some requried pip packages
+  "${EMSDK_PYTHON:-'python3'}" -m pip install install cxxfilt==0.3.0
+fi
+./emsdk activate ${EMSCRIPTEN_VERSION}
 source "$DIST_FOLDER/emsdk-$EMSDK_VERSION/emsdk_env.sh"
 
 # export node_path - so we can use all node_modules bundled with emscripten (e.g. requests)
@@ -255,14 +263,14 @@ fi
 #################################
 if [[ "asyncify-advise" =~ $(echo ^\(${TASKS}\)$) ]]; then
   cd "${ROOT_FOLDER}"
-  emmake make clean 
-  emconfigure ./configure --host=wasm32-unknown-emscripten --build=wasm32-unknown-emscripten --disable-all-engines  --enable-plugins --enable-verbose-build ${LIBS_FLAGS} 
-  emmake make | tee >( grep '^\[asyncify\]' > "${DIST_FOLDER}/asyncify-advise.txt")
- # wasm-objdump -x -j Function ./scummvm.wasm > "${DIST_FOLDER}/main-module-exports.txt"
-  wasm-objdump -x -j Export ./scummvm.wasm > "${DIST_FOLDER}/main-module-exports.txt"
+  emmake make clean
+  emconfigure ./configure --host=wasm32-unknown-emscripten --build=wasm32-unknown-emscripten --disable-all-engines --enable-plugins --enable-verbose-build ${LIBS_FLAGS}
+  emmake make | tee >(grep '^\[asyncify\]' >"${DIST_FOLDER}/asyncify-advise.txt")
+  # wasm-objdump -x -j Function ./scummvm.wasm > "${DIST_FOLDER}/main-module-exports.txt"
+  wasm-objdump -x -j Export ./scummvm.wasm >"${DIST_FOLDER}/main-module-exports.txt"
   #"${EMSDK_PYTHON:-'python3'}" dists/emscripten/asyncify-advise.py
   #"${EMSDK_PYTHON:-'python3'}" dists/emscripten/main-module-exports.py
-  #emmake make clean 
+  #emmake make clean
   #rm "${ROOT_FOLDER}"/scummvm.* "${ROOT_FOLDER}"/scummvm-conf.*
 fi
 
