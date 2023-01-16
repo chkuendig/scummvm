@@ -36,7 +36,7 @@ CONFIGURE_ARGS=()
 _bundle_games=()
 _verbose=false
 EMSDK_VERSION="3.1.28"
-EMSCRIPTEN_VERSION="$EMSDK_VERSION"
+EMSCRIPTEN_VERSION="sdk-upstream-main-64bit"
 
 usage="\
 Usage: ./dists/emscripten/build.sh [TASKS] [OPTIONS]
@@ -115,19 +115,22 @@ if [[ $ret != 0 ]]; then
   # install some required npm packages
   source "$DIST_FOLDER/emsdk-$EMSDK_VERSION/emsdk_env.sh"
   EMSDK_NPM=$(dirname $EMSDK_NODE)/npm
+  EMSDK_PYTHON="${EMSDK_PYTHON:-'python3'}"
   export NODE_PATH=$(dirname $EMSDK_NODE)/../lib/node_modules/
   "$EMSDK_NPM" -g install "puppeteer@13.5.1"
   "$EMSDK_NPM" -g install "request@2.88.2"
   "$EMSDK_NPM" -g install "node-static@0.7.11"
 
-  # install some requried pip packages
-  "${EMSDK_PYTHON:-'python3'}" -m pip install install cxxfilt==0.3.0
+  # install some required pip packages
+  "$EMSDK_PYTHON" -m pip install install cxxfilt==0.3.0
 fi
-./emsdk activate ${EMSCRIPTEN_VERSION}
+
 source "$DIST_FOLDER/emsdk-$EMSDK_VERSION/emsdk_env.sh"
 
 # export node_path - so we can use all node_modules bundled with emscripten (e.g. requests)
 EMSDK_NPM=$(dirname $EMSDK_NODE)/npm
+EMSDK_PYTHON="${EMSDK_PYTHON:-'python3'}"
+EMSDK_NPX=$(dirname $EMSDK_NODE)/npx
 export NODE_PATH=$(dirname $EMSDK_NODE)/../lib/node_modules/
 LIBS_FLAGS=""
 
@@ -268,8 +271,8 @@ if [[ "asyncify-advise" =~ $(echo ^\(${TASKS}\)$) ]]; then
   emmake make | tee >(grep '^\[asyncify\]' >"${DIST_FOLDER}/asyncify-advise.txt")
   # wasm-objdump -x -j Function ./scummvm.wasm > "${DIST_FOLDER}/main-module-exports.txt"
   wasm-objdump -x -j Export ./scummvm.wasm >"${DIST_FOLDER}/main-module-exports.txt"
-  #"${EMSDK_PYTHON:-'python3'}" dists/emscripten/asyncify-advise.py
-  #"${EMSDK_PYTHON:-'python3'}" dists/emscripten/main-module-exports.py
+  #"$EMSDK_PYTHON" dists/emscripten/asyncify-advise.py
+  #"$EMSDK_PYTHON" dists/emscripten/main-module-exports.py
   #emmake make clean
   #rm "${ROOT_FOLDER}"/scummvm.* "${ROOT_FOLDER}"/scummvm-conf.*
 fi
@@ -296,7 +299,7 @@ if [[ "games" =~ $(echo ^\(${TASKS}\)$) || "build" =~ $(echo ^\(${TASKS}\)$) ]];
   if [ -n "$_bundle_games" ]; then
     mkdir -p "${DIST_FOLDER}/games/"
     cd "${DIST_FOLDER}/games/"
-    files=$("$EMSDK_NODE" --unhandled-rejections=strict --trace-warnings "$DIST_FOLDER/build-download_games.js" ${_bundle_games})
+    files=$(f"$EMSDK_NODE" --unhandled-rejections=strict --trace-warnings "$DIST_FOLDER/build-download_games.js" ${_bundle_games})
     for dir in "${ROOT_FOLDER}/build-emscripten/games/"*; do # cleanup games folder
       if [ $(basename $dir) != "testbed" ]; then
         rm -rf "$dir"
@@ -348,13 +351,13 @@ fi
 #################################
 # Add icons
 #################################
-if [[ "icons" =~ $(echo ^\(${TASKS}\)$) || "build" =~ $(echo ^\(${TASKS}\)$) ]]; then
+if [[ "icons" =~ $(echo ^\(${TASKS}\)$) || "build1" =~ $(echo ^\(${TASKS}\)$) ]]; then
 
   if [[ -d "${ROOT_FOLDER}/../scummvm-icons/" ]]; then
     echo "Adding files from icons repository "
     cp "${ROOT_FOLDER}/gui/themes/gui-icons.dat" "${ROOT_FOLDER}/build-emscripten/data"
     cd "${ROOT_FOLDER}/../scummvm-icons/"
-    "${EMSDK_PYTHON:-'python3'}" gen-set.py
+    "$EMSDK_PYTHON" gen-set.py
     echo "add icons"
     zip -q -u "${ROOT_FOLDER}/build-emscripten/data/gui-icons.dat" icons/*
     echo "add xml"
@@ -387,6 +390,5 @@ if [[ "run" =~ $(echo ^\(${TASKS}\)$) ]]; then
   # emrun doesn't support range requests. Once it will, we don't need node-static anymore
   # emrun --browser=chrome scummvm.html
 
-  EMSDK_NPX=$(dirname $EMSDK_NODE)/npx
   $EMSDK_NPX -p node-static static .
 fi

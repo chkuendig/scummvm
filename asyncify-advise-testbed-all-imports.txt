@@ -1,0 +1,532 @@
+asyncify] Common::BaseString<char>::BaseString\28char\20const*\29 is an import that can change the state
+[asyncify] GUI::Dialog::Dialog\28Common::String\20const&\29 is an import that can change the state
+[asyncify] Common::BaseString<char>::~BaseString\28\29 is an import that can change the state
+[asyncify] operator\20new\28unsigned\20long\29 is an import that can change the state
+[asyncify] Common::U32String::U32String\28char\20const*\2c\20Common::CodePage\29 is an import that can change the state
+[asyncify] GUI::StaticTextWidget::StaticTextWidget\28GUI::GuiObject*\2c\20Common::String\20const&\2c\20Common::U32String\20const&\2c\20Common::U32String\20const&\2c\20GUI::ThemeEngine::FontStyle\2c\20Common::Language\2c\20bool\29 is an import that can change the state
+[asyncify] Common::BaseString<char32_t>::~BaseString\28\29 is an import that can change the state
+[asyncify] Common::Array<Testbed::Testsuite*>::push_back\28Testbed::Testsuite*\20const&\29 is an import that can change the state
+[asyncify] Common::U32String::operator=\28char\20const*\29 is an import that can change the state
+[asyncify] GUI::ListWidget::getThemeColor\28GUI::ThemeEngine::FontColor\29 is an import that can change the state
+[asyncify] Common::operator+\28Common::U32String\20const&\2c\20Common::U32String\20const&\29 is an import that can change the state
+[asyncify] Common::String::String\28Common::U32String\20const&\2c\20Common::CodePage\29 is an import that can change the state
+[asyncify] Common::operator+\28Common::String\20const&\2c\20char\20const*\29 is an import that can change the state
+[asyncify] Common::U32String::U32String\28Common::String\20const&\2c\20Common::CodePage\29 is an import that can change the state
+[asyncify] Common::Array<Common::U32String>::push_back\28Common::U32String\20const&\29 is an import that can change the state
+[asyncify] Common::Array<Testbed::Testsuite*>::Array\28Common::Array<Testbed::Testsuite*>\20const&\29 is an import that can change the state
+[asyncify] Testbed::TestbedListWidget::TestbedListWidget\28GUI::Dialog*\2c\20Common::String\20const&\2c\20Common::Array<Testbed::Testsuite*>\29 is an import that can change the state
+[asyncify] free is an import that can change the state
+[asyncify] GUI::ListWidget::setList\28Common::Array<Common::U32String>\20const&\29 is an import that can change the state
+[asyncify] GUI::ButtonWidget::ButtonWidget\28GUI::GuiObject*\2c\20Common::String\20const&\2c\20Common::U32String\20const&\2c\20Common::U32String\20const&\2c\20unsigned\20int\2c\20unsigned\20char\2c\20Common::U32String\20const&\29 is an import that can change the state
+[asyncify] Common::Array<Testbed::Testsuite*>::insert_aux\28Testbed::Testsuite**\2c\20Testbed::Testsuite*\20const*\2c\20Testbed::Testsuite*\20const*\29 is an import that can change the state
+[asyncify] Common::BaseString<char32_t>::BaseString\28Common::BaseString<char32_t>\20const&\29 is an import that can change the state
+[asyncify] Common::Array<Common::U32String>::insert_aux\28Common::U32String*\2c\20Common::U32String\20const*\2c\20Common::U32String\20const*\29 is an import that can change the state
+[asyncify] Common::Array<Testbed::Testsuite*>::allocCapacity\28unsigned\20int\29 is an import that can change the state
+[asyncify] GUI::ListWidget::ListWidget\28GUI::Dialog*\2c\20Common::String\20const&\2c\20Common::U32String\20const&\2c\20unsigned\20int\29 is an import that can change the state
+[asyncify] Common::Array<Testbed::Testsuite*>::~Array\28\29 is an import that can change the state
+[asyncify] Common::Array<Common::U32String>::~Array\28\29 is an import that can change the state
+[asyncify] GUI::GuiObject::~GuiObject\28\29 is an import that can change the state
+[asyncify] Common::Array<Common::U32String>::freeStorage\28Common::U32String*\2c\20unsigned\20int\29 is an import that can change the state
+[asyncify] operator\20delete\28void*\29 is an import that can change the state
+[asyncify] GUI::ListWidget::getSelected\28\29\20const is an import that can change the state
+[asyncify] Common::Array<Testbed::Testsuite*>::operator\5b\5d\28unsigned\20int\29 is an import that can change the state
+[asyncify] Testbed::TestbedListWidget::markAsSelected\28int\29 is an import that can change the state
+[asyncify] Testbed::TestbedListWidget::markAsDeselected\28int\29 is an import that can change the state
+[asyncify] Engine::quitGame\28\29 is an import that can change the state
+[asyncify] GUI::ButtonWidget::setLabel\28Common::String\20const&\29 is an import that can change the state
+[asyncify] GUI::Dialog::handleCommand\28GUI::CommandSender*\2c\20unsigned\20int\2c\20unsigned\20int\29 is an import that can change the state
+[asyncify] __assert_fail is an import that can change the state
+[asyncify] Common::Array<int>::operator\5b\5d\28unsigned\20int\29\20const is an import that can change the state
+[asyncify] Common::Array<Common::U32String>::operator\5b\5d\28unsigned\20int\29 is an import that can change the state
+[asyncify] Common::U32String::encode\28Common::CodePage\29\20const is an import that can change the state
+[asyncify] Common::String::contains\28char\20const*\29\20const is an import that can change the state
+[asyncify] Common::U32String::operator=\28Common::String\20const&\29 is an import that can change the state
+[asyncify] Common::Singleton<Common::ConfigManager>::instance\28\29 is an import that can change the state
+[asyncify] Common::ConfigManager::get\28Common::String\20const&\29\20const is an import that can change the state
+[asyncify] Common::Path::Path\28Common::String\20const&\2c\20char\29 is an import that can change the state
+[asyncify] Common::FSNode::FSNode\28Common::Path\20const&\29 is an import that can change the state
+[asyncify] Common::FSNode::getChild\28Common::String\20const&\29\20const is an import that can change the state
+[asyncify] Common::FSNode::createWriteStream\28\29\20const is an import that can change the state
+[asyncify] Common::FSNode::~FSNode\28\29 is an import that can change the state
+[asyncify] Common::INIFile::setKey\28Common::String\20const&\2c\20Common::String\20const&\2c\20Common::String\20const&\29 is an import that can change the state
+[asyncify] Common::INIFile::saveToStream\28Common::WriteStream&\29 is an import that can change the state
+[asyncify] GUI::StaticTextWidget::StaticTextWidget\28GUI::GuiObject*\2c\20int\2c\20int\2c\20int\2c\20int\2c\20Common::U32String\20const&\2c\20Graphics::TextAlign\2c\20Common::U32String\20const&\2c\20GUI::ThemeEngine::FontStyle\2c\20Common::Language\2c\20bool\29 is an import that can change the state
+[asyncify] GUI::ButtonWidget::ButtonWidget\28GUI::GuiObject*\2c\20int\2c\20int\2c\20int\2c\20int\2c\20Common::U32String\20const&\2c\20Common::U32String\20const&\2c\20unsigned\20int\2c\20unsigned\20char\2c\20Common::U32String\20const&\29 is an import that can change the state
+[asyncify] Common::Array<GUI::ButtonWidget*>::push_back\28GUI::ButtonWidget*\20const&\29 is an import that can change the state
+[asyncify] Common::Array<GUI::ButtonWidget*>::back\28\29 is an import that can change the state
+[asyncify] Common::Array<GUI::ButtonWidget*>::insert_aux\28GUI::ButtonWidget**\2c\20GUI::ButtonWidget*\20const*\2c\20GUI::ButtonWidget*\20const*\29 is an import that can change the state
+[asyncify] GUI::ListWidget::ListWidget\28GUI::Dialog*\2c\20int\2c\20int\2c\20int\2c\20int\2c\20Common::U32String\20const&\2c\20unsigned\20int\29 is an import that can change the state
+[asyncify] Common::Singleton<Common::SearchManager>::instance\28\29 is an import that can change the state
+[asyncify] Common::Singleton<Common::SearchManager>::makeInstance\28\29 is an import that can change the state
+[asyncify] Common::Singleton<Common::ConfigManager>::makeInstance\28\29 is an import that can change the state
+[asyncify] Common::SharedPtr<AbstractFSNode>::~SharedPtr\28\29 is an import that can change the state
+[asyncify] Common::INIFile::loadFromStream\28Common::SeekableReadStream&\29 is an import that can change the state
+[asyncify] Common::List<Common::INIFile::Section>::List\28Common::List<Common::INIFile::Section>\20const&\29 is an import that can change the state
+[asyncify] Common::List<Common::INIFile::Section>::clear\28\29 is an import that can change the state
+[asyncify] Common::ListInternal::ConstIterator<Common::INIFile::Section>::operator*\28\29\20const is an import that can change the state
+[asyncify] Common::String::equalsIgnoreCase\28char\20const*\29\20const is an import that can change the state
+[asyncify] Common::List<Common::INIFile::KeyValue>::List\28Common::List<Common::INIFile::KeyValue>\20const&\29 is an import that can change the state
+[asyncify] Common::ListInternal::ConstIterator<Common::INIFile::KeyValue>::operator*\28\29\20const is an import that can change the state
+[asyncify] Common::BaseString<char>::BaseString\28Common::BaseString<char>\20const&\29 is an import that can change the state
+[asyncify] Common::List<Common::INIFile::KeyValue>::clear\28\29 is an import that can change the state
+[asyncify] Common::INIFile::hasKey\28Common::String\20const&\2c\20Common::String\20const&\29\20const is an import that can change the state
+[asyncify] Common::INIFile::getKey\28Common::String\20const&\2c\20Common::String\20const&\2c\20Common::String&\29\20const is an import that can change the state
+[asyncify] Common::Singleton<Testbed::ConfigParams>::instance\28\29 is an import that can change the state
+[asyncify] Common::String::operator+=\28char\20const*\29 is an import that can change the state
+[asyncify] Engine::shouldQuit\28\29 is an import that can change the state
+[asyncify] GUI::Dialog::runModal\28\29 is an import that can change the state
+[asyncify] Common::INIFile::clear\28\29 is an import that can change the state
+[asyncify] Common::Singleton<Testbed::ConfigParams>::makeInstance\28\29 is an import that can change the state
+[asyncify] Testbed::TestbedInteractionDialog::~TestbedInteractionDialog\28\29 is an import that can change the state
+[asyncify] Common::Array<GUI::ButtonWidget*>::~Array\28\29 is an import that can change the state
+[asyncify] Testbed::TestbedListWidget::~TestbedListWidget\28\29 is an import that can change the state
+[asyncify] GUI::ListWidget::~ListWidget\28\29 is an import that can change the state
+[asyncify] Testbed::TestbedListWidget::~TestbedListWidget\28\29.1 is an import that can change the state
+[asyncify] Common::Array<int>::~Array\28\29 is an import that can change the state
+[asyncify] Common::Array<GUI::ListWidget::ListData>::~Array\28\29 is an import that can change the state
+[asyncify] GUI::EditableWidget::~EditableWidget\28\29 is an import that can change the state
+[asyncify] Common::Array<GUI::ListWidget::ListData>::freeStorage\28GUI::ListWidget::ListData*\2c\20unsigned\20int\29 is an import that can change the state
+[asyncify] GUI::ListWidget::ListData::~ListData\28\29 is an import that can change the state
+[asyncify] Common::BasePtrTrackerInternal::decStrong\28\29 is an import that can change the state
+[asyncify] Common::BasePtrTrackerInternal::decWeak\28\29 is an import that can change the state
+[asyncify] void\20Common::List<Common::INIFile::Section>::insert<Common::ListInternal::ConstIterator<Common::INIFile::Section>>\28Common::ListInternal::Iterator<Common::INIFile::Section>\2c\20Common::ListInternal::ConstIterator<Common::INIFile::Section>\2c\20Common::ListInternal::ConstIterator<Common::INIFile::Section>\29 is an import that can change the state
+[asyncify] Common::List<Common::INIFile::Section>::insert\28Common::ListInternal::NodeBase*\2c\20Common::INIFile::Section\20const&\29 is an import that can change the state
+[asyncify] Common::INIFile::Section::Section\28Common::INIFile::Section\20const&\29 is an import that can change the state
+[asyncify] void\20Common::List<Common::INIFile::KeyValue>::insert<Common::ListInternal::ConstIterator<Common::INIFile::KeyValue>>\28Common::ListInternal::Iterator<Common::INIFile::KeyValue>\2c\20Common::ListInternal::ConstIterator<Common::INIFile::KeyValue>\2c\20Common::ListInternal::ConstIterator<Common::INIFile::KeyValue>\29 is an import that can change the state
+[asyncify] Common::List<Common::INIFile::KeyValue>::insert\28Common::ListInternal::NodeBase*\2c\20Common::INIFile::KeyValue\20const&\29 is an import that can change the state
+[asyncify] Common::INIFile::KeyValue::KeyValue\28Common::INIFile::KeyValue\20const&\29 is an import that can change the state
+[asyncify] Common::INIFile::Section::~Section\28\29 is an import that can change the state
+[asyncify] malloc is an import that can change the state
+[asyncify] error\28char\20const*\2c\20...\29 is an import that can change the state
+[asyncify] Common::Array<Testbed::Testsuite*>::roundUpCapacity\28unsigned\20int\29 is an import that can change the state
+[asyncify] Common::Array<Common::U32String>::roundUpCapacity\28unsigned\20int\29 is an import that can change the state
+[asyncify] Common::Array<Common::U32String>::allocCapacity\28unsigned\20int\29 is an import that can change the state
+[asyncify] Common::U32String*\20Common::uninitialized_copy<Common::U32String*\2c\20Common::U32String>\28Common::U32String*\2c\20Common::U32String*\2c\20Common::U32String*\29 is an import that can change the state
+[asyncify] Common::U32String*\20Common::uninitialized_copy<Common::U32String\20const*\2c\20Common::U32String>\28Common::U32String\20const*\2c\20Common::U32String\20const*\2c\20Common::U32String*\29 is an import that can change the state
+[asyncify] Common::U32String*\20Common::copy_backward<Common::U32String*\2c\20Common::U32String*>\28Common::U32String*\2c\20Common::U32String*\2c\20Common::U32String*\29 is an import that can change the state
+[asyncify] Common::U32String*\20Common::copy<Common::U32String\20const*\2c\20Common::U32String*>\28Common::U32String\20const*\2c\20Common::U32String\20const*\2c\20Common::U32String*\29 is an import that can change the state
+[asyncify] Common::U32String::operator=\28Common::U32String\20const&\29 is an import that can change the state
+[asyncify] Common::Array<GUI::ButtonWidget*>::roundUpCapacity\28unsigned\20int\29 is an import that can change the state
+[asyncify] Common::Array<GUI::ButtonWidget*>::allocCapacity\28unsigned\20int\29 is an import that can change the state
+[asyncify] Common::SearchManager::SearchManager\28\29 is an import that can change the state
+[asyncify] Common::ConfigManager::ConfigManager\28\29 is an import that can change the state
+[asyncify] Common::INIFile::KeyValue::~KeyValue\28\29 is an import that can change the state
+[asyncify] Common::String::operator=\28char\20const*\29 is an import that can change the state
+[asyncify] Common::String::operator=\28Common::String\20const&\29 is an import that can change the state
+[asyncify] Testbed::ConfigParams::~ConfigParams\28\29 is an import that can change the state
+[asyncify] Common::Singleton<Graphics::FontManager>::instance\28\29 is an import that can change the state
+[asyncify] Graphics::FontManager::getFontByUsage\28Graphics::FontManager::FontUsage\29\20const is an import that can change the state
+[asyncify] Common::Rect::Rect\28short\2c\20short\2c\20short\2c\20short\29 is an import that can change the state
+[asyncify] Graphics::Surface::fillRect\28Common::Rect\2c\20unsigned\20int\29 is an import that can change the state
+[asyncify] Graphics::Font::drawString\28Graphics::Surface*\2c\20Common::String\20const&\2c\20int\2c\20int\2c\20int\2c\20unsigned\20int\2c\20Graphics::TextAlign\2c\20int\2c\20bool\29\20const is an import that can change the state
+[asyncify] Common::Singleton<Graphics::FontManager>::makeInstance\28\29 is an import that can change the state
+[asyncify] Common::Singleton<Graphics::CursorManager>::instance\28\29 is an import that can change the state
+[asyncify] Graphics::CursorManager::showMouse\28bool\29 is an import that can change the state
+[asyncify] Common::Rect::contains\28Common::Point\20const&\29\20const is an import that can change the state
+[asyncify] Common::Singleton<Graphics::CursorManager>::makeInstance\28\29 is an import that can change the state
+[asyncify] Common::Rect::contains\28short\2c\20short\29\20const is an import that can change the state
+[asyncify] Common::String::operator+=\28char\29 is an import that can change the state
+[asyncify] Graphics::FontManager::FontManager\28\29 is an import that can change the state
+[asyncify] Common::Path::Path\28char\20const*\2c\20char\29 is an import that can change the state
+[asyncify] Common::FSDirectory::getFSNode\28\29\20const is an import that can change the state
+[asyncify] Common::FSNode::getName\28\29\20const is an import that can change the state
+[asyncify] Common::BaseString<char>::equals\28Common::BaseString<char>\20const&\29\20const is an import that can change the state
+[asyncify] Common::FSDirectory::FSDirectory\28Common::Path\20const&\2c\20int\2c\20bool\2c\20bool\2c\20bool\29 is an import that can change the state
+[asyncify] Common::FSNode::exists\28\29\20const is an import that can change the state
+[asyncify] Common::FSNode::isDirectory\28\29\20const is an import that can change the state
+[asyncify] Common::FSDirectory::getSubDirectory\28Common::Path\20const&\2c\20int\2c\20bool\2c\20bool\29 is an import that can change the state
+[asyncify] Common::BaseString<char>::toLowercase\28\29 is an import that can change the state
+[asyncify] Common::BaseString<char>::toUppercase\28\29 is an import that can change the state
+[asyncify] Common::FSDirectory::~FSDirectory\28\29 is an import that can change the state
+[asyncify] Common::WriteStream::writeString\28Common::String\20const&\29 is an import that can change the state
+[asyncify] Common::FSNode::createReadStream\28\29\20const is an import that can change the state
+[asyncify] Common::BaseString<char>::equals\28char\20const*\29\20const is an import that can change the state
+[asyncify] Common::FSNode::createDirectory\28\29\20const is an import that can change the state
+[asyncify] Common::List<Graphics::PixelFormat>::clear\28\29 is an import that can change the state
+[asyncify] Common::List<Graphics::PixelFormat>::push_back\28Graphics::PixelFormat\20const&\29 is an import that can change the state
+[asyncify] memset is an import that can change the state
+[asyncify] Graphics::CursorManager::disableCursorPalette\28bool\29 is an import that can change the state
+[asyncify] Common::String::format\28char\20const*\2c\20...\29 is an import that can change the state
+[asyncify] Common::String::operator=\28Common::String&&\29 is an import that can change the state
+[asyncify] operator\20new\5b\5d\28unsigned\20long\29 is an import that can change the state
+[asyncify] operator\20delete\5b\5d\28void*\29 is an import that can change the state
+[asyncify] Testbed::Testsuite::clearEntireScreen\28\29 is an import that can change the state
+[asyncify] Graphics::CursorManager::replaceCursorPalette\28unsigned\20char\20const*\2c\20unsigned\20int\2c\20unsigned\20int\29 is an import that can change the state
+[asyncify] Graphics::CursorManager::replaceCursor\28void\20const*\2c\20unsigned\20int\2c\20unsigned\20int\2c\20int\2c\20int\2c\20unsigned\20int\2c\20bool\2c\20Graphics::PixelFormat\20const*\29 is an import that can change the state
+[asyncify] Testbed::Testsuite::getDisplayRegionCoordinates\28\29 is an import that can change the state
+[asyncify] cos is an import that can change the state
+[asyncify] sin is an import that can change the state
+[asyncify] Graphics::PixelFormat::RGBToColor\28unsigned\20char\2c\20unsigned\20char\2c\20unsigned\20char\29\20const is an import that can change the state
+[asyncify] void\20Common::sort<Common::ListInternal::Iterator<Graphics::PixelFormat>\2c\20Testbed::PixelFormatComparator>\28Common::ListInternal::Iterator<Graphics::PixelFormat>\2c\20Common::ListInternal::Iterator<Graphics::PixelFormat>\2c\20Testbed::PixelFormatComparator\29 is an import that can change the state
+[asyncify] Common::List<Graphics::PixelFormat>::size\28\29\20const is an import that can change the state
+[asyncify] Common::ListInternal::ConstIterator<Graphics::PixelFormat>::operator*\28\29\20const is an import that can change the state
+[asyncify] Graphics::PixelFormat::toString\28\29\20const is an import that can change the state
+[asyncify] Common::List<Graphics::PixelFormat>::insert\28Common::ListInternal::NodeBase*\2c\20Graphics::PixelFormat\20const&\29 is an import that can change the state
+[asyncify] Common::ListInternal::Iterator<Graphics::PixelFormat>\20Common::sortChoosePivot<Common::ListInternal::Iterator<Graphics::PixelFormat>>\28Common::ListInternal::Iterator<Graphics::PixelFormat>\2c\20Common::ListInternal::Iterator<Graphics::PixelFormat>\29 is an import that can change the state
+[asyncify] Common::ListInternal::Iterator<Graphics::PixelFormat>\20Common::sortPartition<Common::ListInternal::Iterator<Graphics::PixelFormat>\2c\20Testbed::PixelFormatComparator>\28Common::ListInternal::Iterator<Graphics::PixelFormat>\2c\20Common::ListInternal::Iterator<Graphics::PixelFormat>\2c\20Common::ListInternal::Iterator<Graphics::PixelFormat>\2c\20Testbed::PixelFormatComparator&\29 is an import that can change the state
+[asyncify] Graphics::ManagedSurface::ManagedSurface\28int\2c\20int\2c\20Graphics::PixelFormat\20const&\29 is an import that can change the state
+[asyncify] Graphics::ManagedSurface::blitFrom\28Graphics::Surface\20const&\29 is an import that can change the state
+[asyncify] Graphics::PixelFormat::ARGBToColor\28unsigned\20char\2c\20unsigned\20char\2c\20unsigned\20char\2c\20unsigned\20char\29\20const is an import that can change the state
+[asyncify] Graphics::ManagedSurface::clear\28unsigned\20int\29 is an import that can change the state
+[asyncify] Graphics::ManagedSurface::blitFrom\28Graphics::ManagedSurface\20const&\2c\20Common::Point\20const&\29 is an import that can change the state
+[asyncify] Graphics::ManagedSurface::~ManagedSurface\28\29 is an import that can change the state
+[asyncify] Graphics::ManagedSurface::hLine\28int\2c\20int\2c\20int\2c\20unsigned\20int\29 is an import that can change the state
+[asyncify] Graphics::ManagedSurface::frameRect\28Common::Rect\20const&\2c\20unsigned\20int\29 is an import that can change the state
+[asyncify] Graphics::ManagedSurface::drawLine\28int\2c\20int\2c\20int\2c\20int\2c\20unsigned\20int\29 is an import that can change the state
+[asyncify] Graphics::Surface::hLine\28int\2c\20int\2c\20int\2c\20unsigned\20int\29 is an import that can change the state
+[asyncify] Graphics::Surface::frameRect\28Common::Rect\20const&\2c\20unsigned\20int\29 is an import that can change the state
+[asyncify] Graphics::Surface::drawLine\28int\2c\20int\2c\20int\2c\20int\2c\20unsigned\20int\29 is an import that can change the state
+[asyncify] unsigned\20int\20Common::distance<Common::ListInternal::Iterator<Graphics::PixelFormat>>\28Common::ListInternal::Iterator<Graphics::PixelFormat>\2c\20Common::ListInternal::Iterator<Graphics::PixelFormat>\29 is an import that can change the state
+[asyncify] Common::ListInternal::Iterator<Graphics::PixelFormat>::operator*\28\29\20const is an import that can change the state
+[asyncify] Testbed::PixelFormatComparator::operator\28\29\28Graphics::PixelFormat\20const&\2c\20Graphics::PixelFormat\20const&\29 is an import that can change the state
+[asyncify] Common::BaseString<char>::operator<\28Common::BaseString<char>\20const&\29\20const is an import that can change the state
+[asyncify] Common::Error::Error\28Common::ErrorCode\29 is an import that can change the state
+[asyncify] ADDetectedGame::ADDetectedGame\28\29 is an import that can change the state
+[asyncify] Common::HashMap<Common::String\2c\20FileProperties\2c\20Common::IgnoreCase_Hash\2c\20Common::IgnoreCase_EqualTo>::HashMap\28\29 is an import that can change the state
+[asyncify] Common::FixedSizeMemoryPool<80ul\2c\2010ul>::FixedSizeMemoryPool\28\29 is an import that can change the state
+[asyncify] Common::MemoryPool::MemoryPool\28unsigned\20long\29 is an import that can change the state
+[asyncify] Common::MemoryPool::addPageToPool\28Common::MemoryPool::Page\20const&\29 is an import that can change the state
+[asyncify] Common::ReadStream::readByte\28\29 is an import that can change the state
+[asyncify] MidiDriver::detectDevice\28int\29 is an import that can change the state
+[asyncify] MidiDriver::createMidi\28unsigned\20int\29 is an import that can change the state
+[asyncify] MidiParser::createParser_SMF\28signed\20char\29 is an import that can change the state
+[asyncify] MidiDriver::getErrorName\28int\29 is an import that can change the state
+[asyncify] Common::MemoryWriteStreamDynamic::MemoryWriteStreamDynamic\28DisposeAfterUse::Flag\29 is an import that can change the state
+[asyncify] MidiParser::setTrack\28int\29 is an import that can change the state
+[asyncify] Common::MemoryWriteStreamDynamic::~MemoryWriteStreamDynamic\28\29 is an import that can change the state
+[asyncify] Common::SeekableWriteStream::SeekableWriteStream\28\29 is an import that can change the state
+[asyncify] MidiParser::onTimer\28\29 is an import that can change the state
+[asyncify] Common::MemoryWriteStreamDynamic::~MemoryWriteStreamDynamic\28\29.1 is an import that can change the state
+[asyncify] Common::MemoryWriteStreamDynamic::roundUpCapacity\28unsigned\20long\29 is an import that can change the state
+[asyncify] Common::MemoryWriteStreamDynamic::ensureCapacity\28unsigned\20int\29 is an import that can change the state
+[asyncify] memcpy is an import that can change the state
+[asyncify] Common::Mutex::lock\28\29 is an import that can change the state
+[asyncify] Common::Mutex::unlock\28\29 is an import that can change the state
+[asyncify] Common::operator+\28char\20const*\2c\20Common::String\20const&\29 is an import that can change the state
+[asyncify] Common::Mutex::Mutex\28\29 is an import that can change the state
+[asyncify] Common::Mutex::~Mutex\28\29 is an import that can change the state
+[asyncify] Common::Array<Common::String>::operator\5b\5d\28unsigned\20int\29 is an import that can change the state
+[asyncify] Common::Array<Common::String>::~Array\28\29 is an import that can change the state
+[asyncify] Common::Array<Common::String>::freeStorage\28Common::String*\2c\20unsigned\20int\29 is an import that can change the state
+[asyncify] Testbed::TestbedInteractionDialog::TestbedInteractionDialog\28unsigned\20int\2c\20unsigned\20int\2c\20unsigned\20int\2c\20unsigned\20int\29 is an import that can change the state
+[asyncify] Audio::PCSpeaker::PCSpeaker\28int\29 is an import that can change the state
+[asyncify] Audio::PCSpeaker::play\28Audio::PCSpeaker::WaveForm\2c\20int\2c\20int\29 is an import that can change the state
+[asyncify] GUI::Dialog::Dialog\28int\2c\20int\2c\20int\2c\20int\29 is an import that can change the state
+[asyncify] Common::Array<GUI::ButtonWidget*>::operator\5b\5d\28unsigned\20int\29 is an import that can change the state
+[asyncify] Common::SearchSet::addSubDirectoryMatching\28Common::FSNode\20const&\2c\20Common::String\20const&\2c\20int\2c\20int\2c\20bool\29 is an import that can change the state
+[asyncify] Common::File::File\28\29 is an import that can change the state
+[asyncify] Common::File::~File\28\29 is an import that can change the state
+[asyncify] Common::File::open\28Common::Path\20const&\29 is an import that can change the state
+[asyncify] Common::File::isOpen\28\29\20const is an import that can change the state
+[asyncify] Audio::makeModXmS3mStream\28Common::SeekableReadStream*\2c\20DisposeAfterUse::Flag\2c\20int\2c\20int\2c\20int\29 is an import that can change the state
+[asyncify] Common::File::close\28\29 is an import that can change the state
+[asyncify] Common::SearchSet::addSubDirectoriesMatching\28Common::FSNode\20const&\2c\20Common::String\2c\20bool\2c\20int\2c\20int\2c\20bool\29 is an import that can change the state
+[asyncify] Common::U32String::operator=\28Common::U32String&&\29 is an import that can change the state
+[asyncify] Common::U32String::format\28char\20const*\2c\20...\29 is an import that can change the state
+[asyncify] Engine::Engine\28OSystem*\29 is an import that can change the state
+[asyncify] Common::FSNode::getDisplayName\28\29\20const is an import that can change the state
+[asyncify] Common::SearchSet::addDirectory\28Common::String\20const&\2c\20Common::FSNode\20const&\2c\20int\2c\20int\2c\20bool\29 is an import that can change the state
+[asyncify] Common::Singleton<Common::DebugManager>::instance\28\29 is an import that can change the state
+[asyncify] Common::DebugManager::enableDebugChannel\28Common::String\20const&\29 is an import that can change the state
+[asyncify] Common::Singleton<Common::DebugManager>::makeInstance\28\29 is an import that can change the state
+[asyncify] Engine::~Engine\28\29 is an import that can change the state
+[asyncify] Common::Singleton<Common::AchievementsManager>::instance\28\29 is an import that can change the state
+[asyncify] Common::AchievementsManager::setAchievement\28Common::String\20const&\29 is an import that can change the state
+[asyncify] Common::Singleton<Common::AchievementsManager>::makeInstance\28\29 is an import that can change the state
+[asyncify] Common::AchievementsManager::isAchieved\28Common::String\20const&\29\20const is an import that can change the state
+[asyncify] Common::ConfigManager::hasKey\28Common::String\20const&\29\20const is an import that can change the state
+[asyncify] initGraphics\28int\2c\20int\29 is an import that can change the state
+[asyncify] Common::AchievementsManager::setActiveDomain\28Common::AchievementsInfo\20const&\29 is an import that can change the state
+[asyncify] Testbed::TestbedConfigManager::TestbedConfigManager\28Common::Array<Testbed::Testsuite*>&\2c\20Common::String\29 is an import that can change the state
+[asyncify] Testbed::TestbedExitDialog::TestbedExitDialog\28Common::Array<Testbed::Testsuite*>&\29 is an import that can change the state
+[asyncify] Testbed::TestbedConfigManager::~TestbedConfigManager\28\29 is an import that can change the state
+[asyncify] Common::INIFile::INIFile\28\29 is an import that can change the state
+[asyncify] Common::INIFile::~INIFile\28\29 is an import that can change the state
+[asyncify] Common::DebugManager::DebugManager\28\29 is an import that can change the state
+[asyncify] Common::AchievementsManager::AchievementsManager\28\29 is an import that can change the state
+[asyncify] vsnprintf is an import that can change the state
+[asyncify] debugCN\28unsigned\20int\2c\20char\20const*\2c\20...\29 is an import that can change the state
+[asyncify] debugCN\28int\2c\20unsigned\20int\2c\20char\20const*\2c\20...\29 is an import that can change the state
+[asyncify] Common::Array<Testbed::Test*>::~Array\28\29 is an import that can change the state
+[asyncify] GUI::MessageDialog::MessageDialog\28Common::String\20const&\2c\20Common::String\20const&\2c\20Common::String\20const&\2c\20Graphics::TextAlign\2c\20char\20const*\29 is an import that can change the state
+[asyncify] Testbed::Test::Test\28Common::String\2c\20Testbed::TestExitStatus\20\28*\29\28\29\2c\20bool\29 is an import that can change the state
+[asyncify] Common::Array<Testbed::Test*>::push_back\28Testbed::Test*\20const&\29 is an import that can change the state
+[asyncify] Common::Array<Testbed::Test*>::insert_aux\28Testbed::Test**\2c\20Testbed::Test*\20const*\2c\20Testbed::Test*\20const*\29 is an import that can change the state
+[asyncify] Testbed::Testsuite::getLineSeparation\28\29 is an import that can change the state
+[asyncify] Common::Array<Testbed::Test*>::operator\5b\5d\28unsigned\20int\29 is an import that can change the state
+[asyncify] Common::String::equalsIgnoreCase\28Common::String\20const&\29\20const is an import that can change the state
+[asyncify] Common::AchievementsManager::getStatInt\28Common::String\20const&\29\20const is an import that can change the state
+[asyncify] Common::AchievementsManager::setStatInt\28Common::String\20const&\2c\20int\29 is an import that can change the state
+[asyncify] Common::Array<Testbed::Test*>::roundUpCapacity\28unsigned\20int\29 is an import that can change the state
+[asyncify] Common::Array<Testbed::Test*>::allocCapacity\28unsigned\20int\29 is an import that can change the state
+[asyncify] initGraphics\28int\2c\20int\2c\20Graphics::PixelFormat\20const*\29 is an import that can change the state
+[asyncify] Video::QuickTimeDecoder::QuickTimeDecoder\28\29 is an import that can change the state
+[asyncify] warning\28char\20const*\2c\20...\29 is an import that can change the state
+[asyncify] Video::VideoDecoder::start\28\29 is an import that can change the state
+[asyncify] Video::VideoDecoder::endOfVideo\28\29\20const is an import that can change the state
+[asyncify] Video::VideoDecoder::needsUpdate\28\29\20const is an import that can change the state
+[asyncify] Video::VideoDecoder::getTime\28\29\20const is an import that can change the state
+[asyncify] Graphics::Surface::convertTo\28Graphics::PixelFormat\20const&\2c\20unsigned\20char\20const*\2c\20int\2c\20unsigned\20char\20const*\2c\20int\2c\20Graphics::DitherMethod\29\20const is an import that can change the state
+[asyncify] Graphics::Surface::free\28\29 is an import that can change the state
+[asyncify] __handle_stack_overflow is an import that can change the state
+[asyncify] setTempRet0 is an import that can change the state
+[asyncify] Testbed::TestbedOptionsDialog::TestbedOptionsDialog\28Common::Array<Testbed::Testsuite*>&\2c\20Testbed::TestbedConfigManager*\29 can change the state due to initial scan
+[asyncify] Testbed::TestbedListWidget::markAsSelected\28int\29.1 can change the state due to initial scan
+[asyncify] Testbed::TestbedListWidget::markAsDeselected\28int\29.1 can change the state due to initial scan
+[asyncify] [asyncify] Testbed::TestbedInteractionDialog::addButton\28unsigned\20int\2c\20unsigned\20int\2c\20Common::String\2c\20unsigned\20int\2c\20unsigned\20int\2c\20unsigned\20int\29 can change the state due to initial scan
+[asyncify] Testbed::TestbedOptionsDialog::handleCommand\28GUI::CommandSender*\2c\20unsigned\20int\2c\20unsigned\20int\29 can change the state due to initial scan
+[asyncify] Testbed::TestbedConfigManager::writeTestbedConfigToStream\28Common::WriteStream*\29 can change the state due to initial scan
+Testbed::TestbedInteractionDialog::addList\28unsigned\20int\2c\20unsigned\20int\2c\20unsigned\20int\2c\20unsigned\20int\2c\20Common::Array<Common::U32String>\20const&\2c\20unsigned\20int\29[asyncify] Testbed::TestbedConfigManager::parseConfigFile\28\29 can change the state due to initial scan
+[asyncify] Testbed::TestbedInteractionDialog::addText\28unsigned\20int\2c\20unsigned\20int\2c\20Common::String\2c\20Graphics::TextAlign\2c\20unsigned\20int\2c\20unsigned\20int\29 can change the state due to initial scan
+[asyncify] Testbed::TestbedConfigManager::getConfigReadStream\28\29\20const can change the state due to initial scan
+[asyncify] GUI::Widget::getAbsX\28\29\20const.1[asyncify] [asyncify]  can change the state due to initial scan
+GUI::Widget::getAbsY\28\29\20const.1 can change the state due to initial scan
+[asyncify] GUI::Widget::releaseFocus\28\29.1 can change the state due to initial scan
+[asyncify] GUI::GuiObject::getChildY\28\29\20const.1 can change the state due to initial scan
+[asyncify]  can change the state due to initial scan
+[asyncify] Common::BasePtrTrackerInternal::decWeak\28\29.1 can change the state due to initial scan
+[asyncify] Testbed::TestbedInteractionDialog::addButtonXY\28unsigned\20int\2c\20unsigned\20int\2c\20unsigned\20int\2c\20unsigned\20int\2c\20Common::String\2c\20unsigned\20int\29 can change the state due to initial scan
+Testbed::TestbedConfigManager::getTestsuiteByName\28Common::String\20const&\29 can change the state due to initial scan
+[asyncify] GUI::GuiObject::getChildX\28\29\20const.1 can change the state due to initial scan
+[asyncify] Testbed::ConfigParams::deleteWriteStream\28\29 can change the state due to initial scan
+GUI::Dialog::receivedFocus\28int\2c\20int\29.1 can change the state due to initial scan
+[asyncify] [asyncify] Testbed::EventTests::keystrokeToChar\28\29 can change the state due to initial scan
+[asyncify] Testbed::EventTests::mouseEvents\28\29 can change the state due to initial scan
+[asyncify] Testbed::EventTests::showMainMenu\28\29 can change the state due to initial scan
+Testbed::EventTests::drawFinishZone\28\29 can change the state due to initial scan
+[asyncify] Testbed::FStests::testReadFile\28\29 can change the state due to initial scan
+[asyncify] [asyncify] Common::BasePtrTrackerInternal::decStrong\28\29.1 can change the state due to initial scan
+Testbed::FStests::testWriteFile\28\29 can change the state due to initial scan
+[asyncify] Testbed::GFXtests::pixelFormatsSupported\28\29 can change the state due to initial scan
+[asyncify] [asyncify] Testbed::GFXtests::iconifyWindow\28\29Testbed::GFXtests::copyRectToScreen\28\29 can change the state due to initial scan
+[asyncify] Testbed::FStests::readDataFromFile\28Common::FSDirectory*\2c\20char\20const*\29 can change the state due to initial scan
+[asyncify] [asyncify] GUI::CommandSender::sendCommand\28unsigned\20int\2c\20unsigned\20int\29.1 can change the state due to initial scan
+[asyncify] Testbed::GFXtests::aspectRatio\28\29Testbed::GFXtests::scaledCursors\28\29 can change the state due to initial scan
+ can change the state due to initial scan
+ can change the state due to initial scan
+[asyncify] Testbed::GFXtests::overlayGraphics\28\29 can change the state due to initial scan
+[asyncify] Testbed::GFXtests::fullScreenMode\28\29 can change the state due to initial scan
+[asyncify] Testbed::GFXtests::filteringMode\28\29 can change the state due to initial scan
+[asyncify] Testbed::GFXtests::cursorTrails\28\29 can change the state due to initial scan
+[asyncify] Testbed::GFXtests::mouseMovements\28\29 can change the state due to initial scan
+[asyncify] Testbed::GFXtests::drawEllipse\28int\2c\20int\2c\20int\2c\20int\29 can change the state due to initial scan
+[asyncify] Testbed::GFXtests::pixelFormats\28Common::List<Graphics::PixelFormat>&\29 can change the state due to initial scan
+[asyncify] Testbed::GFXTestSuite::setCustomColor\28unsigned\20int\2c\20unsigned\20int\2c\20unsigned\20int\29[asyncify]  can change the state due to initial scan
+Testbed::Testsuite::clearEntireScreen\28\29.1[asyncify] Testbed::Testsuite::getDisplayRegionCoordinates\28\29.1 can change the state due to initial scan
+ can change the state due to initial scan
+[asyncify] [asyncify] Testbed::GFXtests::paletteRotation\28\29 can change the state due to initial scan
+[asyncify] [asyncify] [asyncify] Testbed::GFXtests::shakingEffect\28\29 can change the state due to initial scan
+Testbed::GFXtests::setupMouseLoop\28bool\2c\20char\20const*\2c\20int\29[asyncify] Testbed::GFXtests::showPixelFormat\28Graphics::PixelFormat\20const&\2c\20unsigned\20int\29 can change the state due to initial scan
+[asyncify] Graphics::ManagedSurface::frameRect\28Common::Rect\20const&\2c\20unsigned\20int\29.1 can change the state due to initial scan
+[asyncify] Graphics::ManagedSurface::drawLine\28int\2c\20int\2c\20int\2c\20int\2c\20unsigned\20int\29.1 can change the state due to initial scan
+Testbed::GFXtests::drawCursor\28bool\2c\20int\29 can change the state due to initial scan
+[asyncify] Common::ReadStream::readByte\28\29.1[asyncify]  can change the state due to initial scan
+MetaEngine::getMaximumSaveSlot\28\29\20const.1 can change the state due to initial scan
+[asyncify] Testbed::MidiTests::waitForMusicToPlay\28MidiParser*\29 can change the state due to initial scan
+[asyncify] Graphics::ManagedSurface::hLine\28int\2c\20int\2c\20int\2c\20unsigned\20int\29.1 can change the state due to initial scan
+[asyncify] Testbed::MidiTestSuite::MidiTestSuite\28\29 can change the state due to initial scan
+[asyncify]  can change the state due to initial scan
+[asyncify] Testbed::MidiTests::loadMusicInMemory\28Common::WriteStream*\29 can change the state due to initial scan
+[asyncify] Common::WriteStream::finalize\28\29.1 can change the state due to initial scan
+Testbed::GFXTestSuite::prepare\28\29 can change the state due to initial scan
+[asyncify] Testbed::MiscTests::criticalSection\28void*\29 can change the state due to initial scan
+[asyncify] Testbed::MiscTests::testTimers\28\29 can change the state due to initial scan
+[asyncify] Testbed::GFXtests::focusRectangle\28\29[asyncify] [asyncify] Testbed::SaveGametests::readAndVerifyData\28char\20const*\2c\20char\20const*\29 can change the state due to initial scan
+Testbed::SaveGametests::writeDataToFile\28char\20const*\2c\20char\20const*\29 can change the state due to initial scan
+[asyncify] Testbed::SaveGametests::testRemovingSavefile\28\29 can change the state due to initial scan
+[asyncify] Testbed::MiscTests::testMutexes\28\29 can change the state due to initial scan
+[asyncify] [asyncify] Testbed::MiscTests::testOpenUrl\28\29Testbed::SaveGametests::testListingSavefile\28\29 can change the state due to initial scan
+[asyncify] Testbed::MiscTests::testDateTime\28\29 can change the state due to initial scan
+ can change the state due to initial scan
+[asyncify] Testbed::MidiTests::playMidiMusic\28\29Testbed::SoundSubsystemDialog::SoundSubsystemDialog\28\29[asyncify]  can change the state due to initial scan
+Testbed::SoundSubsystemDialog::handleCommand\28GUI::CommandSender*\2c\20unsigned\20int\2c\20unsigned\20int\29[asyncify] [asyncify] Testbed::Networkingtests::testConnectionLimit\28\29 can change the state due to initial scan
+ can change the state due to initial scan
+ can change the state due to initial scan
+[asyncify] [asyncify] [asyncify] Testbed::SoundSubsystem::playBeeps\28\29 can change the state due to initial scan
+ can change the state due to initial scan
+Testbed::SaveGametests::testErrorMessages\28\29 can change the state due to initial scan
+[asyncify] Testbed::SoundSubsystem::modPlayback\28\29 can change the state due to initial scan
+[asyncify] [asyncify] Testbed::SoundSubsystem::sampleRates\28\29 can change the state due to initial scan
+[asyncify] Testbed::TestbedEngine::invokeTestsuites\28Testbed::TestbedConfigManager&\29 can change the state due to initial scan
+[asyncify] Testbed::TestbedEngine::~TestbedEngine\28\29 can change the state due to initial scan
+Testbed::TestbedExitDialog::init\28\29 can change the state due to initial scan
+Testbed::SaveGametests::testRenamingSavefile\28\29 can change the state due to initial scan
+[asyncify] [asyncify] [asyncify] Testbed::TestbedEngine::run\28\29 can change the state due to initial scan
+Testbed::Testsuite::logDetailedPrintf\28char\20const*\2c\20...\29Testbed::SoundSubsystem::audiocdOutput\28\29[asyncify] Testbed::Testsuite::logPrintf\28char\20const*\2c\20...\29[asyncify] Testbed::Testsuite::genReport\28\29\20const can change the state due to initial scan
+ can change the state due to initial scan
+[asyncify] [asyncify] Testbed::Testsuite::clearScreen\28Common::Rect\20const&\29 can change the state due to initial scan
+[asyncify] Testbed::Testsuite::writeOnScreen\28Common::String\20const&\2c\20Common::Point\20const&\2c\20bool\29 can change the state due to initial scan
+Testbed::SoundSubsystemTestSuite::SoundSubsystemTestSuite\28\29 can change the state due to initial scan
+[asyncify] Testbed::Testsuite::clearScreen\28bool\29[asyncify]  can change the state due to initial scan
+Testbed::Testsuite::parseEvents\28\29[asyncify] Testbed::Testsuite::getLineSeparation\28\29.1 can change the state due to initial scan
+[asyncify] Testbed::Testsuite::clearScreen\28\29 can change the state due to initial scan
+[asyncify] Testbed::Testsuite::updateStats\28char\20const*\2c\20char\20const*\2c\20unsigned\20int\2c\20unsigned\20int\2c\20Common::Point\29 can change the state due to initial scan
+[asyncify] [asyncify] Testbed::TestbedEngine::checkForAllAchievements\28\29 can change the state due to initial scan
+Testbed::Testsuite::execute\28\29 can change the state due to initial scan
+ can change the state due to initial scan
+[asyncify] Testbed::TestbedEngine::videoTest\28\29 can change the state due to initial scan
+ can change the state due to initial scan
+ can change the state due to initial scan
+Engine::canSaveAutosaveCurrently\28\29.1 can change the state due to initial scan
+[asyncify] Testbed::TestbedConfigManager::getConfigWriteStream\28\29\20const can change the state due to Common::BaseString<char>::BaseString\28char\20const*\29
+[asyncify] Testbed::TestbedConfigManager::initDefaultConfiguration\28\29 can change the state due to Common::BaseString<char>::BaseString\28char\20const*\29
+[asyncify] Testbed::TestbedConfigManager::selectTestsuites\28\29 can change the state due to Common::BaseString<char>::BaseString\28char\20const*\29
+[asyncify] Testbed::ConfigParams::initLogging\28char\20const*\2c\20char\20const*\2c\20bool\29 can change the state due to Common::BaseString<char>::BaseString\28char\20const*\29
+[asyncify] Testbed::ConfigParams::initLogging\28bool\29 can change the state due to Common::BaseString<char>::BaseString\28char\20const*\29
+[asyncify] Testbed::EventTests::kbdEvents\28\29 can change the state due to Common::BaseString<char>::BaseString\28char\20const*\29
+[asyncify] Testbed::EventTestSuite::EventTestSuite\28\29 can change the state due to Common::BaseString<char>::BaseString\28char\20const*\29
+[asyncify] Testbed::FStests::testCreateDir\28\29 can change the state due to Common::BaseString<char>::BaseString\28char\20const*\29
+[asyncify] Testbed::FSTestSuite::FSTestSuite\28\29 can change the state due to Common::BaseString<char>::BaseString\28char\20const*\29
+[asyncify] Testbed::GFXTestSuite::GFXTestSuite\28\29 can change the state due to Common::BaseString<char>::BaseString\28char\20const*\29
+[asyncify] Testbed::GFXtests::pixelFormatsRequired\28\29 can change the state due to Common::BaseString<char>::BaseString\28char\20const*\29
+[asyncify] Testbed::GFXtests::palettizedCursors\28\29 can change the state due to Common::BaseString<char>::BaseString\28char\20const*\29
+[asyncify] Testbed::SaveGameTestSuite::SaveGameTestSuite\28\29 can change the state due to Common::BaseString<char>::BaseString\28char\20const*\29
+[asyncify] Testbed::MiscTestSuite::MiscTestSuite\28\29 can change the state due to Common::BaseString<char>::BaseString\28char\20const*\29
+[asyncify] Testbed::NetworkingTestSuite::NetworkingTestSuite\28\29 can change the state due to Common::BaseString<char>::BaseString\28char\20const*\29
+[asyncify] Testbed::SoundSubsystem::mixSounds\28\29 can change the state due to Common::BaseString<char>::BaseString\28char\20const*\29
+[asyncify] Testbed::TestbedEngine::TestbedEngine\28OSystem*\29 can change the state due to Common::BaseString<char>::BaseString\28char\20const*\29
+[asyncify] Testbed::Testsuite::handleInteractiveInput\28Common::String\20const&\2c\20char\20const*\2c\20char\20const*\2c\20Testbed::OptionSelected\29 can change the state due to Common::BaseString<char>::BaseString\28char\20const*\29
+[asyncify] Testbed::Testsuite::displayMessage\28Common::String\20const&\2c\20char\20const*\29 can change the state due to Common::BaseString<char>::BaseString\28char\20const*\29
+[asyncify] GUI::ListWidget::~ListWidget\28\29.1 can change the state due to Common::BaseString<char>::~BaseString\28\29
+[asyncify] Common::INIFile::Section::~Section\28\29.1 can change the state due to Common::BaseString<char>::~BaseString\28\29
+[asyncify] Common::INIFile::KeyValue::~KeyValue\28\29.1 can change the state due to Common::BaseString<char>::~BaseString\28\29
+[asyncify] Testbed::ConfigParams::~ConfigParams\28\29.2 can change the state due to Common::BaseString<char>::~BaseString\28\29
+[asyncify] Testbed::PixelFormatComparator::operator\28\29\28Graphics::PixelFormat\20const&\2c\20Graphics::PixelFormat\20const&\29.1 can change the state due to Common::BaseString<char>::~BaseString\28\29
+[asyncify] Common::Array<Common::String>::freeStorage\28Common::String*\2c\20unsigned\20int\29.1 can change the state due to Common::BaseString<char>::~BaseString\28\29
+[asyncify] Common::SearchSet::addSubDirectoryMatching\28Common::FSNode\20const&\2c\20Common::String\20const&\2c\20int\2c\20int\2c\20bool\29.1 can change the state due to Common::BaseString<char>::~BaseString\28\29
+[asyncify] Testbed::TestbedConfigManager::~TestbedConfigManager\28\29.1 can change the state due to Common::BaseString<char>::~BaseString\28\29
+[asyncify] Common::INIFile::~INIFile\28\29.1 can change the state due to Common::BaseString<char>::~BaseString\28\29
+[asyncify] Testbed::Testsuite::~Testsuite\28\29 can change the state due to Common::BaseString<char>::~BaseString\28\29
+[asyncify] Testbed::Testsuite::addTest\28Common::String\20const&\2c\20Testbed::TestExitStatus\20\28*\29\28\29\2c\20bool\29 can change the state due to Common::BaseString<char>::~BaseString\28\29
+[asyncify] Common::Singleton<Common::SearchManager>::makeInstance\28\29.1 can change the state due to operator\20new\28unsigned\20long\29
+[asyncify] Common::Singleton<Common::ConfigManager>::makeInstance\28\29.1 can change the state due to operator\20new\28unsigned\20long\29
+[asyncify] Common::Singleton<Testbed::ConfigParams>::makeInstance\28\29.1 can change the state due to operator\20new\28unsigned\20long\29
+[asyncify] Common::List<Common::INIFile::Section>::insert\28Common::ListInternal::NodeBase*\2c\20Common::INIFile::Section\20const&\29.1 can change the state due to operator\20new\28unsigned\20long\29
+[asyncify] Common::List<Common::INIFile::KeyValue>::insert\28Common::ListInternal::NodeBase*\2c\20Common::INIFile::KeyValue\20const&\29.1 can change the state due to operator\20new\28unsigned\20long\29
+[asyncify] Common::Singleton<Graphics::FontManager>::makeInstance\28\29.1 can change the state due to operator\20new\28unsigned\20long\29
+[asyncify] Common::Singleton<Graphics::CursorManager>::makeInstance\28\29.1 can change the state due to operator\20new\28unsigned\20long\29
+[asyncify] Common::List<Graphics::PixelFormat>::insert\28Common::ListInternal::NodeBase*\2c\20Graphics::PixelFormat\20const&\29.1 can change the state due to operator\20new\28unsigned\20long\29
+[asyncify] PLUGIN_getObject can change the state due to operator\20new\28unsigned\20long\29
+[asyncify] TestbedMetaEngine::createInstance\28OSystem*\2c\20Engine**\2c\20ADGameDescription\20const*\29\20const.1 can change the state due to operator\20new\28unsigned\20long\29
+[asyncify] Testbed::TestbedEngine::pushTestsuites\28Common::Array<Testbed::Testsuite*>&\29 can change the state due to operator\20new\28unsigned\20long\29
+[asyncify] Common::Singleton<Common::DebugManager>::makeInstance\28\29.1 can change the state due to operator\20new\28unsigned\20long\29
+[asyncify] Common::Singleton<Common::AchievementsManager>::makeInstance\28\29.1 can change the state due to operator\20new\28unsigned\20long\29
+[asyncify] Testbed::TestbedListWidget::TestbedListWidget\28GUI::Dialog*\2c\20Common::String\20const&\2c\20Common::Array<Testbed::Testsuite*>\29.1 can change the state due to Common::BaseString<char32_t>::~BaseString\28\29
+[asyncify] Common::Array<Common::U32String>::freeStorage\28Common::U32String*\2c\20unsigned\20int\29.1 can change the state due to Common::BaseString<char32_t>::~BaseString\28\29
+[asyncify] GUI::ListWidget::ListData::~ListData\28\29.1 can change the state due to Common::BaseString<char32_t>::~BaseString\28\29
+[asyncify] Common::Array<Testbed::Testsuite*>::insert_aux\28Testbed::Testsuite**\2c\20Testbed::Testsuite*\20const*\2c\20Testbed::Testsuite*\20const*\29.1 can change the state due to free
+[asyncify] Common::Array<Testbed::Testsuite*>::~Array\28\29.1 can change the state due to free
+[asyncify] Common::Array<GUI::ButtonWidget*>::insert_aux\28GUI::ButtonWidget**\2c\20GUI::ButtonWidget*\20const*\2c\20GUI::ButtonWidget*\20const*\29.1 can change the state due to free
+[asyncify] Common::Array<GUI::ButtonWidget*>::~Array\28\29.1 can change the state due to free
+[asyncify] Common::Array<int>::~Array\28\29.1 can change the state due to free
+[asyncify] Common::Array<GUI::ListWidget::ListData>::freeStorage\28GUI::ListWidget::ListData*\2c\20unsigned\20int\29.1 can change the state due to free
+[asyncify] Common::MemoryWriteStreamDynamic::~MemoryWriteStreamDynamic\28\29.4 can change the state due to free
+[asyncify] Common::MemoryWriteStreamDynamic::ensureCapacity\28unsigned\20int\29.1 can change the state due to free
+[asyncify] Common::Array<Testbed::Test*>::~Array\28\29.1 can change the state due to free
+[asyncify] Common::Array<Testbed::Test*>::insert_aux\28Testbed::Test**\2c\20Testbed::Test*\20const*\2c\20Testbed::Test*\20const*\29.1 can change the state due to free
+[asyncify] Common::Array<Testbed::Testsuite*>::push_back\28Testbed::Testsuite*\20const&\29.1 can change the state due to Common::Array<Testbed::Testsuite*>::insert_aux\28Testbed::Testsuite**\2c\20Testbed::Testsuite*\20const*\2c\20Testbed::Testsuite*\20const*\29
+[asyncify] Common::Array<Common::U32String>::push_back\28Common::U32String\20const&\29.1 can change the state due to Common::BaseString<char32_t>::BaseString\28Common::BaseString<char32_t>\20const&\29
+[asyncify] Common::U32String*\20Common::uninitialized_copy<Common::U32String*\2c\20Common::U32String>\28Common::U32String*\2c\20Common::U32String*\2c\20Common::U32String*\29.1 can change the state due to Common::BaseString<char32_t>::BaseString\28Common::BaseString<char32_t>\20const&\29
+[asyncify] Common::U32String*\20Common::uninitialized_copy<Common::U32String\20const*\2c\20Common::U32String>\28Common::U32String\20const*\2c\20Common::U32String\20const*\2c\20Common::U32String*\29.1 can change the state due to Common::BaseString<char32_t>::BaseString\28Common::BaseString<char32_t>\20const&\29
+[asyncify] Common::Array<Testbed::Testsuite*>::Array\28Common::Array<Testbed::Testsuite*>\20const&\29.1 can change the state due to Common::Array<Testbed::Testsuite*>::allocCapacity\28unsigned\20int\29
+[asyncify] Testbed::TestbedOptionsDialog::~TestbedOptionsDialog\28\29 can change the state due to Common::Array<Testbed::Testsuite*>::~Array\28\29
+[asyncify] Testbed::TestbedListWidget::~TestbedListWidget\28\29.2 can change the state due to Common::Array<Testbed::Testsuite*>::~Array\28\29
+[asyncify] Testbed::TestbedInteractionDialog::~TestbedInteractionDialog\28\29.2 can change the state due to GUI::GuiObject::~GuiObject\28\29
+[asyncify] Common::Array<Common::U32String>::insert_aux\28Common::U32String*\2c\20Common::U32String\20const*\2c\20Common::U32String\20const*\29.1 can change the state due to Common::Array<Common::U32String>::freeStorage\28Common::U32String*\2c\20unsigned\20int\29
+[asyncify] Common::Array<Common::U32String>::~Array\28\29.1 can change the state due to Common::Array<Common::U32String>::freeStorage\28Common::U32String*\2c\20unsigned\20int\29
+[asyncify] Testbed::TestbedOptionsDialog::~TestbedOptionsDialog\28\29.1 can change the state due to operator\20delete\28void*\29
+[asyncify] Common::List<Common::INIFile::Section>::clear\28\29.1 can change the state due to operator\20delete\28void*\29
+[asyncify] Common::List<Common::INIFile::KeyValue>::clear\28\29.1 can change the state due to operator\20delete\28void*\29
+[asyncify] Testbed::TestbedInteractionDialog::~TestbedInteractionDialog\28\29.3 can change the state due to operator\20delete\28void*\29
+[asyncify] Testbed::TestbedListWidget::~TestbedListWidget\28\29.3 can change the state due to operator\20delete\28void*\29
+[asyncify] Testbed::FSTestSuite::~FSTestSuite\28\29.1 can change the state due to operator\20delete\28void*\29
+[asyncify] Testbed::ConfigParams::~ConfigParams\28\29.3 can change the state due to operator\20delete\28void*\29
+[asyncify] Testbed::EventTestSuite::~EventTestSuite\28\29.1 can change the state due to operator\20delete\28void*\29
+[asyncify] Common::List<Graphics::PixelFormat>::clear\28\29.1 can change the state due to operator\20delete\28void*\29
+[asyncify] Testbed::GFXTestSuite::~GFXTestSuite\28\29.1 can change the state due to operator\20delete\28void*\29
+[asyncify] TestbedMetaEngine::~TestbedMetaEngine\28\29.1 can change the state due to operator\20delete\28void*\29
+[asyncify] Testbed::MidiTestSuite::~MidiTestSuite\28\29.1 can change the state due to operator\20delete\28void*\29
+[asyncify] Common::MemoryWriteStreamDynamic::~MemoryWriteStreamDynamic\28\29.5 can change the state due to operator\20delete\28void*\29
+[asyncify] Common::Stream::~Stream\28\29.3 can change the state due to operator\20delete\28void*\29
+[asyncify] Testbed::MiscTestSuite::~MiscTestSuite\28\29.1 can change the state due to operator\20delete\28void*\29
+[asyncify] Testbed::NetworkingTestSuite::~NetworkingTestSuite\28\29.1 can change the state due to operator\20delete\28void*\29
+[asyncify] Testbed::SaveGameTestSuite::~SaveGameTestSuite\28\29.1 can change the state due to operator\20delete\28void*\29
+[asyncify] Testbed::SoundSubsystemDialog::~SoundSubsystemDialog\28\29.1 can change the state due to operator\20delete\28void*\29
+[asyncify] Testbed::SoundSubsystemTestSuite::~SoundSubsystemTestSuite\28\29.1 can change the state due to operator\20delete\28void*\29
+[asyncify] Testbed::TestbedEngine::~TestbedEngine\28\29.1 can change the state due to operator\20delete\28void*\29
+[asyncify] Testbed::TestbedExitDialog::~TestbedExitDialog\28\29.1 can change the state due to operator\20delete\28void*\29
+[asyncify] Testbed::TestbedConfigManager::getNumSuitesEnabled\28\29 can change the state due to Common::Array<Testbed::Testsuite*>::operator\5b\5d\28unsigned\20int\29
+[asyncify] Testbed::TestbedInteractionDialog::handleCommand\28GUI::CommandSender*\2c\20unsigned\20int\2c\20unsigned\20int\29 can change the state due to GUI::Dialog::handleCommand\28GUI::CommandSender*\2c\20unsigned\20int\2c\20unsigned\20int\29
+[asyncify] Testbed::TestbedExitDialog::handleCommand\28GUI::CommandSender*\2c\20unsigned\20int\2c\20unsigned\20int\29 can change the state due to GUI::Dialog::handleCommand\28GUI::CommandSender*\2c\20unsigned\20int\2c\20unsigned\20int\29
+[asyncify] Common::Array<Testbed::Testsuite*>::operator\5b\5d\28unsigned\20int\29.1 can change the state due to __assert_fail
+[asyncify] Common::Array<int>::operator\5b\5d\28unsigned\20int\29\20const.1 can change the state due to __assert_fail
+[asyncify] Common::Array<Common::U32String>::operator\5b\5d\28unsigned\20int\29.1 can change the state due to __assert_fail
+[asyncify] Common::Array<GUI::ButtonWidget*>::back\28\29.1 can change the state due to __assert_fail
+[asyncify] Common::ListInternal::ConstIterator<Common::INIFile::Section>::operator*\28\29\20const.1 can change the state due to __assert_fail
+[asyncify] Common::ListInternal::ConstIterator<Common::INIFile::KeyValue>::operator*\28\29\20const.1 can change the state due to __assert_fail
+[asyncify] Common::Rect::Rect\28short\2c\20short\2c\20short\2c\20short\29.1 can change the state due to __assert_fail
+[asyncify] Common::ListInternal::ConstIterator<Graphics::PixelFormat>::operator*\28\29\20const.1 can change the state due to __assert_fail
+[asyncify] Common::ListInternal::Iterator<Graphics::PixelFormat>::operator*\28\29\20const.1 can change the state due to __assert_fail
+[asyncify] Common::FixedSizeMemoryPool<80ul\2c\2010ul>::FixedSizeMemoryPool\28\29.1 can change the state due to __assert_fail
+[asyncify] Common::MemoryWriteStreamDynamic::seek\28long\20long\2c\20int\29.1 can change the state due to __assert_fail
+[asyncify] Common::Array<Common::String>::operator\5b\5d\28unsigned\20int\29.1 can change the state due to __assert_fail
+[asyncify] Common::Array<GUI::ButtonWidget*>::operator\5b\5d\28unsigned\20int\29.1 can change the state due to __assert_fail
+[asyncify] Common::Array<Testbed::Test*>::operator\5b\5d\28unsigned\20int\29.1 can change the state due to __assert_fail
+[asyncify] GUI::ListWidget::getSelected\28\29\20const.1 can change the state due to Common::Array<int>::operator\5b\5d\28unsigned\20int\29\20const
+[asyncify] Common::Array<GUI::ButtonWidget*>::push_back\28GUI::ButtonWidget*\20const&\29.1 can change the state due to Common::Array<GUI::ButtonWidget*>::insert_aux\28GUI::ButtonWidget**\2c\20GUI::ButtonWidget*\20const*\2c\20GUI::ButtonWidget*\20const*\29
+[asyncify] Common::Singleton<Common::SearchManager>::instance\28\29.1 can change the state due to Common::Singleton<Common::SearchManager>::makeInstance\28\29
+[asyncify] Common::Singleton<Common::ConfigManager>::instance\28\29.1 can change the state due to Common::Singleton<Common::ConfigManager>::makeInstance\28\29
+[asyncify] Common::FSNode::~FSNode\28\29.1 can change the state due to Common::SharedPtr<AbstractFSNode>::~SharedPtr\28\29
+[asyncify] void\20Common::List<Common::INIFile::Section>::insert<Common::ListInternal::ConstIterator<Common::INIFile::Section>>\28Common::ListInternal::Iterator<Common::INIFile::Section>\2c\20Common::ListInternal::ConstIterator<Common::INIFile::Section>\2c\20Common::ListInternal::ConstIterator<Common::INIFile::Section>\29.1 can change the state due to Common::ListInternal::ConstIterator<Common::INIFile::Section>::operator*\28\29\20const
+[asyncify] Common::INIFile::Section::Section\28Common::INIFile::Section\20const&\29.1 can change the state due to Common::List<Common::INIFile::KeyValue>::List\28Common::List<Common::INIFile::KeyValue>\20const&\29
+[asyncify] void\20Common::List<Common::INIFile::KeyValue>::insert<Common::ListInternal::ConstIterator<Common::INIFile::KeyValue>>\28Common::ListInternal::Iterator<Common::INIFile::KeyValue>\2c\20Common::ListInternal::ConstIterator<Common::INIFile::KeyValue>\2c\20Common::ListInternal::ConstIterator<Common::INIFile::KeyValue>\29.1 can change the state due to Common::ListInternal::ConstIterator<Common::INIFile::KeyValue>::operator*\28\29\20const
+[asyncify] Common::INIFile::KeyValue::KeyValue\28Common::INIFile::KeyValue\20const&\29.1 can change the state due to Common::BaseString<char>::BaseString\28Common::BaseString<char>\20const&\29
+[asyncify] Testbed::TestbedConfigManager::TestbedConfigManager\28Common::Array<Testbed::Testsuite*>&\2c\20Common::String\29.1 can change the state due to Common::BaseString<char>::BaseString\28Common::BaseString<char>\20const&\29
+[asyncify] Testbed::Test::Test\28Common::String\2c\20Testbed::TestExitStatus\20\28*\29\28\29\2c\20bool\29.1 can change the state due to Common::BaseString<char>::BaseString\28Common::BaseString<char>\20const&\29
+[asyncify] Testbed::FSTestSuite::enable\28bool\29 can change the state due to Common::Singleton<Testbed::ConfigParams>::instance\28\29
+[asyncify] Common::Singleton<Testbed::ConfigParams>::instance\28\29.1 can change the state due to Common::Singleton<Testbed::ConfigParams>::makeInstance\28\29
+[asyncify] non-virtual\20thunk\20to\20Testbed::TestbedListWidget::~TestbedListWidget\28\29.2 can change the state due to Testbed::TestbedListWidget::~TestbedListWidget\28\29
+[asyncify] non-virtual\20thunk\20to\20Testbed::TestbedListWidget::~TestbedListWidget\28\29.3 can change the state due to Testbed::TestbedListWidget::~TestbedListWidget\28\29.1
+[asyncify] Common::Array<GUI::ListWidget::ListData>::~Array\28\29.1 can change the state due to Common::Array<GUI::ListWidget::ListData>::freeStorage\28GUI::ListWidget::ListData*\2c\20unsigned\20int\29
+[asyncify] Common::SharedPtr<AbstractFSNode>::~SharedPtr\28\29.1 can change the state due to Common::BasePtrTrackerInternal::decStrong\28\29
+[asyncify] Common::List<Common::INIFile::Section>::List\28Common::List<Common::INIFile::Section>\20const&\29.1 can change the state due to void\20Common::List<Common::INIFile::Section>::insert<Common::ListInternal::ConstIterator<Common::INIFile::Section>>\28Common::ListInternal::Iterator<Common::INIFile::Section>\2c\20Common::ListInternal::ConstIterator<Common::INIFile::Section>\2c\20Common::ListInternal::ConstIterator<Common::INIFile::Section>\29
+[asyncify] Common::List<Common::INIFile::KeyValue>::List\28Common::List<Common::INIFile::KeyValue>\20const&\29.1 can change the state due to void\20Common::List<Common::INIFile::KeyValue>::insert<Common::ListInternal::ConstIterator<Common::INIFile::KeyValue>>\28Common::ListInternal::Iterator<Common::INIFile::KeyValue>\2c\20Common::ListInternal::ConstIterator<Common::INIFile::KeyValue>\2c\20Common::ListInternal::ConstIterator<Common::INIFile::KeyValue>\29
+[asyncify] Common::Array<Testbed::Testsuite*>::allocCapacity\28unsigned\20int\29.1 can change the state due to malloc
+[asyncify] Common::Array<Common::U32String>::allocCapacity\28unsigned\20int\29.1 can change the state due to malloc
+[asyncify] Common::Array<GUI::ButtonWidget*>::allocCapacity\28unsigned\20int\29.1 can change the state due to malloc
+[asyncify] Common::Array<Testbed::Test*>::allocCapacity\28unsigned\20int\29.1 can change the state due to malloc
+[asyncify] Common::U32String*\20Common::copy_backward<Common::U32String*\2c\20Common::U32String*>\28Common::U32String*\2c\20Common::U32String*\2c\20Common::U32String*\29.1 can change the state due to Common::U32String::operator=\28Common::U32String\20const&\29
+[asyncify] Common::U32String*\20Common::copy<Common::U32String\20const*\2c\20Common::U32String*>\28Common::U32String\20const*\2c\20Common::U32String\20const*\2c\20Common::U32String*\29.1 can change the state due to Common::U32String::operator=\28Common::U32String\20const&\29
+[asyncify] Testbed::ConfigParams::ConfigParams\28\29 can change the state due to Common::String::operator=\28char\20const*\29
+[asyncify] TestbedMetaEngine::getAchievementsInfo\28Common::String\20const&\29\20const.1 can change the state due to Common::String::operator=\28char\20const*\29
+[asyncify] Common::Singleton<Graphics::FontManager>::instance\28\29.1 can change the state due to Common::Singleton<Graphics::FontManager>::makeInstance\28\29
+[asyncify] Testbed::GFXtests::initMousePalette\28\29 can change the state due to Common::Singleton<Graphics::CursorManager>::instance\28\29
+[asyncify] Testbed::GFXtests::initMouseCursor\28\29 can change the state due to Common::Singleton<Graphics::CursorManager>::instance\28\29
+[asyncify] Common::Singleton<Graphics::CursorManager>::instance\28\29.1 can change the state due to Common::Singleton<Graphics::CursorManager>::makeInstance\28\29
+[asyncify] Common::Rect::contains\28Common::Point\20const&\29\20const.1 can change the state due to Common::Rect::contains\28short\2c\20short\29\20const
+[asyncify] Common::HashMap<Common::String\2c\20FileProperties\2c\20Common::IgnoreCase_Hash\2c\20Common::IgnoreCase_EqualTo>::HashMap\28\29.1 can change the state due to memset
+[asyncify] Testbed::MiscTests::getHumanReadableFormat\28TimeDate\20const&\29 can change the state due to Common::String::format\28char\20const*\2c\20...\29
+[asyncify] Engine::getSaveStateName\28int\29\20const.1 can change the state due to Common::String::format\28char\20const*\2c\20...\29
+[asyncify] void\20Common::sort<Common::ListInternal::Iterator<Graphics::PixelFormat>\2c\20Testbed::PixelFormatComparator>\28Common::ListInternal::Iterator<Graphics::PixelFormat>\2c\20Common::ListInternal::Iterator<Graphics::PixelFormat>\2c\20Testbed::PixelFormatComparator\29.1 can change the state due to void\20Common::sort<Common::ListInternal::Iterator<Graphics::PixelFormat>\2c\20Testbed::PixelFormatComparator>\28Common::ListInternal::Iterator<Graphics::PixelFormat>\2c\20Common::ListInternal::Iterator<Graphics::PixelFormat>\2c\20Testbed::PixelFormatComparator\29
+[asyncify] Common::List<Graphics::PixelFormat>::push_back\28Graphics::PixelFormat\20const&\29.1 can change the state due to Common::List<Graphics::PixelFormat>::insert\28Common::ListInternal::NodeBase*\2c\20Graphics::PixelFormat\20const&\29
+[asyncify] Common::ListInternal::Iterator<Graphics::PixelFormat>\20Common::sortChoosePivot<Common::ListInternal::Iterator<Graphics::PixelFormat>>\28Common::ListInternal::Iterator<Graphics::PixelFormat>\2c\20Common::ListInternal::Iterator<Graphics::PixelFormat>\29.1 can change the state due to unsigned\20int\20Common::distance<Common::ListInternal::Iterator<Graphics::PixelFormat>>\28Common::ListInternal::Iterator<Graphics::PixelFormat>\2c\20Common::ListInternal::Iterator<Graphics::PixelFormat>\29
+[asyncify] Common::ListInternal::Iterator<Graphics::PixelFormat>\20Common::sortPartition<Common::ListInternal::Iterator<Graphics::PixelFormat>\2c\20Testbed::PixelFormatComparator>\28Common::ListInternal::Iterator<Graphics::PixelFormat>\2c\20Common::ListInternal::Iterator<Graphics::PixelFormat>\2c\20Common::ListInternal::Iterator<Graphics::PixelFormat>\2c\20Testbed::PixelFormatComparator&\29.1 can change the state due to Common::ListInternal::Iterator<Graphics::PixelFormat>::operator*\28\29\20const
+[asyncify] AdvancedMetaEngine::fallbackDetectExtern\28unsigned\20int\2c\20Common::HashMap<Common::String\2c\20Common::FSNode\2c\20Common::IgnoreCase_Hash\2c\20Common::IgnoreCase_EqualTo>\20const&\2c\20Common::FSList\20const&\2c\20ADDetectedGameExtraInfo**\29\20const.1 can change the state due to ADDetectedGame::ADDetectedGame\28\29
+[asyncify] ADDetectedGame::ADDetectedGame\28\29.1 can change the state due to Common::HashMap<Common::String\2c\20FileProperties\2c\20Common::IgnoreCase_Hash\2c\20Common::IgnoreCase_EqualTo>::HashMap\28\29
+[asyncify] Common::MemoryWriteStreamDynamic::MemoryWriteStreamDynamic\28DisposeAfterUse::Flag\29.1 can change the state due to Common::SeekableWriteStream::SeekableWriteStream\28\29
+[asyncify] MidiParser::timerCallback\28void*\29.1 can change the state due to MidiParser::onTimer\28\29
+[asyncify] Common::MemoryWriteStreamDynamic::~MemoryWriteStreamDynamic\28\29.3 can change the state due to Common::MemoryWriteStreamDynamic::~MemoryWriteStreamDynamic\28\29.1
+[asyncify] Common::MemoryWriteStreamDynamic::write\28void\20const*\2c\20unsigned\20int\29.1 can change the state due to Common::MemoryWriteStreamDynamic::roundUpCapacity\28unsigned\20long\29
+[asyncify] Common::Array<Common::String>::~Array\28\29.1 can change the state due to Common::Array<Common::String>::freeStorage\28Common::String*\2c\20unsigned\20int\29
+[asyncify] Testbed::TestbedExitDialog::TestbedExitDialog\28Common::Array<Testbed::Testsuite*>&\29.1 can change the state due to Testbed::TestbedInteractionDialog::TestbedInteractionDialog\28unsigned\20int\2c\20unsigned\20int\2c\20unsigned\20int\2c\20unsigned\20int\29
+[asyncify] Testbed::TestbedInteractionDialog::TestbedInteractionDialog\28unsigned\20int\2c\20unsigned\20int\2c\20unsigned\20int\2c\20unsigned\20int\29.1 can change the state due to GUI::Dialog::Dialog\28int\2c\20int\2c\20int\2c\20int\29
+[asyncify] Common::Singleton<Common::DebugManager>::instance\28\29.1 can change the state due to Common::Singleton<Common::DebugManager>::makeInstance\28\29
+[asyncify] Common::Singleton<Common::AchievementsManager>::instance\28\29.1 can change the state due to Common::Singleton<Common::AchievementsManager>::makeInstance\28\29
+[asyncify] Common::Array<Testbed::Test*>::push_back\28Testbed::Test*\20const&\29.1 can change the state due to Common::Array<Testbed::Test*>::insert_aux\28Testbed::Test**\2c\20Testbed::Test*\20const*\2c\20Testbed::Test*\20const*\29
+[asyncify] Testbed::Testsuite::enableTest\28Common::String\20const&\2c\20bool\29 can change the state due to Common::Array<Testbed::Test*>::operator\5b\5d\28unsigned\20int\29
+[asyncify] Testbed::GFXtests::computeSize\28Common::Rect\20const&\2c\20int\2c\20int\29 can change the state due to __handle_stack_overflow
+[asyncify] legalstub$Common::MemoryWriteStreamDynamic::size\28\29\20const.1 can change the state due to setTempRet0
+[asyncify] legalstub$Common::MemoryWriteStreamDynamic::pos\28\29\20const.1 can change the state due to setTempRet0
+[asyncify] Testbed::Testsuite::Testsuite\28\29 can change the state due to Testbed::GFXTestSuite::setCustomColor\28unsigned\20int\2c\20unsigned\20int\2c\20unsigned\20int\29
+[asyncify] Testbed::SaveGametests::testSaveLoadState\28\29 can change the state due to Testbed::SaveGametests::writeDataToFile\28char\20const*\2c\20char\20const*\29
+[asyncify] legalstub$Common::MemoryWriteStreamDynamic::seek\28long\20long\2c\20int\29.1 can change the state due to Common::MemoryWriteStreamDynamic::seek\28long\20long\2c\20int\29.1

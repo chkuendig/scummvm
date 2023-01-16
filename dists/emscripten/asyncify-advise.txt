@@ -888,6 +888,7 @@
 [asyncify] virtual\20thunk\20to\20ModularGraphicsBackend::getHiDPIScreenFactor\28\29\20const can change the state due to initial scan
 [asyncify] ModularGraphicsBackend::updateScreen\28\29 can change the state due to initial scan
 [asyncify] ModularGraphicsBackend::showMouse\28bool\29 can change the state due to initial scan
+[asyncify] virtual\20thunk\20to\20ModularGraphicsBackend::updateScreen\28\29 can change the state due to initial scan
 [asyncify] virtual\20thunk\20to\20ModularGraphicsBackend::showMouse\28bool\29 can change the state due to initial scan
 [asyncify] ModularGraphicsBackend::warpMouse\28int\2c\20int\29 can change the state due to initial scan
 [asyncify] virtual\20thunk\20to\20ModularGraphicsBackend::lockMouse\28bool\29 can change the state due to initial scan

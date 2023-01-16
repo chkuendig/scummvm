@@ -2954,20 +2954,13 @@ EOF
 		append_var DEFINES "-DEMSCRIPTEN"
 		add_line_to_config_mk 'EMSCRIPTEN = 1'
 
+		_optimization_level=-Oz
+		append_var LDFLAGS "-Oz"
 		if test "$_debug_build" = yes; then
-			_optimization_level=-O0
-			append_var LDFLAGS "-O0 -g3 -s ASSERTIONS=2"
-		else
-			_optimization_level=-O1
-			append_var LDFLAGS "-O1"
+			append_var LDFLAGS "-g2 -s ASSERTIONS=2"
+
 		fi
 
-		# Enable serial debugging output only when --enable-debug is passed
-		if test "$_release_build" = yes; then
-			_optimization_level=-Oz
-			append_var LDFLAGS "-Oz"
-		fi
-	
 		if test "$_verbose_build" = yes; then
 			append_var LDFLAGS "-s ASYNCIFY_ADVISE=1"
 		fi
@@ -2976,7 +2969,7 @@ EOF
 		if test "$_freetype2" != no; then
 			append_var LDFLAGS "-s USE_FREETYPE=1 -s SUPPORT_LONGJMP=1" # freetype requires setjmp
 			# neither pkg-config nor freetype-config work, so we setup freetype manually
-			_freetypepath="$EMSCRIPTEN/cache/sysroot/include/freetype2/"
+			_freetypepath="$EMSDK/upstream/emscripten/cache/sysroot/include/freetype2/"
 			FREETYPE2_CFLAGS="-I$_freetypepath" # there were link errors / missing symbols without this
 			_freetype_found="true"
 		else
@@ -4365,11 +4358,11 @@ PLUGIN_LDFLAGS		+= -Wl,-T$(srcdir)/backends/plugins/ds/plugin.ld -mthumb -mthumb
 		append_var DEFINES "-DUNCACHED_PLUGINS"
 		append_var CXXFLAGS "-fPIC"
 		append_var LIBS ""
-		asyncify_imports=$(cat ./dists/emscripten/asyncify-imports.txt)
-		#asyncify_imports="'[*]'"
-		# response file is not supported, (ASYNCIFY_IMPORTS is treated as an array in emcc.py)
-		#asyncify_imports="@./dists/emscripten/asyncify-imports.txt"
-
+		asyncify_imports="[*]"
+		asyncify_imports_path="./dists/emscripten/asyncify-imports.txt"
+		if test -f "$asyncify_imports_path" ; then
+			asyncify_imports=$(cat $asyncify_imports_path)
+		fi
 _mak_plugins='
 PLUGIN_EXTRA_DEPS =
 PLUGIN_LDFLAGS  += $(LDFLAGS) -s SIDE_MODULE=1 -s ASYNCIFY_IMPORTS="'$asyncify_imports'" -s EXPORT_ALL=1

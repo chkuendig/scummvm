@@ -74,7 +74,7 @@ with open('./dists/emscripten/asyncify-advise.json', 'w') as f:
 main_module_exports = open("./dists/emscripten/main-module-exports.txt")
 testbed_imports = open("./dists/emscripten/testbed-imports.txt")
 
-lines = testbed_imports.readlines()
+lines = main_module_exports.readlines()
 callees = {}
 all_callers = []
 i =0
@@ -82,11 +82,11 @@ symbols = {}
 def add_symbol(mangled):
     demangled = demangle(mangled.removeprefix("env.").removeprefix("GOT.func."))
     if(demangled in symbols):
-        symbols[demangled].append(mangled)
+        symbols[demangled].append("env."+mangled)
         # deduplicate
         symbols[demangled] = list(dict.fromkeys(symbols[demangled]))
     else:
-        symbols[demangled] = [mangled]
+        symbols[demangled] = ["env."+mangled]
     #print(demangled + " " + str(symbols[demangled]))
 
 for line in lines:
@@ -104,7 +104,6 @@ for line in lines:
                 #add_symbol(group)
                 pass
     '''
-    '''
     # Regex for Exports
     result = re.search(r"^ - (?:\w+)\[\d+\](?: \<(?:[\$\w]+)\>)? -\> \"([\$\w]+)\"$", line)
     if(result):
@@ -112,11 +111,11 @@ for line in lines:
             if (group and len(group)> 0):
                 add_symbol(group)
         
-        elif line.strip() != "":                    
-            print("Ignoring Line: "+line.strip())
-    '''
-    #Regex for Imports 
+    elif line.strip() != "":                    
+        print("Ignoring Line: "+line.strip())
 
+    #Regex for Imports 
+    '''
     result = re.search(r"^ - (?:\w+)\[\d+\] (?:i32 mutable=[0-1])?(?:sig=\d+)?(?: \<(\S+)\>)? \<- (\S+)$", line)
     if(result):
         for group in result.groups():
@@ -125,21 +124,21 @@ for line in lines:
             
     elif line.strip() != "":                    
         print("Ignoring Line: "+line.strip())
+    '''
+
 
 asyncify_imports= []
-ignored_objects = ['(anonymous namespace)::addStringToConf(Common::String const&, Common::String const&, Common::String const&)']
 #print(instrumented_functions)
 print(symbols)
 for obj in instrumented_functions:
     if( obj in symbols):
        # print("found: "+obj)
-        asyncify_imports.extend(symbols[obj])
+       if "TinyGL" not in obj and not obj.startswith("std::") and not obj.startswith("SDL_"): ## we strip some we know won't be part of the imports (as the argument list will get too long otherwise)
+            asyncify_imports.extend(symbols[obj])
     else:
        
-        if obj not in ignored_objects and not obj.startswith("(anonymous namespace)"):
-            #print("Couldn't mangle "+obj)
-            #sys.exit()
-            pass;
+        #sys.exit()
+        pass;
 
 #print(asyncify_imports)
 # TODO: To make this work also with debug builds which don't mangle, we shoudl also add the cleartext names here (maybe they need to be escaped? have to check with binaryen and test)

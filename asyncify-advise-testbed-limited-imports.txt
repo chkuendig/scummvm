@@ -1,0 +1,184 @@
+[asyncify] Testbed::TestbedOptionsDialog::TestbedOptionsDialog\28Common::Array<Testbed::Testsuite*>&\2c\20Testbed::TestbedConfigManager*\29 can change the state due to initial scan
+[asyncify] Testbed::TestbedOptionsDialog::handleCommand\28GUI::CommandSender*\2c\20unsigned\20int\2c\20unsigned\20int\29 can change the state due to initial scan
+[asyncify] Testbed::TestbedConfigManager::writeTestbedConfigToStream\28Common::WriteStream*\29 can change the state due to initial scan
+[asyncify] Testbed::TestbedInteractionDialog::addText\28unsigned\20int\2c\20unsigned\20int\2c\20Common::String\2c\20Graphics::TextAlign\2c\20unsigned\20int\2c\20unsigned\20int\29 can change the state due to initial scan
+[asyncify] Testbed::TestbedListWidget::markAsDeselected\28int\29.1 can change the state due to initial scan
+[asyncify] Testbed::TestbedInteractionDialog::addList\28unsigned\20int\2c\20unsigned\20int\2c\20unsigned\20int\2c\20unsigned\20int\2c\20Common::Array<Common::U32String>\20const&\2c\20unsigned\20int\29[asyncify]  can change the state due to initial scan
+Testbed::TestbedConfigManager::getTestsuiteByName\28Common::String\20const&\29 can change the state due to initial scan
+[asyncify] Testbed::TestbedInteractionDialog::addButton\28unsigned\20int\2c\20unsigned\20int\2c\20Common::String\2c\20unsigned\20int\2c\20unsigned\20int\2c\20unsigned\20int\29[asyncify] [asyncify] GUI::GuiObject::getChildX\28\29\20const.1 can change the state due to initial scan
+[asyncify] [asyncify] GUI::Dialog::receivedFocus\28int\2c\20int\29.1 can change the state due to initial scan
+[asyncify] GUI::Widget::getAbsX\28\29\20const.1 can change the state due to initial scan
+[asyncify] GUI::Widget::getAbsY\28\29\20const.1 can change the state due to initial scan
+Testbed::TestbedListWidget::markAsSelected\28int\29.1 can change the state due to initial scan
+[asyncify] [asyncify] GUI::GuiObject::getChildY\28\29\20const.1 can change the state due to initial scan
+GUI::CommandSender::sendCommand\28unsigned\20int\2c\20unsigned\20int\29.1 can change the state due to initial scan
+[asyncify] Testbed::TestbedConfigManager::getConfigReadStream\28\29\20const can change the state due to initial scan
+Testbed::TestbedInteractionDialog::addButtonXY\28unsigned\20int\2c\20unsigned\20int\2c\20unsigned\20int\2c\20unsigned\20int\2c\20Common::String\2c\20unsigned\20int\29 can change the state due to initial scan
+[asyncify] GUI::Widget::releaseFocus\28\29.1 can change the state due to initial scan
+ can change the state due to initial scan
+[asyncify] Testbed::ConfigParams::deleteWriteStream\28\29 can change the state due to initial scan
+[asyncify] Common::BasePtrTrackerInternal::decWeak\28\29.1 can change the state due to initial scan
+[asyncify] Testbed::EventTests::drawFinishZone\28\29 can change the state due to initial scan
+[asyncify] Testbed::EventTests::mouseEvents\28\29 can change the state due to initial scan
+[asyncify] Testbed::TestbedConfigManager::parseConfigFile\28\29 can change the state due to initial scan
+[asyncify] [asyncify] [asyncify] Testbed::GFXtests::pixelFormatsSupported\28\29 can change the state due to initial scan
+Common::BasePtrTrackerInternal::decStrong\28\29.1 can change the state due to initial scan
+[asyncify] [asyncify] Testbed::EventTests::keystrokeToChar\28\29 can change the state due to initial scan
+[asyncify] Testbed::GFXtests::copyRectToScreen\28\29 can change the state due to initial scan
+[asyncify] [asyncify] Testbed::GFXtests::aspectRatio\28\29 can change the state due to initial scan
+Testbed::FStests::testReadFile\28\29 can change the state due to initial scan
+Testbed::FStests::readDataFromFile\28Common::FSDirectory*\2c\20char\20const*\29 can change the state due to initial scan
+[asyncify] Testbed::GFXtests::iconifyWindow\28\29 can change the state due to initial scan
+[asyncify] Testbed::GFXtests::shakingEffect\28\29 can change the state due to initial scan
+[asyncify] Testbed::GFXtests::overlayGraphics\28\29 can change the state due to initial scan
+[asyncify] [asyncify] Testbed::GFXtests::cursorTrails\28\29 can change the state due to initial scan
+Testbed::GFXtests::filteringMode\28\29 can change the state due to initial scan
+[asyncify] Testbed::GFXtests::pixelFormats\28Common::List<Graphics::PixelFormat>&\29 can change the state due to initial scan
+[asyncify] Testbed::EventTests::showMainMenu\28\29[asyncify]  can change the state due to initial scan
+[asyncify] Testbed::GFXtests::drawEllipse\28int\2c\20int\2c\20int\2c\20int\29 can change the state due to initial scan
+[asyncify] Testbed::FStests::testWriteFile\28\29 can change the state due to initial scan
+[asyncify] Testbed::Testsuite::clearEntireScreen\28\29.1 can change the state due to initial scan
+[asyncify] Testbed::GFXTestSuite::setCustomColor\28unsigned\20int\2c\20unsigned\20int\2c\20unsigned\20int\29 can change the state due to initial scan
+Testbed::GFXtests::fullScreenMode\28\29Testbed::GFXtests::scaledCursors\28\29[asyncify] Testbed::GFXtests::paletteRotation\28\29 can change the state due to initial scan
+ can change the state due to initial scan
+[asyncify] Testbed::GFXtests::mouseMovements\28\29 can change the state due to initial scan
+[asyncify] Testbed::GFXtests::setupMouseLoop\28bool\2c\20char\20const*\2c\20int\29 can change the state due to initial scan
+ can change the state due to initial scan
+[asyncify] [asyncify] Graphics::ManagedSurface::frameRect\28Common::Rect\20const&\2c\20unsigned\20int\29.1Testbed::GFXTestSuite::prepare\28\29[asyncify]  can change the state due to initial scan
+ can change the state due to initial scan
+Graphics::ManagedSurface::drawLine\28int\2c\20int\2c\20int\2c\20int\2c\20unsigned\20int\29.1 can change the state due to initial scan
+[asyncify] Testbed::GFXtests::drawCursor\28bool\2c\20int\29 can change the state due to initial scan
+[asyncify] [asyncify] Common::ReadStream::readByte\28\29.1 can change the state due to initial scan
+Testbed::GFXtests::focusRectangle\28\29[asyncify] Testbed::GFXtests::showPixelFormat\28Graphics::PixelFormat\20const&\2c\20unsigned\20int\29[asyncify] Graphics::ManagedSurface::hLine\28int\2c\20int\2c\20int\2c\20unsigned\20int\29.1 can change the state due to initial scan
+[asyncify] [asyncify] Testbed::MidiTests::playMidiMusic\28\29 can change the state due to initial scan
+ can change the state due to initial scan
+[asyncify] [asyncify] Testbed::MidiTestSuite::MidiTestSuite\28\29 can change the state due to initial scan
+Testbed::MidiTests::waitForMusicToPlay\28MidiParser*\29[asyncify] Common::WriteStream::finalize\28\29.1 can change the state due to initial scan
+ can change the state due to initial scan
+[asyncify] MetaEngine::getMaximumSaveSlot\28\29\20const.1 can change the state due to initial scan
+[asyncify] Testbed::MiscTests::criticalSection\28void*\29 can change the state due to initial scan
+[asyncify] Testbed::MiscTests::testDateTime\28\29 can change the state due to initial scan
+[asyncify] Testbed::MiscTests::testTimers\28\29 can change the state due to initial scan
+[asyncify] [asyncify] Testbed::Networkingtests::testConnectionLimit\28\29 can change the state due to initial scan
+[asyncify] Testbed::SaveGametests::writeDataToFile\28char\20const*\2c\20char\20const*\29 can change the state due to initial scan
+[asyncify] Testbed::MiscTests::testMutexes\28\29 can change the state due to initial scan
+[asyncify] [asyncify] Testbed::SaveGametests::testRenamingSavefile\28\29 can change the state due to initial scan
+Testbed::SaveGametests::testRemovingSavefile\28\29 can change the state due to initial scan
+[asyncify] Testbed::SaveGametests::readAndVerifyData\28char\20const*\2c\20char\20const*\29 can change the state due to initial scan
+[asyncify] Testbed::SaveGametests::testErrorMessages\28\29 can change the state due to initial scan
+[asyncify] Testbed::SoundSubsystemDialog::SoundSubsystemDialog\28\29 can change the state due to initial scan
+[asyncify] Testbed::SoundSubsystemDialog::handleCommand\28GUI::CommandSender*\2c\20unsigned\20int\2c\20unsigned\20int\29 can change the state due to initial scan
+[asyncify] Testbed::MiscTests::testOpenUrl\28\29Testbed::MidiTests::loadMusicInMemory\28Common::WriteStream*\29 can change the state due to initial scan
+ can change the state due to initial scan
+Testbed::Testsuite::getDisplayRegionCoordinates\28\29.1 can change the state due to initial scan
+[asyncify] Testbed::SoundSubsystem::sampleRates\28\29 can change the state due to initial scan
+[asyncify] Testbed::SoundSubsystemTestSuite::SoundSubsystemTestSuite\28\29 can change the state due to initial scan
+[asyncify] Testbed::SoundSubsystem::playBeeps\28\29 can change the state due to initial scan
+ can change the state due to initial scan
+[asyncify] [asyncify] Testbed::SaveGametests::testListingSavefile\28\29[asyncify] Testbed::TestbedExitDialog::init\28\29 can change the state due to initial scan
+ can change the state due to initial scan
+Testbed::TestbedEngine::run\28\29 can change the state due to initial scan
+[asyncify] Testbed::TestbedEngine::~TestbedEngine\28\29 can change the state due to initial scan
+[asyncify] [asyncify] Testbed::TestbedEngine::invokeTestsuites\28Testbed::TestbedConfigManager&\29Testbed::TestbedEngine::checkForAllAchievements\28\29 can change the state due to initial scan
+[asyncify] [asyncify] [asyncify] Testbed::Testsuite::logPrintf\28char\20const*\2c\20...\29 can change the state due to initial scan
+Testbed::Testsuite::logDetailedPrintf\28char\20const*\2c\20...\29 can change the state due to initial scan
+Testbed::SoundSubsystem::modPlayback\28\29 can change the state due to initial scan
+ can change the state due to initial scan
+[asyncify] Engine::canSaveAutosaveCurrently\28\29.1 can change the state due to initial scan
+[asyncify] Testbed::Testsuite::clearScreen\28\29 can change the state due to initial scan
+[asyncify] [asyncify] Testbed::Testsuite::writeOnScreen\28Common::String\20const&\2c\20Common::Point\20const&\2c\20bool\29[asyncify] Testbed::Testsuite::parseEvents\28\29 can change the state due to initial scan
+ can change the state due to initial scan
+[asyncify] Testbed::Testsuite::getLineSeparation\28\29.1 can change the state due to initial scan
+[asyncify] [asyncify] Testbed::Testsuite::clearScreen\28bool\29 can change the state due to initial scan
+Testbed::Testsuite::genReport\28\29\20const can change the state due to initial scan
+[asyncify] Testbed::TestbedEngine::videoTest\28\29 can change the state due to initial scan
+[asyncify] Testbed::Testsuite::execute\28\29 can change the state due to initial scan
+[asyncify] Testbed::SoundSubsystem::audiocdOutput\28\29 can change the state due to initial scan
+[asyncify] Testbed::Testsuite::clearScreen\28Common::Rect\20const&\29 can change the state due to initial scan
+Testbed::Testsuite::updateStats\28char\20const*\2c\20char\20const*\2c\20unsigned\20int\2c\20unsigned\20int\2c\20Common::Point\29 can change the state due to initial scan
+[asyncify] Testbed::TestbedConfigManager::getConfigWriteStream\28\29\20const can change the state due to Common::BaseString<char>::BaseString\28char\20const*\29
+[asyncify] Testbed::TestbedConfigManager::initDefaultConfiguration\28\29 can change the state due to Common::BaseString<char>::BaseString\28char\20const*\29
+[asyncify] Testbed::TestbedConfigManager::selectTestsuites\28\29 can change the state due to Common::BaseString<char>::BaseString\28char\20const*\29
+[asyncify] Testbed::ConfigParams::initLogging\28char\20const*\2c\20char\20const*\2c\20bool\29 can change the state due to Common::BaseString<char>::BaseString\28char\20const*\29
+[asyncify] Testbed::ConfigParams::initLogging\28bool\29 can change the state due to Common::BaseString<char>::BaseString\28char\20const*\29
+[asyncify] Testbed::EventTests::kbdEvents\28\29 can change the state due to Common::BaseString<char>::BaseString\28char\20const*\29
+[asyncify] Testbed::EventTestSuite::EventTestSuite\28\29 can change the state due to Common::BaseString<char>::BaseString\28char\20const*\29
+[asyncify] Testbed::FStests::testCreateDir\28\29 can change the state due to Common::BaseString<char>::BaseString\28char\20const*\29
+[asyncify] Testbed::FSTestSuite::FSTestSuite\28\29 can change the state due to Common::BaseString<char>::BaseString\28char\20const*\29
+[asyncify] Testbed::GFXTestSuite::GFXTestSuite\28\29 can change the state due to Common::BaseString<char>::BaseString\28char\20const*\29
+[asyncify] Testbed::GFXtests::pixelFormatsRequired\28\29 can change the state due to Common::BaseString<char>::BaseString\28char\20const*\29
+[asyncify] Testbed::GFXtests::palettizedCursors\28\29 can change the state due to Common::BaseString<char>::BaseString\28char\20const*\29
+[asyncify] Testbed::SaveGameTestSuite::SaveGameTestSuite\28\29 can change the state due to Common::BaseString<char>::BaseString\28char\20const*\29
+[asyncify] Testbed::MiscTestSuite::MiscTestSuite\28\29 can change the state due to Common::BaseString<char>::BaseString\28char\20const*\29
+[asyncify] Testbed::NetworkingTestSuite::NetworkingTestSuite\28\29 can change the state due to Common::BaseString<char>::BaseString\28char\20const*\29
+[asyncify] Testbed::SoundSubsystem::mixSounds\28\29 can change the state due to Common::BaseString<char>::BaseString\28char\20const*\29
+[asyncify] Testbed::TestbedEngine::TestbedEngine\28OSystem*\29 can change the state due to Common::BaseString<char>::BaseString\28char\20const*\29
+[asyncify] Testbed::Testsuite::handleInteractiveInput\28Common::String\20const&\2c\20char\20const*\2c\20char\20const*\2c\20Testbed::OptionSelected\29 can change the state due to Common::BaseString<char>::BaseString\28char\20const*\29
+[asyncify] Testbed::Testsuite::displayMessage\28Common::String\20const&\2c\20char\20const*\29 can change the state due to Common::BaseString<char>::BaseString\28char\20const*\29
+[asyncify] GUI::ListWidget::~ListWidget\28\29.1 can change the state due to Common::BaseString<char>::~BaseString\28\29
+[asyncify] Common::INIFile::Section::~Section\28\29.1 can change the state due to Common::BaseString<char>::~BaseString\28\29
+[asyncify] Common::INIFile::KeyValue::~KeyValue\28\29.1 can change the state due to Common::BaseString<char>::~BaseString\28\29
+[asyncify] Testbed::ConfigParams::~ConfigParams\28\29.2 can change the state due to Common::BaseString<char>::~BaseString\28\29
+[asyncify] Testbed::PixelFormatComparator::operator\28\29\28Graphics::PixelFormat\20const&\2c\20Graphics::PixelFormat\20const&\29.1 can change the state due to Common::BaseString<char>::~BaseString\28\29
+[asyncify] Common::Array<Common::String>::freeStorage\28Common::String*\2c\20unsigned\20int\29.1 can change the state due to Common::BaseString<char>::~BaseString\28\29
+[asyncify] Common::SearchSet::addSubDirectoryMatching\28Common::FSNode\20const&\2c\20Common::String\20const&\2c\20int\2c\20int\2c\20bool\29.1 can change the state due to Common::BaseString<char>::~BaseString\28\29
+[asyncify] Testbed::TestbedConfigManager::~TestbedConfigManager\28\29.1 can change the state due to Common::BaseString<char>::~BaseString\28\29
+[asyncify] Common::INIFile::~INIFile\28\29.1 can change the state due to Common::BaseString<char>::~BaseString\28\29
+[asyncify] Testbed::Testsuite::~Testsuite\28\29 can change the state due to Common::BaseString<char>::~BaseString\28\29
+[asyncify] Testbed::Testsuite::addTest\28Common::String\20const&\2c\20Testbed::TestExitStatus\20\28*\29\28\29\2c\20bool\29 can change the state due to Common::BaseString<char>::~BaseString\28\29
+[asyncify] Common::Singleton<Common::SearchManager>::makeInstance\28\29.1 can change the state due to operator\20new\28unsigned\20long\29
+[asyncify] Common::Singleton<Common::ConfigManager>::makeInstance\28\29.1 can change the state due to operator\20new\28unsigned\20long\29
+[asyncify] Common::Singleton<Testbed::ConfigParams>::makeInstance\28\29.1 can change the state due to operator\20new\28unsigned\20long\29
+[asyncify] Common::List<Common::INIFile::Section>::insert\28Common::ListInternal::NodeBase*\2c\20Common::INIFile::Section\20const&\29.1 can change the state due to operator\20new\28unsigned\20long\29
+[asyncify] Common::List<Common::INIFile::KeyValue>::insert\28Common::ListInternal::NodeBase*\2c\20Common::INIFile::KeyValue\20const&\29.1 can change the state due to operator\20new\28unsigned\20long\29
+[asyncify] Common::Singleton<Graphics::FontManager>::makeInstance\28\29.1 can change the state due to operator\20new\28unsigned\20long\29
+[asyncify] Common::Singleton<Graphics::CursorManager>::makeInstance\28\29.1 can change the state due to operator\20new\28unsigned\20long\29
+[asyncify] Common::List<Graphics::PixelFormat>::insert\28Common::ListInternal::NodeBase*\2c\20Graphics::PixelFormat\20const&\29.1 can change the state due to operator\20new\28unsigned\20long\29
+[asyncify] PLUGIN_getObject can change the state due to operator\20new\28unsigned\20long\29
+[asyncify] TestbedMetaEngine::createInstance\28OSystem*\2c\20Engine**\2c\20ADGameDescription\20const*\29\20const.1 can change the state due to operator\20new\28unsigned\20long\29
+[asyncify] Testbed::TestbedEngine::pushTestsuites\28Common::Array<Testbed::Testsuite*>&\29 can change the state due to operator\20new\28unsigned\20long\29
+[asyncify] Common::Singleton<Common::DebugManager>::makeInstance\28\29.1 can change the state due to operator\20new\28unsigned\20long\29
+[asyncify] Common::Singleton<Common::AchievementsManager>::makeInstance\28\29.1 can change the state due to operator\20new\28unsigned\20long\29
+[asyncify] Testbed::TestbedListWidget::TestbedListWidget\28GUI::Dialog*\2c\20Common::String\20const&\2c\20Common::Array<Testbed::Testsuite*>\29.1 can change the state due to Common::BaseString<char32_t>::~BaseString\28\29
+[asyncify] Common::Array<Common::U32String>::freeStorage\28Common::U32String*\2c\20unsigned\20int\29.1 can change the state due to Common::BaseString<char32_t>::~BaseString\28\29
+[asyncify] GUI::ListWidget::ListData::~ListData\28\29.1 can change the state due to Common::BaseString<char32_t>::~BaseString\28\29
+[asyncify] Common::Array<Common::U32String>::push_back\28Common::U32String\20const&\29.1 can change the state due to Common::BaseString<char32_t>::BaseString\28Common::BaseString<char32_t>\20const&\29
+[asyncify] Common::U32String*\20Common::uninitialized_copy<Common::U32String*\2c\20Common::U32String>\28Common::U32String*\2c\20Common::U32String*\2c\20Common::U32String*\29.1 can change the state due to Common::BaseString<char32_t>::BaseString\28Common::BaseString<char32_t>\20const&\29
+[asyncify] Common::U32String*\20Common::uninitialized_copy<Common::U32String\20const*\2c\20Common::U32String>\28Common::U32String\20const*\2c\20Common::U32String\20const*\2c\20Common::U32String*\29.1 can change the state due to Common::BaseString<char32_t>::BaseString\28Common::BaseString<char32_t>\20const&\29
+[asyncify] Testbed::TestbedOptionsDialog::~TestbedOptionsDialog\28\29 can change the state due to GUI::GuiObject::~GuiObject\28\29
+[asyncify] Testbed::TestbedInteractionDialog::~TestbedInteractionDialog\28\29.2 can change the state due to GUI::GuiObject::~GuiObject\28\29
+[asyncify] Testbed::TestbedInteractionDialog::handleCommand\28GUI::CommandSender*\2c\20unsigned\20int\2c\20unsigned\20int\29 can change the state due to GUI::Dialog::handleCommand\28GUI::CommandSender*\2c\20unsigned\20int\2c\20unsigned\20int\29
+[asyncify] Testbed::TestbedExitDialog::handleCommand\28GUI::CommandSender*\2c\20unsigned\20int\2c\20unsigned\20int\29 can change the state due to GUI::Dialog::handleCommand\28GUI::CommandSender*\2c\20unsigned\20int\2c\20unsigned\20int\29
+[asyncify] Common::INIFile::Section::Section\28Common::INIFile::Section\20const&\29.1 can change the state due to Common::List<Common::INIFile::KeyValue>::List\28Common::List<Common::INIFile::KeyValue>\20const&\29
+[asyncify] Common::INIFile::KeyValue::KeyValue\28Common::INIFile::KeyValue\20const&\29.1 can change the state due to Common::BaseString<char>::BaseString\28Common::BaseString<char>\20const&\29
+[asyncify] Testbed::TestbedConfigManager::TestbedConfigManager\28Common::Array<Testbed::Testsuite*>&\2c\20Common::String\29.1 can change the state due to Common::BaseString<char>::BaseString\28Common::BaseString<char>\20const&\29
+[asyncify] Testbed::Test::Test\28Common::String\2c\20Testbed::TestExitStatus\20\28*\29\28\29\2c\20bool\29.1 can change the state due to Common::BaseString<char>::BaseString\28Common::BaseString<char>\20const&\29
+[asyncify] Testbed::TestbedListWidget::~TestbedListWidget\28\29.2 can change the state due to GUI::ListWidget::~ListWidget\28\29
+[asyncify] Common::Array<Testbed::Testsuite*>::allocCapacity\28unsigned\20int\29.1 can change the state due to error\28char\20const*\2c\20...\29
+[asyncify] Common::Array<Common::U32String>::allocCapacity\28unsigned\20int\29.1 can change the state due to error\28char\20const*\2c\20...\29
+[asyncify] Common::Array<GUI::ButtonWidget*>::allocCapacity\28unsigned\20int\29.1 can change the state due to error\28char\20const*\2c\20...\29
+[asyncify] Common::Array<Testbed::Test*>::allocCapacity\28unsigned\20int\29.1 can change the state due to error\28char\20const*\2c\20...\29
+[asyncify] Common::U32String*\20Common::copy_backward<Common::U32String*\2c\20Common::U32String*>\28Common::U32String*\2c\20Common::U32String*\2c\20Common::U32String*\29.1 can change the state due to Common::U32String::operator=\28Common::U32String\20const&\29
+[asyncify] Common::U32String*\20Common::copy<Common::U32String\20const*\2c\20Common::U32String*>\28Common::U32String\20const*\2c\20Common::U32String\20const*\2c\20Common::U32String*\29.1 can change the state due to Common::U32String::operator=\28Common::U32String\20const&\29
+[asyncify] Testbed::ConfigParams::ConfigParams\28\29 can change the state due to Common::String::operator=\28char\20const*\29
+[asyncify] TestbedMetaEngine::getAchievementsInfo\28Common::String\20const&\29\20const.1 can change the state due to Common::String::operator=\28char\20const*\29
+[asyncify] Testbed::MiscTests::getHumanReadableFormat\28TimeDate\20const&\29 can change the state due to Common::String::format\28char\20const*\2c\20...\29
+[asyncify] Engine::getSaveStateName\28int\29\20const.1 can change the state due to Common::String::format\28char\20const*\2c\20...\29
+[asyncify] Common::HashMap<Common::String\2c\20FileProperties\2c\20Common::IgnoreCase_Hash\2c\20Common::IgnoreCase_EqualTo>::HashMap\28\29.1 can change the state due to operator\20new\5b\5d\28unsigned\20long\29
+[asyncify] Testbed::GFXtests::initMousePalette\28\29 can change the state due to Graphics::CursorManager::replaceCursorPalette\28unsigned\20char\20const*\2c\20unsigned\20int\2c\20unsigned\20int\29
+[asyncify] Testbed::GFXtests::initMouseCursor\28\29 can change the state due to Graphics::CursorManager::replaceCursor\28void\20const*\2c\20unsigned\20int\2c\20unsigned\20int\2c\20int\2c\20int\2c\20unsigned\20int\2c\20bool\2c\20Graphics::PixelFormat\20const*\29
+[asyncify] MidiParser::timerCallback\28void*\29.1 can change the state due to MidiParser::onTimer\28\29
+[asyncify] Testbed::TestbedInteractionDialog::TestbedInteractionDialog\28unsigned\20int\2c\20unsigned\20int\2c\20unsigned\20int\2c\20unsigned\20int\29.1 can change the state due to GUI::Dialog::Dialog\28int\2c\20int\2c\20int\2c\20int\29
+[asyncify] Testbed::Testsuite::Testsuite\28\29 can change the state due to Testbed::GFXTestSuite::setCustomColor\28unsigned\20int\2c\20unsigned\20int\2c\20unsigned\20int\29
+[asyncify] Testbed::SaveGametests::testSaveLoadState\28\29 can change the state due to Testbed::SaveGametests::writeDataToFile\28char\20const*\2c\20char\20const*\29
+[asyncify] Testbed::TestbedEngine::~TestbedEngine\28\29.1 can change the state due to Testbed::TestbedEngine::~TestbedEngine\28\29
+[asyncify] Testbed::GFXtests::computeSize\28Common::Rect\20const&\2c\20int\2c\20int\29 can change the state due to Testbed::Testsuite::logPrintf\28char\20const*\2c\20...\29
+[asyncify] Testbed::FSTestSuite::~FSTestSuite\28\29.1 can change the state due to Testbed::Testsuite::~Testsuite\28\29
+[asyncify] Testbed::EventTestSuite::~EventTestSuite\28\29.1 can change the state due to Testbed::Testsuite::~Testsuite\28\29
+[asyncify] Testbed::GFXTestSuite::~GFXTestSuite\28\29.1 can change the state due to Testbed::Testsuite::~Testsuite\28\29
+[asyncify] Testbed::MidiTestSuite::~MidiTestSuite\28\29.1 can change the state due to Testbed::Testsuite::~Testsuite\28\29
+[asyncify] Testbed::MiscTestSuite::~MiscTestSuite\28\29.1 can change the state due to Testbed::Testsuite::~Testsuite\28\29
+[asyncify] Testbed::NetworkingTestSuite::~NetworkingTestSuite\28\29.1 can change the state due to Testbed::Testsuite::~Testsuite\28\29
+[asyncify] Testbed::SaveGameTestSuite::~SaveGameTestSuite\28\29.1 can change the state due to Testbed::Testsuite::~Testsuite\28\29
+[asyncify] Testbed::SoundSubsystemTestSuite::~SoundSubsystemTestSuite\28\29.1 can change the state due to Testbed::Testsuite::~Testsuite\28\29
+[asyncify] Testbed::TestbedOptionsDialog::~TestbedOptionsDialog\28\29.1 can change the state due to Testbed::TestbedOptionsDialog::~TestbedOptionsDialog\28\29

@@ -11288,6 +11288,7 @@
   "virtual thunk to ModularGraphicsBackend::setStretchMode(int)",
   "virtual thunk to ModularGraphicsBackend::showMouse(bool)",
   "virtual thunk to ModularGraphicsBackend::showOverlay(bool)",
+  "virtual thunk to ModularGraphicsBackend::updateScreen()",
   "virtual thunk to ModularGraphicsBackend::warpMouse(int, int)",
   "virtual thunk to ModularMixerBackend::getMixer()",
   "virtual thunk to Modules::ModXmS3mStream::readBuffer(short*, int)",
