@@ -2993,6 +2993,9 @@ EOF
 		if test "$_zlib" != no; then
 			append_var LDFLAGS "-s USE_ZLIB=1"
 		fi
+		if test "$_gif" != no; then
+			append_var LDFLAGS "-s USE_GIFLIB=1"
+		fi
 	;;
 	freebsd* | dragonfly*)
 		append_var LDFLAGS "-L/usr/local/lib"
@@ -6463,6 +6466,10 @@ case $_host_os in
 		if test "${LDFLAGS#*-s USE_ZLIB=1}" != "$LDFLAGS"; then
 			LIBS=`echo ${LIBS} | sed 's/-lz//g'`
 		fi
+		if test "${LDFLAGS#*-s USE_GIFLIB=1}" != "$LDFLAGS"; then
+			LIBS=`echo ${LIBS} | sed 's/-lgif//g'`
+		fi
+		
 		;;
 	mingw*)
 		if test "$_windows_unicode" = yes; then

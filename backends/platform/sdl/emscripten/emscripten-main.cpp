@@ -26,6 +26,11 @@
 #include "backends/plugins/sdl/sdl-provider.h"
 #include "base/main.h"
 
+/*
+Without this attribute linking fails when libgif is also used (since that also contains a main)
+See https://github.com/emscripten-core/emscripten/issues/16628 for background
+*/
+__attribute__((__used__)) 
 int main(int argc, char *argv[]) {
 
 	// Create our OSystem instance

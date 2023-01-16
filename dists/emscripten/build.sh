@@ -36,7 +36,7 @@ CONFIGURE_ARGS=()
 _bundle_games=()
 _verbose=false
 EMSDK_VERSION="3.1.28"
-EMSCRIPTEN_VERSION="sdk-upstream-main-64bit"
+EMSCRIPTEN_VERSION="$EMSDK_VERSION"
 
 usage="\
 Usage: ./dists/emscripten/build.sh [TASKS] [OPTIONS]
