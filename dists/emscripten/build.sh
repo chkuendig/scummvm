@@ -171,7 +171,7 @@ if [[ "libs" =~ $(echo ^\(${TASKS}\)$) || "build" =~ $(echo ^\(${TASKS}\)$) ]]; 
     emmake make -j 3
     emmake make install
   fi
-  LIBS_FLAGS="${LIBS_FLAGS} --with-vorbis-prefix=$LIBS_FOLDER/build/"
+  #LIBS_FLAGS="${LIBS_FLAGS} --with-vorbis-prefix=$LIBS_FOLDER/build/"
 
   if [[ ! -f "$LIBS_FOLDER/build/lib/libtheora.a" ]]; then
     echo "build libtheora-1.1.1"
@@ -183,7 +183,7 @@ if [[ "libs" =~ $(echo ^\(${TASKS}\)$) || "build" =~ $(echo ^\(${TASKS}\)$) ]]; 
     emmake make -j 3
     emmake make install
   fi
-  LIBS_FLAGS="${LIBS_FLAGS} --with-theoradec-prefix=$LIBS_FOLDER/build/"
+  #LIBS_FLAGS="${LIBS_FLAGS} --with-theoradec-prefix=$LIBS_FOLDER/build/"
 
   if [[ ! -f "$LIBS_FOLDER/build/lib/libfaad.a" ]]; then
     echo "building faad2-2.8.8"
@@ -195,7 +195,7 @@ if [[ "libs" =~ $(echo ^\(${TASKS}\)$) || "build" =~ $(echo ^\(${TASKS}\)$) ]]; 
     emmake make
     emmake make install
   fi
-  LIBS_FLAGS="${LIBS_FLAGS} --with-faad-prefix=$LIBS_FOLDER/build/"
+   #LIBS_FLAGS="${LIBS_FLAGS} --with-faad-prefix=$LIBS_FOLDER/build/"
 
   if [[ ! -f "$LIBS_FOLDER/build/lib/libmad.a" ]]; then
     echo "building libmad-0.15.1b"
@@ -211,7 +211,7 @@ if [[ "libs" =~ $(echo ^\(${TASKS}\)$) || "build" =~ $(echo ^\(${TASKS}\)$) ]]; 
     emmake make
     emmake make install
   fi
-  LIBS_FLAGS="${LIBS_FLAGS} --with-mad-prefix=$LIBS_FOLDER/build/"
+   #LIBS_FLAGS="${LIBS_FLAGS} --with-mad-prefix=$LIBS_FOLDER/build/"
 
   if [[ ! -f "$LIBS_FOLDER/build/lib/libmpeg2.a" ]]; then
     echo "building libmpeg2-0.5.1"
@@ -223,7 +223,7 @@ if [[ "libs" =~ $(echo ^\(${TASKS}\)$) || "build" =~ $(echo ^\(${TASKS}\)$) ]]; 
     emmake make
     emmake make install
   fi
-  LIBS_FLAGS="${LIBS_FLAGS} --with-mpeg2-prefix=$LIBS_FOLDER/build/"
+   #LIBS_FLAGS="${LIBS_FLAGS} --with-mpeg2-prefix=$LIBS_FOLDER/build/"
 
   if [[ ! -f "$LIBS_FOLDER/build/lib/liba52.a" ]]; then
     echo "building a52dec-0.7.4"
@@ -235,7 +235,7 @@ if [[ "libs" =~ $(echo ^\(${TASKS}\)$) || "build" =~ $(echo ^\(${TASKS}\)$) ]]; 
     emmake make -j 3
     emmake make install
   fi
-  LIBS_FLAGS="${LIBS_FLAGS} --with-a52-prefix=$LIBS_FOLDER/build/"
+   #LIBS_FLAGS="${LIBS_FLAGS} --with-a52-prefix=$LIBS_FOLDER/build/"
 fi
 
 #################################
@@ -321,12 +321,13 @@ fi
 # Bundle everything into a neat package
 #################################
 if [[ "dist" =~ $(echo ^\(${TASKS}\)$) || "build" =~ $(echo ^\(${TASKS}\)$) ]]; then
+  echo "Bundle ScummVM"
   cd "${ROOT_FOLDER}"
   mv "${ROOT_FOLDER}"/scummvm.* "${ROOT_FOLDER}"/build-emscripten/ || true
 
   # prepare data
+  echo "Bundle Data"
   if [[ -d "${ROOT_FOLDER}/dist-generic/scummvm/data" ]]; then
-    echo "Bundle ScummVM + Data"
     rm -rf "${ROOT_FOLDER}/build-emscripten/data"
     mv "${ROOT_FOLDER}/dist-generic/scummvm/data" "${ROOT_FOLDER}/build-emscripten/"
     cd "${ROOT_FOLDER}/build-emscripten/data"
@@ -339,6 +340,7 @@ if [[ "dist" =~ $(echo ^\(${TASKS}\)$) || "build" =~ $(echo ^\(${TASKS}\)$) ]]; 
   mkdir -p "${ROOT_FOLDER}/build-emscripten/plugins"
   mv "${ROOT_FOLDER}/plugins/"* "${ROOT_FOLDER}/build-emscripten/plugins/" || true
   cd "${ROOT_FOLDER}/build-emscripten/plugins"
+  echo "Bundle Plugin - make HTTP index"
   "$EMSDK_NODE" "$DIST_FOLDER/build-make_http_index.js" >index.json
 
   # add logos and other assets

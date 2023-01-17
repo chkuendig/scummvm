@@ -177,6 +177,7 @@ Common::SeekableReadStream *MacVISEArchive::ArchiveMember::createReadStream() co
 		return nullptr;
 
 
+#ifdef USE_ZLIB
 	// WARNING/TODO: Based on reverse engineering of the "Dcmp" resource from the installer, which contains the decompression code,
 	// the bitstream format is usually just deflate, however there is one difference: Stored blocks are flushed to a 2-byte boundary
 	// instead of 1-byte boundary, because the decompressor reads 2 bytes at a time.  This doesn't usually matter because stored
@@ -190,6 +191,7 @@ Common::SeekableReadStream *MacVISEArchive::ArchiveMember::createReadStream() co
 		return nullptr;
 	}
 
+#endif
 	return new Common::MemoryReadStream(decompressedData, uncompressedSize, DisposeAfterUse::YES);
 }
 

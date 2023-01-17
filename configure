@@ -2949,13 +2949,15 @@ EOF
 		;;
 	emscripten)
 		# mandatory emscripten flags
-		append_var LDFLAGS "-s ALLOW_MEMORY_GROWTH=1 -s ASYNCIFY -s FORCE_FILESYSTEM=1"
-
 		append_var DEFINES "-DEMSCRIPTEN"
 		add_line_to_config_mk 'EMSCRIPTEN = 1'
+		append_var LDFLAGS "-s ALLOW_MEMORY_GROWTH=1 -s ASYNCIFY -s FORCE_FILESYSTEM=1"
 
-		_optimization_level=-Oz
-		append_var LDFLAGS "-Oz"
+		_optimization_level=-O3
+		append_var LDFLAGS "-O3"
+			# TODO: Figure out why this is a conflict and/or if freetype can be built without setjmp or with flto
+			#append_var CXXFLAGS "-flto"
+			#append_var LDFLAGS "-flto"
 		if test "$_debug_build" = yes; then
 			append_var LDFLAGS "-g2 -s ASSERTIONS=2"
 
@@ -2965,37 +2967,43 @@ EOF
 			append_var LDFLAGS "-s ASYNCIFY_ADVISE=1"
 		fi
 
-		# activate emscripten-ports
-		if test "$_freetype2" != no; then
-			append_var LDFLAGS "-s USE_FREETYPE=1 -s SUPPORT_LONGJMP=1" # freetype requires setjmp
+
+		# activate  more or less required emscripten-ports
+		
+		if test "$_sdl" != no; then # we enable SDL2 by default 
+			append_var LDFLAGS "-s USE_SDL=2 "
+		fi
+		if test "$_png" != no; then # new theme system doesn't work without png
+			append_var LDFLAGS "-s USE_LIBPNG=1"
+		fi
+		if test "$_zlib" != no; then # if we have png, we need zlib
+			append_var LDFLAGS "-s USE_ZLIB=1"
+		fi
+		# activate optional emscripten-ports (primarily required by certain ports)
+		if test "$_freetype2" = yes; then # TODO: There's a bug leading to a tiny UI if freetype isn't compiled in (similar to what was observed before https://github.com/libsdl-org/SDL/pull/5383 )
+			append_var LDFLAGS "-s USE_FREETYPE=1" # freetype requires setjmp
 			# neither pkg-config nor freetype-config work, so we setup freetype manually
 			_freetypepath="$EMSDK/upstream/emscripten/cache/sysroot/include/freetype2/"
 			FREETYPE2_CFLAGS="-I$_freetypepath" # there were link errors / missing symbols without this
 			_freetype_found="true"
-		else
-			#use link time optimization to further reduce exe size (this can't be used with setjmp which freetype requires)
-			# TODO: Figure out why this is a conflict and/or if freetype can be built without setjmp
-			append_var CXXFLAGS "-flto"
-			append_var LDFLAGS "-flto"
 		fi
-		if test "$_jpeg" != no; then
+		if test "$_jpeg" = yes; then
 			append_var LDFLAGS "-s USE_LIBJPEG=1"
 		fi
-		if test "$_png" != no; then
-			append_var LDFLAGS "-s USE_LIBPNG=1"
+		if test "$_gif" = yes; then
+			# TODO: broken, see  https://github.com/emscripten-core/emscripten/issues/18537
+		 	append_var LDFLAGS "-s USE_GIFLIB=1"
 		fi
-		if test "$_sdl" != no; then
-			append_var LDFLAGS "-s USE_SDL=2 "
+		if test "$_ogg" = yes; then
+			append_var LDFLAGS "-s USE_OGG=1" 
 		fi
-		if test "$_vorbis" != no; then
-			append_var LDFLAGS "-s USE_OGG=1" # vorbis needs to be linked against OGG (even if we use an external vorbis lib)
+		if test "$_vorbis" = yes; then
+			append_var LDFLAGS "-s USE_VORBIS=1" 
+			# broken, see  https://github.com/emscripten-core/emscripten/pull/14005 and
+			# it doesn't properly link vorbisfile https://github.com/emscripten-core/emscripten/pull/14005
+			# https://github.com/emscripten-core/emscripten/pull/9849/commits/5e39ced843efd4d97d313d24fe928c7d996cfe37
 		fi
-		if test "$_zlib" != no; then
-			append_var LDFLAGS "-s USE_ZLIB=1"
-		fi
-		if test "$_gif" != no; then
-			append_var LDFLAGS "-s USE_GIFLIB=1"
-		fi
+
 	;;
 	freebsd* | dragonfly*)
 		append_var LDFLAGS "-L/usr/local/lib"
@@ -4368,8 +4376,8 @@ PLUGIN_LDFLAGS		+= -Wl,-T$(srcdir)/backends/plugins/ds/plugin.ld -mthumb -mthumb
 		fi
 _mak_plugins='
 PLUGIN_EXTRA_DEPS =
-PLUGIN_LDFLAGS  += $(LDFLAGS) -s SIDE_MODULE=1 -s ASYNCIFY_IMPORTS="'$asyncify_imports'" -s EXPORT_ALL=1
-PRE_OBJS_FLAGS  := -s MAIN_MODULE=1 -s EXPORT_ALL=1
+PLUGIN_LDFLAGS  += $(LDFLAGS) -s SIDE_MODULE=1 -s ASYNCIFY_IMPORTS="'$asyncify_imports'" 
+PRE_OBJS_FLAGS  := -s MAIN_MODULE=2 -s EXPORTED_FUNCTIONS=["_main","_g_system","_ZN6Common9SingletonIN8Graphics13CursorManagerEE10_singletonE"]
 POST_OBJS_FLAGS :=
 '
 		;;
