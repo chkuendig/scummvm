@@ -4374,11 +4374,14 @@ PLUGIN_LDFLAGS		+= -Wl,-T$(srcdir)/backends/plugins/ds/plugin.ld -mthumb -mthumb
 		if test -f "$asyncify_imports_path" ; then
 			asyncify_imports=$(cat $asyncify_imports_path)
 		fi
+		# TODO: Figure out hwo to pass side modules when linking main module, see https://github.com/emscripten-core/emscripten/issues/18537#issuecomment-1385780553
+		# the problem right now is that we a) don't know which plugins exist and b) build the main module before the plugins. 
+		# one way we could do this is to keep the plugins around (or build them separately) and iterate here over all files that exist
 _mak_plugins='
 PLUGIN_EXTRA_DEPS =
 PLUGIN_LDFLAGS  += $(LDFLAGS) -s SIDE_MODULE=1 -s ASYNCIFY_IMPORTS="'$asyncify_imports'" 
-PRE_OBJS_FLAGS  := -s MAIN_MODULE=2 -s EXPORTED_FUNCTIONS=["_main","_g_system","_ZN6Common9SingletonIN8Graphics13CursorManagerEE10_singletonE"]
-POST_OBJS_FLAGS :=
+PRE_OBJS_FLAGS  := -s MAIN_MODULE=2 -sNO_AUTOLOAD_DYLIBS
+POST_OBJS_FLAGS := plugins/libtestbed.so
 '
 		;;
 	freebsd* | openbsd*)
