@@ -2953,7 +2953,6 @@ EOF
 		add_line_to_config_mk 'EMSCRIPTEN = 1'
 		append_var LDFLAGS "-s ALLOW_MEMORY_GROWTH=1 -s ASYNCIFY -s FORCE_FILESYSTEM=1"
 
-		_optimization_level=-O3
 		append_var LDFLAGS "-O3"
 			# TODO: Figure out why this is a conflict and/or if freetype can be built without setjmp or with flto
 			#append_var CXXFLAGS "-flto"
@@ -2986,22 +2985,32 @@ EOF
 			_freetypepath="$EMSDK/upstream/emscripten/cache/sysroot/include/freetype2/"
 			FREETYPE2_CFLAGS="-I$_freetypepath" # there were link errors / missing symbols without this
 			_freetype_found="true"
+		else
+			_freetype2=no # don't automatically enable any optional libraries which are part of ports
 		fi
 		if test "$_jpeg" = yes; then
 			append_var LDFLAGS "-s USE_LIBJPEG=1"
+		else
+			_jpeg=no # don't automatically enable any optional libraries which are part of ports
 		fi
 		if test "$_gif" = yes; then
 			# TODO: broken, see  https://github.com/emscripten-core/emscripten/issues/18537
 		 	append_var LDFLAGS "-s USE_GIFLIB=1"
+		else
+			_gif=no # don't automatically enable any optional libraries which are part of ports
 		fi
 		if test "$_ogg" = yes; then
 			append_var LDFLAGS "-s USE_OGG=1" 
+		else
+			_ogg=no # don't automatically enable any optional libraries which are part of ports
 		fi
 		if test "$_vorbis" = yes; then
 			append_var LDFLAGS "-s USE_VORBIS=1" 
 			# broken, see  https://github.com/emscripten-core/emscripten/pull/14005 and
 			# it doesn't properly link vorbisfile https://github.com/emscripten-core/emscripten/pull/14005
 			# https://github.com/emscripten-core/emscripten/pull/9849/commits/5e39ced843efd4d97d313d24fe928c7d996cfe37
+		else
+			_vorbis=no # don't automatically enable any optional libraries which are part of ports
 		fi
 
 	;;
@@ -4377,12 +4386,23 @@ PLUGIN_LDFLAGS		+= -Wl,-T$(srcdir)/backends/plugins/ds/plugin.ld -mthumb -mthumb
 		# TODO: Figure out hwo to pass side modules when linking main module, see https://github.com/emscripten-core/emscripten/issues/18537#issuecomment-1385780553
 		# the problem right now is that we a) don't know which plugins exist and b) build the main module before the plugins. 
 		# one way we could do this is to keep the plugins around (or build them separately) and iterate here over all files that exist
-_mak_plugins='
+
+
+		if test "$_optimizations" = yes ; then
+ _mak_plugins='
 PLUGIN_EXTRA_DEPS =
 PLUGIN_LDFLAGS  += $(LDFLAGS) -s SIDE_MODULE=1 -s ASYNCIFY_IMPORTS="'$asyncify_imports'" 
 PRE_OBJS_FLAGS  := -s MAIN_MODULE=2 -sNO_AUTOLOAD_DYLIBS
 POST_OBJS_FLAGS := plugins/libtestbed.so
 '
+		else
+_mak_plugins='
+PLUGIN_EXTRA_DEPS =
+PLUGIN_LDFLAGS  += $(LDFLAGS) -s SIDE_MODULE=1 -s ASYNCIFY_IMPORTS="[*]" 
+PRE_OBJS_FLAGS  := -s MAIN_MODULE=1
+POST_OBJS_FLAGS := 
+'
+		fi
 		;;
 	freebsd* | openbsd*)
 		_plugin_prefix="lib"
