@@ -258,7 +258,6 @@ if [[ "make" =~ $(echo ^\(${TASKS}\)$) || "build" =~ $(echo ^\(${TASKS}\)$) ]]; 
   cd "${ROOT_FOLDER}"
   echo "Running make"
   emmake make
-  emmake make dist-generic
 fi
 
 #################################
@@ -285,33 +284,8 @@ mkdir -p "${ROOT_FOLDER}/build-emscripten/"
 # Bundle everything into a neat package
 #################################
 if [[ "dist" =~ $(echo ^\(${TASKS}\)$) || "build" =~ $(echo ^\(${TASKS}\)$) ]]; then
-  echo "Bundle ScummVM"
-  cd "${ROOT_FOLDER}"
-  cp "${ROOT_FOLDER}"/scummvm.* "${ROOT_FOLDER}"/build-emscripten/ 
-
-  # prepare data
-  echo "Bundle Data"
-  if [[ -d "${ROOT_FOLDER}/dist-generic/scummvm/data" ]]; then
-    rm -rf "${ROOT_FOLDER}/build-emscripten/data"
-    cp -r "${ROOT_FOLDER}/dist-generic/scummvm/data" "${ROOT_FOLDER}/build-emscripten/"
-    cd "${ROOT_FOLDER}/build-emscripten/data"
-    "$EMSDK_NODE" "$DIST_FOLDER/build-make_http_index.js" >index.json
-    rm -rf "${ROOT_FOLDER}/dist-generic/"
-  fi
-
-  # bundle plugins
-  echo "Bundle Plugins"
-  mkdir -p "${ROOT_FOLDER}/build-emscripten/plugins"
-  cp "${ROOT_FOLDER}/plugins/"* "${ROOT_FOLDER}/build-emscripten/plugins/" 
-  cd "${ROOT_FOLDER}/build-emscripten/plugins"
-  echo "Bundle Plugin - make HTTP index"
-  "$EMSDK_NODE" "$DIST_FOLDER/build-make_http_index.js" >index.json
-
-  # add logos and other assets
-  cd "${ROOT_FOLDER}"
-  cp "$DIST_FOLDER/assets/"* "${ROOT_FOLDER}/build-emscripten/"
-  cp "$ROOT_FOLDER/gui/themes/common-svg/logo.svg" "${ROOT_FOLDER}/build-emscripten/"
-  cp "$ROOT_FOLDER/icons/scummvm.ico" "${ROOT_FOLDER}/build-emscripten/favicon.ico"
+  echo "Bundle ScummVM for static file hosting"
+  emmake make dist-emscripten 
 fi
 
 
@@ -327,8 +301,8 @@ if [[ "games" =~ $(echo ^\(${TASKS}\)$) || "build" =~ $(echo ^\(${TASKS}\)$) ]];
     _bundle_games="${_bundle_games//testbed/}"
     rm -rf "${ROOT_FOLDER}/build-emscripten/games/testbed"
     cd "${ROOT_FOLDER}/dists/engine-data"
-    ./create-testbed-data.sh
-    cp -R testbed "${ROOT_FOLDER}/build-emscripten/games/testbed"
+    ./create-testbed-data.sh    
+    mv testbed "${ROOT_FOLDER}/build-emscripten/games/testbed"
   fi
 
   if [ -n "$_bundle_games" ]; then
