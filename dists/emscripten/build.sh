@@ -141,8 +141,9 @@ cd "$ROOT_FOLDER"
 if [[ "clean" =~ $(echo ^\(${TASKS}\)$) ]]; then
   emmake make clean || true
   emmake make distclean || true
-  rm -rf ./dists/emscripten/libs/build || true
-  rm -rf ./dists/emscripten/libs/*/ || true
+  emcc --clear-ports --clear-cache
+  #rm -rf ./dists/emscripten/libs/build || true
+  #rm -rf ./dists/emscripten/libs/*/ || true
   rm -rf ./build-emscripten/ || true
   rm scummvm.debug.wasm || true
   find . -name "*.o" || true
@@ -266,7 +267,7 @@ fi
 if [[ "asyncify-advise" =~ $(echo ^\(${TASKS}\)$) ]]; then
   cd "${ROOT_FOLDER}"
   emmake make clean
-  emconfigure ./configure --host=wasm32-unknown-emscripten --build=wasm32-unknown-emscripten --disable-all-engines --enable-plugins --enable-verbose-build ${LIBS_FLAGS}
+  emconfigure ./configure --host=wasm32-unknown-emscripten --build=wasm32-unknown-emscripten --disable-all-engines --enable-plugins --enable-verbose-build --disable-optimizations ${LIBS_FLAGS}
   emmake make | tee >(grep '^\[asyncify\]' >"${DIST_FOLDER}/asyncify-advise.txt")
   # wasm-objdump -x -j Function ./scummvm.wasm > "${DIST_FOLDER}/main-module-exports.txt"
   wasm-objdump -x -j Export ./scummvm.wasm >"${DIST_FOLDER}/main-module-exports.txt"

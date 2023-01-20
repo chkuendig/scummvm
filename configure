@@ -2953,10 +2953,7 @@ EOF
 		add_line_to_config_mk 'EMSCRIPTEN = 1'
 		append_var LDFLAGS "-s ALLOW_MEMORY_GROWTH=1 -s ASYNCIFY -s FORCE_FILESYSTEM=1"
 
-		append_var LDFLAGS "-O3"
-			# TODO: Figure out why this is a conflict and/or if freetype can be built without setjmp or with flto
-			#append_var CXXFLAGS "-flto"
-			#append_var LDFLAGS "-flto"
+	
 		if test "$_debug_build" = yes; then
 			append_var LDFLAGS "-g2 -s ASSERTIONS=2"
 
@@ -2966,7 +2963,12 @@ EOF
 			append_var LDFLAGS "-s ASYNCIFY_ADVISE=1"
 		fi
 
-
+		if test "$_optimizations" = yes ; then
+			append_var CXXFLAGS "-flto"
+			append_var LDFLAGS "-flto"
+			append_var LDFLAGS "-O3" # TODO: Ideally we would use -Oz or at least -Os but both lead to some asyncify issues when also using dynamic linking (maybe a mangling issue? need to check the exports with wasm-objdump)
+			_optimization_level=-O3
+		fi
 		# activate  more or less required emscripten-ports
 		
 		if test "$_sdl" != no; then # we enable SDL2 by default 
@@ -4378,17 +4380,16 @@ PLUGIN_LDFLAGS		+= -Wl,-T$(srcdir)/backends/plugins/ds/plugin.ld -mthumb -mthumb
 		append_var DEFINES "-DUNCACHED_PLUGINS"
 		append_var CXXFLAGS "-fPIC"
 		append_var LIBS ""
-		asyncify_imports="[*]"
-		asyncify_imports_path="./dists/emscripten/asyncify-imports.txt"
-		if test -f "$asyncify_imports_path" ; then
-			asyncify_imports=$(cat $asyncify_imports_path)
-		fi
+		
 		# TODO: Figure out hwo to pass side modules when linking main module, see https://github.com/emscripten-core/emscripten/issues/18537#issuecomment-1385780553
 		# the problem right now is that we a) don't know which plugins exist and b) build the main module before the plugins. 
 		# one way we could do this is to keep the plugins around (or build them separately) and iterate here over all files that exist
-
-
 		if test "$_optimizations" = yes ; then
+			asyncify_imports="[]"
+			asyncify_imports_path="./dists/emscripten/asyncify-imports.txt"
+			if test -f "$asyncify_imports_path" ; then
+				asyncify_imports="[$(tr '\n' ',' < ${asyncify_imports_path})]"
+			fi
  _mak_plugins='
 PLUGIN_EXTRA_DEPS =
 PLUGIN_LDFLAGS  += $(LDFLAGS) -s SIDE_MODULE=1 -s ASYNCIFY_IMPORTS="'$asyncify_imports'" 

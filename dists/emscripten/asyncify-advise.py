@@ -143,5 +143,6 @@ for obj in instrumented_functions:
 #print(asyncify_imports)
 # TODO: To make this work also with debug builds which don't mangle, we shoudl also add the cleartext names here (maybe they need to be escaped? have to check with binaryen and test)
 with open('./dists/emscripten/asyncify-imports.txt', 'w') as f:
-        asyncify_import_str = "'[\"" + "\",\"".join(asyncify_imports) + "\"]'"
-        f.write(f"{asyncify_import_str}")
+    asyncify_imports.sort()
+    asyncify_import_str = "\n".join(['"' + item + '"' for item in asyncify_imports]) 
+    f.write(f"{asyncify_import_str}")
