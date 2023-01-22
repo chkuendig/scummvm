@@ -5,7 +5,55 @@ import json
 import re
 import sys
 import json
-from cxxfilt import demangle
+#from cxxfilt import demangle
+
+
+## FIRST FIGURE OUT FUNCTIONS TO EXPORT in MAIN MODULE
+plugin_imports = open("./dists/emscripten/plugins-imports.log")
+
+lines = plugin_imports.readlines()
+main_module_exports = []
+for line in lines:
+   
+    # regex for Globals (result in groups[5])
+    #result = re.search(r"^ - (\w+)\[(\d+)\] (i32 mutable=[0-1] )?(sig=\d+ )?(\<([\$\w]+)\> )?- init i32=\d+\n", line)
+
+    
+
+    #Regex for Imports 
+    
+    result = re.search(r"^ - (?:\w+)\[\d+\] (?:i32 mutable=[0-1])?(?:sig=\d+)?(?: \<(\S+)\>)? \<- (\S+)$", line)
+    # don't count the globals
+    result = re.search(r"^ - (?:func)\[\d+\] (?:sig=\d+)?(?: \<(\S+)\>)? \<- (\S+)$", line)
+    if(result):
+        for group in result.groups():
+            if (group and len(group)> 0): 
+                main_module_exports.append("_"+group.removeprefix("env.").removeprefix("GOT.func.").removeprefix("GOT.mem."))
+            
+    elif line.strip() != "":                    
+        print("Ignoring Line: "+line.strip())
+
+main_module_exports = list(dict.fromkeys(main_module_exports)) # deduplicate
+main_module_exports.sort()
+
+main_module_exports.insert(0,"_main")
+
+print(main_module_exports)
+
+with open('./dists/emscripten/main-module-exports.txt', 'w') as f:
+    main_module_exports.sort()
+    main_module_exports = "\n".join(['"' + item + '"' for item in main_module_exports]) 
+    f.write(f"{main_module_exports}")
+
+
+
+sys.exit()
+
+
+## THEN FIGURE OUT WHICH FUNFTIONS TO INSTRUMENT IN PLUGINS
+
+
+
 
 def string_unescape(s, encoding='utf-8'): ## the output is escaped
     replacements=[["20"," "],["28","("],["29",")"],["2c",","],["5b","["],["5d","]"]]
@@ -34,7 +82,7 @@ class color:
    UNDERLINE = '\033[4m'
    END = '\033[0m'
 
-main_module_exports = open("./dists/emscripten/asyncify-advise.txt")
+main_module_exports = open("./dists/emscripten/asyncify-advise.log")
 
 lines = main_module_exports.readlines()
 callees = {}
@@ -71,8 +119,7 @@ with open('./dists/emscripten/asyncify-advise.json', 'w') as f:
 
 
 
-main_module_exports = open("./dists/emscripten/main-module-exports.txt")
-testbed_imports = open("./dists/emscripten/testbed-imports.txt")
+main_module_exports = open("./dists/emscripten/main-module-exports.log")
 
 lines = main_module_exports.readlines()
 callees = {}
@@ -146,3 +193,7 @@ with open('./dists/emscripten/asyncify-imports.txt', 'w') as f:
     asyncify_imports.sort()
     asyncify_import_str = "\n".join(['"' + item + '"' for item in asyncify_imports]) 
     f.write(f"{asyncify_import_str}")
+
+
+
+

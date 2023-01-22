@@ -37,6 +37,7 @@ _bundle_games=()
 _verbose=false
 EMSDK_VERSION="3.1.30"
 EMSCRIPTEN_VERSION="$EMSDK_VERSION"
+EMSCRIPTEN_VERSION="sdk-upstream-main-64bit"
 
 usage="\
 Usage: ./dists/emscripten/build.sh [TASKS] [OPTIONS]
@@ -157,6 +158,7 @@ fi
 #################################
 if [[ "libs" =~ $(echo ^\(${TASKS}\)$) || "build" =~ $(echo ^\(${TASKS}\)$) ]]; then
 
+  # TODO: We should only add the flags if the switches for these libs are enabled
   if [[ ! -d "$LIBS_FOLDER/build" ]]; then
     mkdir -p "$LIBS_FOLDER/build"
   fi
@@ -294,6 +296,7 @@ if [[ "games" =~ $(echo ^\(${TASKS}\)$) || "build" =~ $(echo ^\(${TASKS}\)$) ]];
   fi
 
   if [ -n "$_bundle_games" ]; then
+    echo "Fetching gmaes: " + $_bundle_games
     mkdir -p "${DIST_FOLDER}/games/"
     cd "${DIST_FOLDER}/games/"
     files=$(f"$EMSDK_NODE" --unhandled-rejections=strict --trace-warnings "$DIST_FOLDER/build-download_games.js" ${_bundle_games})
@@ -316,7 +319,7 @@ fi
 #################################
 # Add icons
 #################################
-if [[ "icons" =~ $(echo ^\(${TASKS}\)$) || "build1" =~ $(echo ^\(${TASKS}\)$) ]]; then
+if [[ "icons" =~ $(echo ^\(${TASKS}\)$) || "build" =~ $(echo ^\(${TASKS}\)$) ]]; then
 
   if [[ -d "${ROOT_FOLDER}/../scummvm-icons/" ]]; then
     echo "Adding files from icons repository "

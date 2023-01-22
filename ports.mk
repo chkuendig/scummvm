@@ -591,7 +591,6 @@ endif
 
 # Special generic target for emscripten static file hosting bundle
 dist-emscripten: $(EXECUTABLE) $(PLUGINS)
-	echo $(EXECUTABLE) $(PLUGINS)
 	mkdir -p ./build-emscripten/data
 	mkdir -p ./build-emscripten/doc
 	cp $(EXECUTABLE) ./build-emscripten/

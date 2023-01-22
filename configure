@@ -2966,7 +2966,13 @@ EOF
 		if test "$_optimizations" = yes ; then
 			append_var CXXFLAGS "-flto"
 			append_var LDFLAGS "-flto"
-			append_var LDFLAGS "-O3" # TODO: Ideally we would use -Oz or at least -Os but both lead to some asyncify issues when also using dynamic linking (maybe a mangling issue? need to check the exports with wasm-objdump)
+			 # TODO: Ideally we would use -Oz or at least -Os but both lead to some asyncify issues when also using dynamic linking 
+			 # (maybe a mangling issue? need to check the exports with wasm-objdump) NOT TRUE - THE FUNCTION IN QUESTION IS NEVER CHECKED AGAINST THE IMPORTED LIST 
+			 # "env._ZTv0_n176_N22ModularGraphicsBackend12updateScreenEv"
+			 # (maybe an issue with virtual methods being stripped? it's not in the list of imports either weirdly enough)
+			 # maybe ASYNCIFY_ADD will help?
+			 # UPDATE: it's not in the asyncify-advise list or in the list of imports either with -O3 and that build works...
+			append_var LDFLAGS "-O3"
 			_optimization_level=-O3
 		fi
 		# activate  more or less required emscripten-ports
@@ -4385,13 +4391,20 @@ PLUGIN_LDFLAGS		+= -Wl,-T$(srcdir)/backends/plugins/ds/plugin.ld -mthumb -mthumb
 			asyncify_imports="[]"
 			asyncify_imports_path="./dists/emscripten/asyncify-imports.txt"
 			if test -f "$asyncify_imports_path" ; then
-				asyncify_imports="[$(tr '\n' ',' < ${asyncify_imports_path})]"
+			asyncify_imports="\[$(tr '\n' ',' < ${asyncify_imports_path})\]"
 			fi
+			exported_functions="[]"
+			exported_functions_path="./dists/emscripten/main-module-exports.txt"
+			if test -f "$exported_functions_path" ; then
+				exported_functions="\[$(tr '\n' ',' < ${exported_functions_path})\]"
+			fi
+		#we have to use  -Wno-undefined as I haven't figured out a way to get a main-module-exports which doesn't contain symbols which aren't defined
+		# e.g. _ZN6Common13sortPartitionINS_12ListInternal8IteratorIN8Graphics11PixelFormatEEEN7Testbed21PixelFormatComparatorEEET_S8_S8_S8_RT0_ is an import with it's typed parameters, but obv. not an export
  _mak_plugins='
 PLUGIN_EXTRA_DEPS =
-PLUGIN_LDFLAGS  += $(LDFLAGS) -s SIDE_MODULE=1 -s ASYNCIFY_IMPORTS="'$asyncify_imports'" 
-PRE_OBJS_FLAGS  := -s MAIN_MODULE=2 -sNO_AUTOLOAD_DYLIBS
-POST_OBJS_FLAGS := plugins/libtestbed.so
+PLUGIN_LDFLAGS  += $(LDFLAGS) -s SIDE_MODULE=1 -s ASYNCIFY_IMPORTS='$asyncify_imports'
+PRE_OBJS_FLAGS  := -s MAIN_MODULE=2 -s EXPORTED_FUNCTIONS='$exported_functions' -Wno-undefined
+POST_OBJS_FLAGS := 
 '
 		else
 _mak_plugins='
