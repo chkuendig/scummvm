@@ -35,7 +35,7 @@ TASKS=()
 CONFIGURE_ARGS=()
 _bundle_games=()
 _verbose=false
-EMSDK_VERSION="3.1.28"
+EMSDK_VERSION="3.1.30"
 EMSCRIPTEN_VERSION="$EMSDK_VERSION"
 
 usage="\
@@ -161,19 +161,6 @@ if [[ "libs" =~ $(echo ^\(${TASKS}\)$) || "build" =~ $(echo ^\(${TASKS}\)$) ]]; 
     mkdir -p "$LIBS_FOLDER/build"
   fi
 
-  # Emscripten has an official port for vorbis, but it doesn't properly link vorbisfile https://github.com/emscripten-core/emscripten/pull/14005
-  if [[ ! -f "$LIBS_FOLDER/build/lib/libvorbis.a" ]]; then
-    echo "building libvorbis-1.3.7"
-    cd "$LIBS_FOLDER"
-    wget -nc "https://downloads.xiph.org/releases/vorbis/libvorbis-1.3.7.tar.gz"
-    tar -xf libvorbis-1.3.7.tar.gz
-    cd "$LIBS_FOLDER/libvorbis-1.3.7"
-    CFLAGS="-fPIC -s USE_OGG=1" emconfigure ./configure --host=wasm32-unknown-none --build=wasm32-unknown-none --prefix="$LIBS_FOLDER/build/"
-    emmake make -j 3
-    emmake make install
-  fi
-  #LIBS_FLAGS="${LIBS_FLAGS} --with-vorbis-prefix=$LIBS_FOLDER/build/"
-
   if [[ ! -f "$LIBS_FOLDER/build/lib/libtheora.a" ]]; then
     echo "build libtheora-1.1.1"
     cd "$LIBS_FOLDER"
@@ -184,7 +171,7 @@ if [[ "libs" =~ $(echo ^\(${TASKS}\)$) || "build" =~ $(echo ^\(${TASKS}\)$) ]]; 
     emmake make -j 3
     emmake make install
   fi
-  #LIBS_FLAGS="${LIBS_FLAGS} --with-theoradec-prefix=$LIBS_FOLDER/build/"
+  LIBS_FLAGS="${LIBS_FLAGS} --with-theoradec-prefix=$LIBS_FOLDER/build/"
 
   if [[ ! -f "$LIBS_FOLDER/build/lib/libfaad.a" ]]; then
     echo "building faad2-2.8.8"
@@ -196,7 +183,7 @@ if [[ "libs" =~ $(echo ^\(${TASKS}\)$) || "build" =~ $(echo ^\(${TASKS}\)$) ]]; 
     emmake make
     emmake make install
   fi
-   #LIBS_FLAGS="${LIBS_FLAGS} --with-faad-prefix=$LIBS_FOLDER/build/"
+  LIBS_FLAGS="${LIBS_FLAGS} --with-faad-prefix=$LIBS_FOLDER/build/"
 
   if [[ ! -f "$LIBS_FOLDER/build/lib/libmad.a" ]]; then
     echo "building libmad-0.15.1b"
@@ -212,7 +199,7 @@ if [[ "libs" =~ $(echo ^\(${TASKS}\)$) || "build" =~ $(echo ^\(${TASKS}\)$) ]]; 
     emmake make
     emmake make install
   fi
-   #LIBS_FLAGS="${LIBS_FLAGS} --with-mad-prefix=$LIBS_FOLDER/build/"
+  LIBS_FLAGS="${LIBS_FLAGS} --with-mad-prefix=$LIBS_FOLDER/build/"
 
   if [[ ! -f "$LIBS_FOLDER/build/lib/libmpeg2.a" ]]; then
     echo "building libmpeg2-0.5.1"
@@ -224,7 +211,7 @@ if [[ "libs" =~ $(echo ^\(${TASKS}\)$) || "build" =~ $(echo ^\(${TASKS}\)$) ]]; 
     emmake make
     emmake make install
   fi
-   #LIBS_FLAGS="${LIBS_FLAGS} --with-mpeg2-prefix=$LIBS_FOLDER/build/"
+  LIBS_FLAGS="${LIBS_FLAGS} --with-mpeg2-prefix=$LIBS_FOLDER/build/"
 
   if [[ ! -f "$LIBS_FOLDER/build/lib/liba52.a" ]]; then
     echo "building a52dec-0.7.4"
@@ -236,7 +223,7 @@ if [[ "libs" =~ $(echo ^\(${TASKS}\)$) || "build" =~ $(echo ^\(${TASKS}\)$) ]]; 
     emmake make -j 3
     emmake make install
   fi
-   #LIBS_FLAGS="${LIBS_FLAGS} --with-a52-prefix=$LIBS_FOLDER/build/"
+  LIBS_FLAGS="${LIBS_FLAGS} --with-a52-prefix=$LIBS_FOLDER/build/"
 fi
 
 #################################

@@ -3008,9 +3008,6 @@ EOF
 		fi
 		if test "$_vorbis" = yes; then
 			append_var LDFLAGS "-s USE_VORBIS=1" 
-			# broken, see  https://github.com/emscripten-core/emscripten/pull/14005 and
-			# it doesn't properly link vorbisfile https://github.com/emscripten-core/emscripten/pull/14005
-			# https://github.com/emscripten-core/emscripten/pull/9849/commits/5e39ced843efd4d97d313d24fe928c7d996cfe37
 		else
 			_vorbis=no # don't automatically enable any optional libraries which are part of ports
 		fi
@@ -6500,6 +6497,10 @@ case $_host_os in
 		fi
 		if test "${LDFLAGS#*-s USE_GIFLIB=1}" != "$LDFLAGS"; then
 			LIBS=`echo ${LIBS} | sed 's/-lgif//g'`
+		fi
+		if test "${LDFLAGS#*-s USE_VORBIS=1}" != "$LDFLAGS"; then
+			LIBS=`echo ${LIBS} | sed 's/-lvorbisfile//g;'`
+			LIBS=`echo ${LIBS} | sed 's/-lvorbis//g'`
 		fi
 		
 		;;
