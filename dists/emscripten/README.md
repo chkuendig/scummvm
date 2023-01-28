@@ -74,7 +74,9 @@ ScummVM relies heavily on Asyncify (see note above), and this comes with a quite
 *   Look into emscripten-core/emscripten#16779 as an alternative
 
 NOTES: 
-- run wasm-objdump -x -j Export scummvm.wasm and demangle to match against what's in asyncify-imports. this should help us get mangled names whcih can be used in asyncify_imports
+- TODO: run wasm-objdump -x -j Export scummvm.wasm and demangle to match against what's in asyncify-imports. this should help us get mangled names whcih can be used in asyncify_imports
+- TODO: figure out how to compile side_module=2
+- TODO: Fix optional libraries and document. set up default libraries (i.e. freetpye, png etc.). we  should only build the libs which are demanded by --emable-faad etc. Make sure that auto-detection doesn't link libraries which are in ports but not activated (i.e. is the library still found even without -s USE_VORBIS?)
 
 ### Storage Integration
 *   BrowserFS seems abandoned and never did a stable 2.0.0 release. It's worth replacing it.  

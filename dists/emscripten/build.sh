@@ -282,7 +282,7 @@ fi
 #################################
 # Create Games & Testbed Data
 #################################
-if [[ "games" =~ $(echo ^\(${TASKS}\)$) || "build" =~ $(echo ^\(${TASKS}\)$) ]]; then
+if [[ "games" =~ $(echo ^\(${TASKS}\)$) || "build111" =~ $(echo ^\(${TASKS}\)$) ]]; then
   cd "${ROOT_FOLDER}"
   echo "Creating Games + Testbed Data"
   mkdir -p "${ROOT_FOLDER}/build-emscripten/games/"
@@ -319,7 +319,7 @@ fi
 #################################
 # Add icons
 #################################
-if [[ "icons" =~ $(echo ^\(${TASKS}\)$) || "build" =~ $(echo ^\(${TASKS}\)$) ]]; then
+if [[ "icons" =~ $(echo ^\(${TASKS}\)$) || "build111" =~ $(echo ^\(${TASKS}\)$) ]]; then
 
   if [[ -d "${ROOT_FOLDER}/../scummvm-icons/" ]]; then
     echo "Adding files from icons repository "
@@ -342,7 +342,7 @@ fi
 #################################
 # Automatically detect games and create scummvm.ini file
 #################################
-if [[ "add-games" =~ $(echo ^\(${TASKS}\)$) || "build" =~ $(echo ^\(${TASKS}\)$) ]]; then
+if [[ "add-games" =~ $(echo ^\(${TASKS}\)$) || "build111" =~ $(echo ^\(${TASKS}\)$) ]]; then
   cd "${ROOT_FOLDER}"
   cp "$DIST_FOLDER/assets/scummvm.ini" "${ROOT_FOLDER}/build-emscripten/"
   cd "${ROOT_FOLDER}/build-emscripten/"

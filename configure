@@ -2951,7 +2951,7 @@ EOF
 		# mandatory emscripten flags
 		append_var DEFINES "-DEMSCRIPTEN"
 		add_line_to_config_mk 'EMSCRIPTEN = 1'
-		append_var LDFLAGS "-s ALLOW_MEMORY_GROWTH=1 -s ASYNCIFY -s FORCE_FILESYSTEM=1"
+		append_var LDFLAGS "-s ALLOW_MEMORY_GROWTH=1 -s ASYNCIFY -s FORCE_FILESYSTEM=1 -s ASYNCIFY_STACK_SIZE=16384"
 
 	
 		if test "$_debug_build" = yes; then
@@ -4403,7 +4403,7 @@ PLUGIN_LDFLAGS		+= -Wl,-T$(srcdir)/backends/plugins/ds/plugin.ld -mthumb -mthumb
  _mak_plugins='
 PLUGIN_EXTRA_DEPS =
 PLUGIN_LDFLAGS  += $(LDFLAGS) -s SIDE_MODULE=1 -s ASYNCIFY_IMPORTS='$asyncify_imports'
-PRE_OBJS_FLAGS  := -s MAIN_MODULE=2 -s EXPORTED_FUNCTIONS='$exported_functions' -Wno-undefined
+PRE_OBJS_FLAGS  := -s MAIN_MODULE=2  -Wno-undefined -s EXPORTED_FUNCTIONS='$exported_functions' 
 POST_OBJS_FLAGS := 
 '
 		else
