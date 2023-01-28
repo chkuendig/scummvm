@@ -35,9 +35,8 @@ TASKS=()
 CONFIGURE_ARGS=()
 _bundle_games=()
 _verbose=false
-EMSDK_VERSION="3.1.30"
+EMSDK_VERSION="3.1.31"
 EMSCRIPTEN_VERSION="$EMSDK_VERSION"
-EMSCRIPTEN_VERSION="sdk-upstream-main-64bit"
 
 usage="\
 Usage: ./dists/emscripten/build.sh [TASKS] [OPTIONS]
@@ -143,13 +142,10 @@ if [[ "clean" =~ $(echo ^\(${TASKS}\)$) ]]; then
   emmake make clean || true
   emmake make distclean || true
   emcc --clear-ports --clear-cache
-  #rm -rf ./dists/emscripten/libs/build || true
-  #rm -rf ./dists/emscripten/libs/*/ || true
   rm -rf ./build-emscripten/ || true
   rm scummvm.debug.wasm || true
-  find . -name "*.o" || true
-  find . -name "*.a" || true
-  find . -name "*.wasm" || true
+  rm scummvm.wasm || true
+  rm scummvm.js || true
   exit 0
 fi
 
@@ -342,7 +338,7 @@ fi
 #################################
 # Automatically detect games and create scummvm.ini file
 #################################
-if [[ "add-games" =~ $(echo ^\(${TASKS}\)$) || "build111" =~ $(echo ^\(${TASKS}\)$) ]]; then
+if [[ "add-games" =~ $(echo ^\(${TASKS}\)$) || "build" =~ $(echo ^\(${TASKS}\)$) ]]; then
   cd "${ROOT_FOLDER}"
   cp "$DIST_FOLDER/assets/scummvm.ini" "${ROOT_FOLDER}/build-emscripten/"
   cd "${ROOT_FOLDER}/build-emscripten/"
