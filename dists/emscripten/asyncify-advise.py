@@ -23,8 +23,6 @@ for line in lines:
     #Regex for Imports 
     
     result = re.search(r"^ - (?:\w+)\[\d+\] (?:i32 mutable=[0-1])?(?:sig=\d+)?(?: \<(\S+)\>)? \<- (\S+)$", line)
-    # don't count the globals
-    result = re.search(r"^ - (?:func)\[\d+\] (?:sig=\d+)?(?: \<(\S+)\>)? \<- (\S+)$", line)
     if(result):
         for group in result.groups():
             if (group and len(group)> 0): 
