@@ -2956,7 +2956,9 @@ EOF
 	
 		if test "$_debug_build" = yes; then
 			append_var LDFLAGS "-g2 -s ASSERTIONS=2"
+		else 
 
+			append_var LDFLAGS "-s ASSERTIONS=1"
 		fi
 
 		if test "$_verbose_build" = yes; then
