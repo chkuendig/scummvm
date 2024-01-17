@@ -211,6 +211,9 @@ const char gScummVMFeatures[] = ""
 #  ifdef USE_LIBCURL
 	"libcurl "
 #  endif
+#  ifdef EMSCRIPTEN
+	"emscripten_fetch "
+#  endif
 #  ifdef USE_SDL_NET
 	"SDL_net "
 #  endif
