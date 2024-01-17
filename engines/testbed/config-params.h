@@ -53,7 +53,7 @@ private:
 	 */
 	bool _isInteractive;
 	bool _isGameDataFound;
-#ifdef USE_LIBCURL
+#if defined(USE_LIBCURL) || defined(EMSCRIPTEN) 
 	bool _isCloudTestCallbackCalled;
 	bool _isCloudTestErrorCallbackCalled;
 #endif
