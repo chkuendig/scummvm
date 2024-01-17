@@ -42,7 +42,7 @@
 #include "gui/widgets/popup.h"
 #include "gui/widgets/scrollcontainer.h"
 
-#if defined(USE_CLOUD) && defined(USE_LIBCURL)
+#if defined(USE_CLOUD) && ( defined(USE_LIBCURL) || defined(EMSCRIPTEN) )
 #include "backends/cloud/cloudmanager.h"
 #endif
 
