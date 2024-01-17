@@ -49,7 +49,7 @@ MODULE_OBJS := \
 	widgets/tab.o
 
 ifdef USE_CLOUD
-ifdef USE_LIBCURL
+ifneq "$(or $(USE_LIBCURL),$(EMSCRIPTEN))" ""
 MODULE_OBJS += \
 	cloudconnectionwizard.o \
 	downloaddialog.o \
