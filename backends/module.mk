@@ -109,6 +109,10 @@ MODULE_OBJS += \
 	networking/curl/session.o \
 	networking/curl/sessionrequest.o \
 	networking/curl/url.o
+ifdef USE_CLOUD
+MODULE_OBJS += \
+	fs/emscripten/cloud-fs.o 
+endif
 endif
 
 ifdef USE_SDL_NET

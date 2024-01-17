@@ -26,6 +26,10 @@
 #include "backends/fs/emscripten/emscripten-fs-factory.h"
 #include "backends/fs/emscripten/emscripten-posix-fs.h"
 #include "backends/fs/emscripten/http-fs.h"
+#ifdef USE_CLOUD
+#include "backends/fs/emscripten/cloud-fs.h"
+#endif
+
 #include <emscripten.h>
 
 EM_ASYNC_JS(void, _initIDBFS, (const char *pathPtr), {
@@ -92,6 +96,10 @@ AbstractFSNode *EmscriptenFilesystemFactory::makeFileNodePath(const Common::Stri
 	assert(!path.empty());
 	if (path.hasPrefix(DATA_PATH)) {
 		return new HTTPFilesystemNode(path);
+#ifdef USE_CLOUD
+	} else if (path.hasPrefix(CLOUD_FS_PATH) && CloudMan.isStorageEnabled()) {
+		return new CloudFilesystemNode(path);
+#endif
 	} else {
 		return new EmscriptenPOSIXFilesystemNode(path);
 	}

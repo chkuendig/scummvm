@@ -28,7 +28,7 @@
 
 namespace Cloud {
 
-DownloadRequest::DownloadRequest(Storage *storage, Storage::BoolCallback callback, Networking::ErrorCallback ecb, Common::String remoteFileId, Common::DumpFile *dumpFile):
+DownloadRequest::DownloadRequest(Storage *storage, Storage::BoolCallback callback, Networking::ErrorCallback ecb, const Common::String &remoteFileId, Common::DumpFile *dumpFile):
 	Request(nullptr, ecb), _boolCallback(callback), _localFile(dumpFile), _remoteFileId(remoteFileId), _storage(storage),
 	_remoteFileStream(nullptr), _workingRequest(nullptr), _ignoreCallback(false), _buffer(new byte[DOWNLOAD_REQUEST_BUFFER_SIZE]) {
 	start();
@@ -53,22 +53,22 @@ void DownloadRequest::start() {
 
 	_workingRequest = _storage->streamFileById(
 		_remoteFileId,
-		new Common::Callback<DownloadRequest, Networking::NetworkReadStreamResponse>(this, &DownloadRequest::streamCallback),
-		new Common::Callback<DownloadRequest, Networking::ErrorResponse>(this, &DownloadRequest::streamErrorCallback)
+		new Common::Callback<DownloadRequest, const Networking::NetworkReadStreamResponse &>(this, &DownloadRequest::streamCallback),
+		new Common::Callback<DownloadRequest, const Networking::ErrorResponse &>(this, &DownloadRequest::streamErrorCallback)
 	);
 }
 
-void DownloadRequest::streamCallback(Networking::NetworkReadStreamResponse response) {
+void DownloadRequest::streamCallback(const Networking::NetworkReadStreamResponse &response) {
 	_workingRequest = nullptr;
 	if (_ignoreCallback)
 		return;
-	_remoteFileStream = (Networking::NetworkReadStream *)response.value;
+	_remoteFileStream = response.value;
 #ifdef EMSCRIPTEN
 	((Networking::NetworkReadStreamEmscripten *) _remoteFileStream)->setRequest(this);
 #endif
 }
 
-void DownloadRequest::streamErrorCallback(Networking::ErrorResponse error) {
+void DownloadRequest::streamErrorCallback(const Networking::ErrorResponse &error) {
 	_workingRequest = nullptr;
 	if (_ignoreCallback)
 		return;
@@ -128,7 +128,7 @@ void DownloadRequest::finishDownload(bool success) {
 		(*_boolCallback)(Storage::BoolResponse(this, success));
 }
 
-void DownloadRequest::finishError(Networking::ErrorResponse error, Networking::RequestState state) {
+void DownloadRequest::finishError(const Networking::ErrorResponse &error, Networking::RequestState state) {
 	if (_localFile)
 		_localFile->close();
 	Request::finishError(error);
