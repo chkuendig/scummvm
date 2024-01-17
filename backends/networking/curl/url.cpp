@@ -20,7 +20,11 @@
  */
 
 #define FORBIDDEN_SYMBOL_ALLOW_ALL
+#ifdef USE_LIBCURL
 #include <curl/curl.h>
+#elif defined(EMSCRIPTEN)
+#include "backends/networking/emscripten/slist.h"
+#endif
 #include "backends/networking/curl/url.h"
 #include "common/debug.h"
 #include "common/textconsole.h"
