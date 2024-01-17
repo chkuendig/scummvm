@@ -195,6 +195,7 @@ public:
 	 * @returns date from "Date" response header.
 	 */
 	virtual Common::String date() const;
+
 };
 
 } // End of namespace Networking

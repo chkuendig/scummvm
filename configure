@@ -3619,9 +3619,11 @@ if test -n "$_host"; then
 			# Disable cloud and SDL_Net as this is handled in the browser
 			_cloud=no
 			_sdlnet=no
+			# Emscripten backend uses emscripten_fetch not libcurl
 			_libcurl=no
 			_curl=no
 			_enet=no
+			append_var LDFLAGS "-sFETCH"
 			_ar="emar cr"
 			_ranlib="emranlib"
 			;;

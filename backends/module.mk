@@ -93,6 +93,19 @@ MODULE_OBJS += \
 	networking/curl/url.o
 endif
 
+ifdef EMSCRIPTEN
+MODULE_OBJS += \
+	networking/emscripten/connectionmanager-emscripten.o \
+	networking/emscripten/networkreadstream-emscripten.o \
+	networking/curl/curlrequest.o \
+	networking/curl/curljsonrequest.o \
+	networking/curl/postrequest.o \
+	networking/curl/request.o \
+	networking/curl/session.o \
+	networking/curl/sessionrequest.o \
+	networking/curl/url.o
+endif
+
 ifdef USE_SDL_NET
 MODULE_OBJS += \
 	networking/sdl_net/client.o \
