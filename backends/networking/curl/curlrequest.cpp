@@ -21,10 +21,17 @@
 
 #define FORBIDDEN_SYMBOL_ALLOW_ALL
 
+#ifdef USE_LIBCURL
 #include <curl/curl.h>
+#elif defined(EMSCRIPTEN)
+#include "backends/networking/emscripten/slist.h"
+#endif
 #include "backends/networking/curl/curlrequest.h"
 #include "backends/networking/curl/connectionmanager.h"
 #include "backends/networking/curl/networkreadstream.h"
+#ifdef EMSCRIPTEN
+#include "backends/networking/emscripten/networkreadstream-emscripten.h"
+#endif
 #include "common/textconsole.h"
 
 namespace Networking {
@@ -40,11 +47,23 @@ CurlRequest::~CurlRequest() {
 }
 
 NetworkReadStream *CurlRequest::makeStream() {
+#ifdef USE_LIBCURL
 	if (_bytesBuffer)
 		return new NetworkReadStream(_url.c_str(), _headersList, _bytesBuffer, _bytesBufferSize, _uploading, _usingPatch, true, _keepAlive, _keepAliveIdle, _keepAliveInterval);
 	if (!_formFields.empty() || !_formFiles.empty())
 		return new NetworkReadStream(_url.c_str(), _headersList, _formFields, _formFiles, _keepAlive, _keepAliveIdle, _keepAliveInterval);
 	return new NetworkReadStream(_url.c_str(), _headersList, _postFields, _uploading, _usingPatch, _keepAlive, _keepAliveIdle, _keepAliveInterval);
+#elif defined(EMSCRIPTEN)
+	NetworkReadStreamEmscripten *stream;
+	if (_bytesBuffer)
+		stream = new NetworkReadStreamEmscripten(_url.c_str(), _headersList, _bytesBuffer, _bytesBufferSize, _uploading, _usingPatch, true, _keepAlive, _keepAliveIdle, _keepAliveInterval);
+	if (!_formFields.empty() || !_formFiles.empty())
+		stream = new NetworkReadStreamEmscripten(_url.c_str(), _headersList, _formFields, _formFiles, _keepAlive, _keepAliveIdle, _keepAliveInterval);
+	stream = new NetworkReadStreamEmscripten(_url.c_str(), _headersList, _postFields, _uploading, _usingPatch, _keepAlive, _keepAliveIdle, _keepAliveInterval);
+
+	stream->setRequest(this);
+	return stream;
+#endif
 }
 
 void CurlRequest::handle() {
