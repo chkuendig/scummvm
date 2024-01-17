@@ -28,7 +28,7 @@ MODULE_OBJS := \
 	timer/default/default-timer.o
 
 ifdef USE_CLOUD
-ifdef USE_LIBCURL
+ifneq "$(or $(USE_LIBCURL),$(EMSCRIPTEN))" ""
 MODULE_OBJS += \
 	cloud/basestorage.o \
 	cloud/cloudicon.o \

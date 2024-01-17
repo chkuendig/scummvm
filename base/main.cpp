@@ -73,7 +73,7 @@
 #include "backends/keymapper/keymapper.h"
 
 #ifdef USE_CLOUD
-#ifdef USE_LIBCURL
+#if defined(USE_LIBCURL) || defined(EMSCRIPTEN)
 #include "backends/cloud/cloudmanager.h"
 #include "backends/networking/curl/connectionmanager.h"
 #endif
