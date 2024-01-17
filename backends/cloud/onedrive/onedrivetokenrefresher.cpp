@@ -21,7 +21,11 @@
 
 #define FORBIDDEN_SYMBOL_ALLOW_ALL
 
+#ifdef USE_LIBCURL
 #include <curl/curl.h>
+#elif defined(EMSCRIPTEN)
+#include "backends/networking/emscripten/slist.h"
+#endif
 #include "backends/cloud/onedrive/onedrivetokenrefresher.h"
 #include "backends/cloud/onedrive/onedrivestorage.h"
 #include "backends/networking/curl/networkreadstream.h"

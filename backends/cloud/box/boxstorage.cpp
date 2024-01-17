@@ -21,7 +21,11 @@
 
 #define FORBIDDEN_SYMBOL_ALLOW_ALL
 
+#ifdef USE_LIBCURL
 #include <curl/curl.h>
+#elif defined(EMSCRIPTEN)
+#include "backends/networking/emscripten/slist.h"
+#endif
 #include "backends/cloud/box/boxstorage.h"
 #include "backends/cloud/box/boxlistdirectorybyidrequest.h"
 #include "backends/cloud/box/boxtokenrefresher.h"
@@ -33,6 +37,9 @@
 #include "common/config-manager.h"
 #include "common/debug.h"
 #include "common/formats/json.h"
+#ifdef EMSCRIPTEN
+#include "backends/networking/emscripten/networkreadstream-emscripten.h"
+#endif
 
 namespace Cloud {
 namespace Box {
@@ -198,8 +205,13 @@ Networking::Request *BoxStorage::streamFileById(const Common::String &id, Networ
 		Common::String url = Common::String::format(BOX_API_FILES_CONTENT, id.c_str());
 		Common::String header = "Authorization: Bearer " + _token;
 		curl_slist *headersList = curl_slist_append(nullptr, header.c_str());
+#ifndef EMSCRIPTEN
 		Networking::NetworkReadStream *stream = new Networking::NetworkReadStream(url.c_str(), headersList, "");
 		(*callback)(Networking::NetworkReadStreamResponse(nullptr, stream));
+#else
+		Networking::NetworkReadStream *stream = new Networking::NetworkReadStreamEmscripten(url.c_str(), headersList, "");
+		(*callback)(Networking::NetworkReadStreamResponse(nullptr, stream));
+#endif
 	}
 	delete callback;
 	delete errorCallback;

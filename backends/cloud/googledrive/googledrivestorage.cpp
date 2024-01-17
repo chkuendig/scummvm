@@ -21,7 +21,11 @@
 
 #define FORBIDDEN_SYMBOL_ALLOW_ALL
 
+#ifdef USE_LIBCURL
 #include <curl/curl.h>
+#elif defined(EMSCRIPTEN)
+#include "backends/networking/emscripten/slist.h"
+#endif
 #include "backends/cloud/googledrive/googledrivestorage.h"
 #include "backends/cloud/cloudmanager.h"
 #include "backends/cloud/googledrive/googledrivetokenrefresher.h"
@@ -34,6 +38,9 @@
 #include "common/debug.h"
 #include "common/formats/json.h"
 #include "common/debug.h"
+#ifdef EMSCRIPTEN
+#include "backends/networking/emscripten/networkreadstream-emscripten.h"
+#endif
 
 namespace Cloud {
 namespace GoogleDrive {
@@ -169,8 +176,13 @@ Networking::Request *GoogleDriveStorage::streamFileById(const Common::String &id
 		Common::String url = Common::String::format(GOOGLEDRIVE_API_FILES_ALT_MEDIA, ConnMan.urlEncode(id).c_str());
 		Common::String header = "Authorization: Bearer " + _token;
 		curl_slist *headersList = curl_slist_append(nullptr, header.c_str());
+#ifndef EMSCRIPTEN
 		Networking::NetworkReadStream *stream = new Networking::NetworkReadStream(url.c_str(), headersList, "");
 		(*callback)(Networking::NetworkReadStreamResponse(nullptr, stream));
+#else
+		Networking::NetworkReadStream *stream = new Networking::NetworkReadStreamEmscripten(url.c_str(), headersList, "");
+		(*callback)(Networking::NetworkReadStreamResponse(nullptr, stream));
+#endif
 	}
 	delete callback;
 	delete errorCallback;

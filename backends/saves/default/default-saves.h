@@ -44,7 +44,7 @@ public:
 	bool removeSavefile(const Common::String &filename) override;
 	bool exists(const Common::String &filename) override;
 
-#ifdef USE_LIBCURL
+#if defined(USE_LIBCURL) || defined(EMSCRIPTEN)
 
 	static const uint32 INVALID_TIMESTAMP = UINT_MAX;
 	static const char *const TIMESTAMPS_FILENAME;

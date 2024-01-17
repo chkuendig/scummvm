@@ -21,7 +21,11 @@
 
 #define FORBIDDEN_SYMBOL_ALLOW_ALL
 
+#ifdef USE_LIBCURL
 #include <curl/curl.h>
+#elif defined(EMSCRIPTEN)
+#include "backends/networking/emscripten/slist.h"
+#endif
 #include "backends/cloud/googledrive/googledrivetokenrefresher.h"
 #include "backends/cloud/googledrive/googledrivestorage.h"
 #include "backends/networking/curl/networkreadstream.h"

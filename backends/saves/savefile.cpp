@@ -22,7 +22,7 @@
 #include "common/util.h"
 #include "common/savefile.h"
 #include "common/str.h"
-#if defined(USE_CLOUD) && defined(USE_LIBCURL)
+#if defined(USE_CLOUD) && ( defined(USE_LIBCURL) || defined(EMSCRIPTEN) )
 #include "backends/cloud/cloudmanager.h"
 #endif
 

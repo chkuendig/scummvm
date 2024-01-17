@@ -203,7 +203,7 @@ const char gScummVMFeatures[] = ""
 
 #ifdef USE_CLOUD
 	"cloud ("
-#  ifdef USE_LIBCURL
+#  if defined(USE_LIBCURL) || defined(EMSCRIPTEN) 
 	"servers"
 #    ifdef USE_SDL_NET
 	", local) "

@@ -149,7 +149,11 @@ void FolderDownloadRequest::downloadNextFile() {
 }
 
 void FolderDownloadRequest::handle() {
+#ifdef USE_LIBCURL
 	uint32 microsecondsPassed = Networking::ConnectionManager::getCloudRequestsPeriodInMicroseconds();
+#elif defined(EMSCRIPTEN)
+	uint32 microsecondsPassed = 0; // TODO: Fix this
+#endif
 	uint64 currentDownloadedBytes = getDownloadedBytes();
 	uint64 downloadedThisPeriod = currentDownloadedBytes - _wasDownloadedBytes;
 	_currentDownloadSpeed = downloadedThisPeriod * (1000000L / microsecondsPassed);
