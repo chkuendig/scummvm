@@ -8,3 +8,7 @@ if (window.location.hash.length > 0) {
         Module["arguments"].push(param);
     })
 }
+
+window.addEventListener("hashchange", function () {
+	location.reload(); // presumably the launch parameters changed
+});
