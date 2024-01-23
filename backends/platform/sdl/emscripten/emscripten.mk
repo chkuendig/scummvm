@@ -29,4 +29,4 @@ endif
 	$(EMSDK_NODE) "$(srcdir)/dists/emscripten/build-make_http_index.js" ./build-emscripten/data
 	cp "$(srcdir)/dists/emscripten/assets/"* ./build-emscripten/
 	cp "$(srcdir)/gui/themes/common-svg/logo.svg" ./build-emscripten/
-	cp "$(srcdir)/icons/scummvm.ico" ./build-emscripten/favicon.ico
+	cp "$(srcdir)/icons/scummvm.svg" ./build-emscripten/scummvm.svg
