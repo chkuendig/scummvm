@@ -36,6 +36,7 @@ public:
 	GraphicsManagerType getDefaultGraphicsManager() const override;
 #endif
 	void exportFile(const Common::Path &filename);
+	void init() override;
 
 protected:
 	Common::Path getDefaultConfigFileName() override;

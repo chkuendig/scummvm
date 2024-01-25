@@ -19,20 +19,19 @@
  *
  */
 
-#ifndef BACKENDS_FS_POSIX_POSIXIOSTREAM_H
-#define BACKENDS_FS_POSIX_POSIXIOSTREAM_H
+#ifndef EMSCRIPTEN_FILESYSTEM_H
+#define EMSCRIPTEN_FILESYSTEM_H
 
-#include "backends/fs/stdiostream.h"
+#include "backends/fs/posix/posix-fs.h"
 
-/**
- * A file input / output stream using POSIX interfaces
- */
-class PosixIoStream : public StdioStream {
+class EmscriptenPOSIXFilesystemNode : public POSIXFilesystemNode {
+
 public:
-	static PosixIoStream *makeFromPath(const Common::String &path, bool writeMode);
-	PosixIoStream(void *handle);
-
-	int64 size() const override;
+	EmscriptenPOSIXFilesystemNode(const Common::String &path);
+	EmscriptenPOSIXFilesystemNode();
+	bool getChildren(AbstractFSList &myList, ListMode mode, bool hidden) const override;
+	AbstractFSNode *makeNode(const Common::String &path) const override;
+	Common::SeekableWriteStream *createWriteStream() override;
 };
 
 #endif

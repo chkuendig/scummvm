@@ -19,20 +19,20 @@
  *
  */
 
-#ifndef BACKENDS_FS_POSIX_POSIXIOSTREAM_H
-#define BACKENDS_FS_POSIX_POSIXIOSTREAM_H
+#ifndef BACKENDS_FS_EMSCRIPTEN_IDBFSIOSTREAM_H
+#define BACKENDS_FS_EMSCRIPTEN_IDBFSIOSTREAM_H
 
-#include "backends/fs/stdiostream.h"
+#include "backends/fs/posix/posix-iostream.h"
 
 /**
  * A file input / output stream using POSIX interfaces
  */
-class PosixIoStream : public StdioStream {
+class EmscriptenIdbfsIoStream : public PosixIoStream {
 public:
-	static PosixIoStream *makeFromPath(const Common::String &path, bool writeMode);
-	PosixIoStream(void *handle);
+		EmscriptenIdbfsIoStream(void *handle);
+	~EmscriptenIdbfsIoStream();
 
-	int64 size() const override;
+	static EmscriptenIdbfsIoStream *makeFromPath(const Common::String &path, bool writeMode);
 };
 
 #endif

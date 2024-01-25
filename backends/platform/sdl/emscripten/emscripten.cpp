@@ -26,6 +26,7 @@
 #define FORBIDDEN_SYMBOL_EXCEPTION_getenv
 #include <emscripten.h>
 
+#include "backends/fs/emscripten/emscripten-fs-factory.h"
 #include "backends/platform/sdl/emscripten/emscripten.h"
 #include "common/file.h"
 
@@ -65,6 +66,15 @@ EM_JS(void, downloadFile, (const char *filenamePtr, char *dataPtr, int dataSize)
 });
 
 // Overridden functions
+void OSystem_Emscripten::init() {
+	// Initialze File System Factory
+	EmscriptenFilesystemFactory *fsFactory = new EmscriptenFilesystemFactory();
+	_fsFactory = fsFactory;
+
+	// Invoke parent implementation of this method
+	OSystem_SDL::init();
+}
+
 bool OSystem_Emscripten::hasFeature(Feature f) {
 	if (f == kFeatureFullscreenMode)
 		return true;
