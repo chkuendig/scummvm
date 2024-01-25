@@ -3405,11 +3405,7 @@ void GlobalOptionsDialog::handleCommand(CommandSender *sender, uint32 cmd, uint3
 		break;
 	}
 	case kOpenUrlStorageCmd: {
-#ifdef EMSCRIPTEN
-		Common::String url = "/";
-#elif
 		Common::String url = "https://cloud.scummvm.org/";
-#endif
 		switch (_selectedStorageIndex) {
 		case Cloud::kStorageDropboxId:
 			url += "dropbox?refresh_token=true";

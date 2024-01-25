@@ -22,7 +22,22 @@ class ApiProxy:
                 path = self.translate_path(self.path)
         
                 print(path)
-                if path.endswith("index.json"): 
+                # url for cloud.scummvm.org
+                if self.path[1:].startswith(tuple(cloud_backends)):
+                    print("cloud.scummvm.org"+self.path)
+                    if self.path[1:].endswith("/refresh"): 
+                        #refresh tokens still need to be proxied to avoid CORS issues
+                        self._proxy_request("get", requests.get)
+                        return
+                    else:
+                        #forward all other requests
+                        self.send_response(HTTPStatus.MOVED_PERMANENTLY)
+                        self.send_header(
+                            'Location', "https://cloud.scummvm.org"+self.path)
+                        self.end_headers()
+                        return
+                
+                elif path.endswith("index.json"): 
                         dir = os.path.dirname(path)
                         if(os.path.isdir(dir)): 
                             print("create json for %s"%dir)
@@ -55,13 +70,47 @@ class ApiProxy:
                 else:
                     super().do_GET()
 
+            def do_DELETE(self):
+                self._proxy_request("delete", requests.delete)
+
+            def do_POST(self):
+                self._proxy_request("post", requests.post)
+
+            def do_PUT(self):
+                self._proxy_request("put", requests.put)
+
+            def do_PATCH(self):
+                self._proxy_request("patch", requests.patch)
+
             def end_headers (self):
                 self.send_header('Access-Control-Allow-Origin', '*')
+               # self.send_header('Cross-Origin-Opener-Policy', 'same-origin')
+                self.send_header('Cross-Origin-Embedder-Policy', 'require-corp')
                 SimpleHTTPRequestHandler.end_headers(self)
-          
+            
+            def _proxy_request(self, method, requests_func):
+                url = "https://cloud.scummvm.org"+self.path
+                headers = dict(self.headers)
+                headers['Host'] = "cloud.scummvm.org"
+                print(url)
+
+                body = None
+                if "content-length" in self.headers:
+                    print("Theres content-length")
+                    body = self.rfile.read(int(self.headers["content-length"]))
+
+                resp = requests_func(url, data=body, headers=headers)
+                self.send_response(resp.status_code)
+                for key in resp.headers:
+                    # server and date are already sent. and we break the transfer encoding, so don't send that either
+                    if (key not in ["Transfer-Encoding", "Server", "Date", "Connection"]):
+                        self.send_header(key, resp.headers[key])
+                self.end_headers()
+                self.wfile.write(resp.content)
+
         server_address = ('', 8001)
         self.httpd = HTTPServer(server_address, ProxyHTTPRequestHandler)
-        print('server is running')
+        print('proxy server is running')
         self.httpd.serve_forever()
 
 
