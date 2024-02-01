@@ -37,8 +37,17 @@ EM_ASYNC_JS(void, _initIDBFS, (const char *pathPtr), {
 			FS.syncfs(true, (err) => {
 				if (err) {
 					reject(err);
-				}
-				else {
+				} else if(!FS.analyzePath("/home/web_user/scummvm.ini").exists) { 
+					// if we don't have a settings file yet, we try to download it
+					// this allows setting up a default scummvm.ini with some games already added 
+					fetch("scummvm.ini")
+						.then((response) => response.ok ? response.text() : "")
+						.then((text) => {
+							Module.FS.writeFile('/home/web_user/scummvm.ini', text);
+							resolve(true);
+						})
+						.catch((err) => reject);
+				} else {
 					resolve(true);
 				}
 			});
