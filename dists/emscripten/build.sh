@@ -316,13 +316,13 @@ if [[ "games" =~ $(echo ^\(${TASKS}\)$) || "build" =~ $(echo ^\(${TASKS}\)$) ]];
     done
     for f in $files; do # unpack into games folder
       echo "Unzipping $f ..."
-      unzip -q -n "$f" -d "${ROOT_FOLDER}/build-emscripten/games/${f%.zip}"
+      unzip -q -n "$f" -d "${ROOT_FOLDER}/build-emscripten/data/games/${f%.zip}"
       # some zip files have weird permissions, this fixes that:
-      find "${ROOT_FOLDER}/build-emscripten/games/${f%.zip}" -type d -exec chmod 0755 {} \;
-      find "${ROOT_FOLDER}/build-emscripten/games/${f%.zip}" -type f -exec chmod 0644 {} \;
+      find "${ROOT_FOLDER}/build-emscripten/data/games/${f%.zip}" -type d -exec chmod 0755 {} \;
+      find "${ROOT_FOLDER}/build-emscripten/data/games/${f%.zip}" -type f -exec chmod 0644 {} \;
     done
   fi
-  cd "${ROOT_FOLDER}/build-emscripten/games/"
+  cd "${ROOT_FOLDER}/build-emscripten/data/games/"
   "$EMSDK_NODE" "$DIST_FOLDER/build-make_http_index.js" >index.json
 fi
 #################################

@@ -26,13 +26,14 @@
 #include "backends/fs/fs-factory.h"
 #include "backends/fs/posix/posix-fs.h"
 #include "backends/fs/posix/posix-iostream.h"
+#include "common/debug.h"
 #include "common/file.h"
-#include "common/system.h"
 
 Common::HashMap<Common::String, AbstractFSList> HTTPFilesystemNode::_httpFolders = Common::HashMap<Common::String, AbstractFSList>();
 
-HTTPFilesystemNode::HTTPFilesystemNode(const Common::String &p) : _path(p), _isValid(false) {
-	warning("HTTPFilesystemNode::HTTPFilesystemNode(%s)", p.c_str());
+HTTPFilesystemNode::HTTPFilesystemNode(const Common::String &p) : _path(p), _isValid(false), _isDirectory(false) {
+	debug(5, "HTTPFilesystemNode::HTTPFilesystemNode(%s)", p.c_str());
+	debug(5, "isValid %s isDirectory %s", _isValid ? "True" : "false", _isDirectory ? "True" : "false");
 	assert(p.size() > 0);
 
 	// Normalize the path (that is, remove unneeded slashes etc.)
@@ -58,6 +59,7 @@ HTTPFilesystemNode::HTTPFilesystemNode(const Common::String &p) : _path(p), _isV
 
 		return;
 	}
+	debug(5, "isValid %s isDirectory %s", _isValid ? "True" : "false", _isDirectory ? "True" : "false");
 }
 
 AbstractFSNode *HTTPFilesystemNode::getChild(const Common::String &n) const {
@@ -76,7 +78,6 @@ AbstractFSNode *HTTPFilesystemNode::getChild(const Common::String &n) const {
 
 	return makeNode(newPath);
 }
-
 
 void HTTPFilesystemNode::directoryListedCallback(const Networking::JsonResponse &response) {
 	Common::JSONObject jsonObj = Common::JSON::parse(response.value->stringify().c_str())->asObject();
@@ -97,21 +98,20 @@ void HTTPFilesystemNode::directoryListedCallback(const Networking::JsonResponse 
 	_httpFolders[_path] = *dirList;
 }
 
-
 void HTTPFilesystemNode::requestErrorCallback(const Networking::ErrorResponse &_error) {
-	warning("Response %ld: %s", _error.httpResponseCode, _error.response.c_str());
+	debug(5, "Response %ld: %s", _error.httpResponseCode, _error.response.c_str());
 	error("HTTPFilesystemNode::requestErrorCallback");
 }
 
 void HTTPFilesystemNode::fileDownloadedCallback(const Networking::MemoryWriteStreamDynamicResponse &response) {
-	warning("HTTPFilesystemNode::fileDownloadedCallback %u",response.request->state());
+	debug(5, "HTTPFilesystemNode::fileDownloadedCallback %u", response.request->state());
 	Common::String fsCachePath = Common::normalizePath("/.cache/" + _path, '/');
-	warning("HTTPFilesystemNode::fileDownloadedCallback");
+	debug(5, "HTTPFilesystemNode::fileDownloadedCallback");
 	Common::DumpFile *_localFile = new Common::DumpFile();
 	if (!_localFile->open(Common::Path(fsCachePath), true)) {
 		error("Storage: unable to open file to download into");
 	}
-	warning("*HTTPFilesystemNode::createReadStream() file downloaded %s", _path.c_str());
+	debug(5, "*HTTPFilesystemNode::createReadStream() file downloaded %s", _path.c_str());
 
 	Common::MemoryWriteStreamDynamic *_memoryStream;
 	_memoryStream = response.value;
@@ -124,16 +124,17 @@ void HTTPFilesystemNode::fileDownloadedCallback(const Networking::MemoryWriteStr
 	_localFile->close();
 }
 
-
 void HTTPFilesystemNode::requestFinishedCallback(Networking::Request *invalidRequestPointer) {
-	warning(" HTTPFilesystemNode::requestFinishedCallback");
+	debug(5, " HTTPFilesystemNode::requestFinishedCallback");
 }
 
 bool HTTPFilesystemNode::getChildren(AbstractFSList &myList, ListMode mode, bool hidden) const {
+	if (!_isValid) {
+		return false;
+	}
 	assert(_isDirectory);
-
 	if (!_httpFolders.contains(_path)) {
-		warning("HTTPFilesystemNode::getChildren Fetching Children: %s", _path.c_str());
+		debug(5, "HTTPFilesystemNode::getChildren Fetching Children: %s", _path.c_str());
 		Common::String url = _path + "/index.json";
 
 		Networking::CurlJsonRequest *request = new Networking::CurlJsonRequest(
@@ -147,7 +148,7 @@ bool HTTPFilesystemNode::getChildren(AbstractFSList &myList, ListMode mode, bool
 		while (!_httpFolders.contains(_path)) {
 			g_system->delayMillis(10);
 		}
-		warning("HTTPFilesystemNode::getChildren %s size %u", _path.c_str(), _httpFolders[_path].size());
+		debug(5, "HTTPFilesystemNode::getChildren %s size %u", _path.c_str(), _httpFolders[_path].size());
 	}
 
 	for (AbstractFSList::iterator i = _httpFolders[_path].begin(); i != _httpFolders[_path].end(); ++i) {
@@ -185,7 +186,7 @@ AbstractFSNode *HTTPFilesystemNode::getParent() const {
 }
 
 Common::SeekableReadStream *HTTPFilesystemNode::createReadStream() {
-	warning("*HTTPFilesystemNode::createReadStream() %s", _path.c_str());
+	debug(5, "*HTTPFilesystemNode::createReadStream() %s", _path.c_str());
 	Common::String fsCachePath = Common::normalizePath("/.cache/" + _path, '/');
 	POSIXFilesystemNode *cacheFile = new POSIXFilesystemNode(fsCachePath);
 	if (!cacheFile->exists()) {
@@ -199,9 +200,9 @@ Common::SeekableReadStream *HTTPFilesystemNode::createReadStream() {
 			new Common::Callback<HTTPFilesystemNode, Networking::Request *>(this, &HTTPFilesystemNode::requestFinishedCallback));
 		while (!cacheFile->exists()) {
 			g_system->delayMillis(10);
-			warning("%u %s %s", request->state(), cacheFile->exists() ? "true": "false", request? "true":"false");
+			debug(5, "%u %s %s", request->state(), cacheFile->exists() ? "true" : "false", request ? "true" : "false");
 		}
-		warning("*HTTPFilesystemNode::createReadStream() file written %s", fsCachePath.c_str());
+		debug(5, "*HTTPFilesystemNode::createReadStream() file written %s", fsCachePath.c_str());
 	}
 	return PosixIoStream::makeFromPath(fsCachePath, false);
 }

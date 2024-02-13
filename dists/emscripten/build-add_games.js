@@ -11,7 +11,7 @@ const server = http.createServer(function (req, res) {
     const browser = await puppeteer.launch({ headless: true });
     const page = await browser.newPage();
 
-    await page.goto('http://localhost:8080/scummvm.html#--add --path=/games --recursive');
+    await page.goto('http://localhost:8080/scummvm.html#--add --path=/data/games --recursive');
 
     await page.screenshot({ path: 'example.png' });
     const regex = /Added ([0-9]+) games/;
