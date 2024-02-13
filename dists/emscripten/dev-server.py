@@ -110,7 +110,7 @@ class ApiProxy:
 
         server_address = ('', 8001)
         self.httpd = HTTPServer(server_address, ProxyHTTPRequestHandler)
-        print('proxy server is running')
+        print('proxy server is running at port 8001')
         self.httpd.serve_forever()
 
 
