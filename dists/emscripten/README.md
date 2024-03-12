@@ -71,7 +71,8 @@ ScummVM relies heavily on Asyncify (see note above), and this comes with a quite
 *   Limit asyncify overhead by having a more specific setting for `ASYNCIFY_IMPORTS` in `configure`. This is especailly critical for plugins as when plugins are enabled, we currently add all functions as imports. 
 *   Don't use asyncify but rewrite main loop to improve performance.
 *   Look into Stack Switching (emscripten-core/emscripten#16779) or multithreading as an alternative to Asyncify.
-
+* TODO: Check out https://github.com/scummvm/scummvm/blob/5219c9940089099f6b5b5558f27ac706c7ee1305/graphics/framelimiter.h - it should help with making sure sleep is happening, but it only sleeps if the delay is >0 (https://github.com/scummvm/scummvm/blob/5219c9940089099f6b5b5558f27ac706c7ee1305/graphics/framelimiter.cpp#L55 ) which would be an issue.
+* 
 ### Storage Integration
 *   BrowserFS seems abandoned and never did a stable 2.0.0 release. It's worth replacing it.  
     * `scummvm_fs.js` is an early prototype for a custom FS which can be adopted for ScummVM specific needs, i.e.
