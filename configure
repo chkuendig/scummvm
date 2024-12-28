@@ -3555,6 +3555,8 @@ if test -n "$_host"; then
 			;;
 		wasm*-emscripten)
 			_backend="sdl"
+			_seq_midi=no
+			_timidity=no
 			# Disable SDL_Net and ENet (no sockets in the browser)
 			_enet=no
 			_sdlnet=no

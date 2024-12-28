@@ -146,7 +146,7 @@ if [[ $ret != 0 ]]; then
   EMSDK_NPM=$(dirname $EMSDK_NODE)/npm
   EMSDK_PYTHON="${EMSDK_PYTHON:-python3}"
   export NODE_PATH=$(dirname $EMSDK_NODE)/../lib/node_modules/
-  "$EMSDK_NODE" "$EMSDK_NPM" -g install "puppeteer@13.5.1"
+  "$EMSDK_NODE" "$EMSDK_NPM" -g install "puppeteer@23.11.1"
   "$EMSDK_NODE" "$EMSDK_NPM" -g install "request@2.88.2"
   "$EMSDK_NODE" "$EMSDK_NPM" -g install "node-static@0.7.11"
 
@@ -305,7 +305,7 @@ if [[ "games" =~ $(echo ^\(${TASKS}\)$) || "build" =~ $(echo ^\(${TASKS}\)$) ]];
   fi
 
   if [ -n "$_bundle_games" ]; then
-    echo "Fetching gmaes: $_bundle_games"
+    echo "Fetching games: $_bundle_games"
     mkdir -p "${DIST_FOLDER}/games/"
     cd "${DIST_FOLDER}/games/"
     files=$("$EMSDK_NODE" --unhandled-rejections=strict --trace-warnings "$DIST_FOLDER/build-download_games.js" ${_bundle_games})
