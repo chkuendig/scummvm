@@ -91,10 +91,8 @@ EM_JS(void, clipboard_add_paste_listener, (), {
 EM_JS(bool, cloud_connection_open_oauth_window, (char const *url), {
 	oauth_window = window.open(UTF8ToString(url));
 	window.addEventListener("message", (event) => {
-		if (event.origin = "https://cloud.scummvm.org/") {
-			Module._cloud_connection_json_callback(stringToNewUTF8(event.data));
-			oauth_window.close()
-		}
+		Module._cloud_connection_json_callback(stringToNewUTF8( JSON.stringify(event.data)));
+		oauth_window.close()
 	}, {once : true});
 	return true;
 });
@@ -219,11 +217,8 @@ bool OSystem_Emscripten::setTextInClipboard(const Common::U32String &text) {
 	return 0;
 }
 
-bool OSystem_Emscripten::openUrl(const Common::String &url) {
-	if(url.hasPrefix("https://cloud.scummvm.org/")){
-		return cloud_connection_open_oauth_window(url.c_str());
-	}
-	return	OSystem_SDL::openUrl(url);
+bool OSystem_Emscripten::openStorageUrl(const Common::String &url) {
+	return cloud_connection_open_oauth_window(url.c_str());
 }
 
 #endif

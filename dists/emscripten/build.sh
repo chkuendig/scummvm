@@ -367,8 +367,9 @@ if [[ "run" =~ $(echo ^\(${TASKS}\)$) ]]; then
   echo "Run ScummVM"
   cd "${ROOT_FOLDER}/build-emscripten/"
   # emrun doesn't support range requests. Once it will, we don't need node-static anymore
-  emrun --browser=chrome scummvm.html
-
+  #emrun --browser=chrome scummvm.html
+  # todo: include the relevant parts from https://github.com/emscripten-core/emscripten/blob/main/emrun.py
+  "$EMSDK_PYTHON" "$DIST_FOLDER/dev-server.py"
   # TODO: https://github.com/cloudhead/node-static/issues/241 means node-static doesn't work either.
   # $EMSDK_NPX -p node-static static .
 fi

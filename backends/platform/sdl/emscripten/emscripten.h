@@ -61,12 +61,12 @@ public:
 
 #ifdef USE_CLOUD
 	void setCloudConnectionCallback(CloudConnectionCallback cb) { _cloudConnectionCallback = cb; }
+	bool openStorageUrl(const Common::String &url); 
 #endif // USE_CLOUD
 
 	bool hasTextInClipboard() override;
 	Common::U32String getTextFromClipboard() override;
 	bool setTextInClipboard(const Common::U32String &text) override;
-	bool openUrl(const Common::String &url) override;
     
 protected:
 	Common::Path getDefaultConfigFileName() override;
