@@ -100,6 +100,7 @@ CloudConnectionWizard::~CloudConnectionWizard() {
 #ifdef EMSCRIPTEN
 // allow browser to pass in JSON tokens
 void CloudConnectionWizard::emscriptenCloudConnectionCallback(const Common::String *message ){
+	warning("CloudConnectionWizard::emscriptenCloudConnectionCallback %s", message->c_str());
 	showStep(Step::MANUAL_MODE_STEP_2);
 	if (!message->empty()) {
 		_codeBox->setEditString(*message);
@@ -647,7 +648,12 @@ void CloudConnectionWizard::handleCommand(CommandSender *sender, uint32 cmd, uin
 		break;
 
 	case kCloudConnectionWizardOpenUrlStorageCmd: {
+
+#ifdef EMSCRIPTEN 
+		Common::String url = "/";
+#elif
 		Common::String url = "https://cloud.scummvm.org/";
+#endif
 		switch (_selectedStorageIndex) {
 		case Cloud::kStorageDropboxId:
 			url += "dropbox/271?refresh_token=true";
@@ -665,10 +671,16 @@ void CloudConnectionWizard::handleCommand(CommandSender *sender, uint32 cmd, uin
 			break;
 		}
 
+#ifdef EMSCRIPTEN
+		// Users can't access the virtual emscripten filesystem in the browser, so we export the generated screenshot file via OSystem_Emscripten::exportFile.
+		OSystem_Emscripten *emscripten_g_system = dynamic_cast<OSystem_Emscripten*>(g_system);
+		emscripten_g_system->openStorageUrl(url);
+#elif
 		if (!g_system->openUrl(url)) {
 			MessageDialog alert(_("Failed to open URL!\nPlease navigate to this page manually."));
 			alert.runModal();
 		}
+#endif
 		break;
 	}
 

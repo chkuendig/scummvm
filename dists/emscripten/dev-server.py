@@ -33,7 +33,7 @@ class ApiProxy:
                         #forward all other requests
                         self.send_response(HTTPStatus.MOVED_PERMANENTLY)
                         self.send_header(
-                            'Location', "https://cloud.scummvm.org"+self.path)
+                            'Location', "http://localhost:8080"+self.path)
                         self.end_headers()
                         return
                 
