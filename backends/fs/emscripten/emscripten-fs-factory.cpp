@@ -47,7 +47,7 @@ EM_ASYNC_JS(void, _initIDBFS, (const char *pathPtr), {
 					fetch("scummvm.ini")
 						.then((response) => response.ok ? response.text() : "")
 						.then((text) => {
-							Module.FS.writeFile('/home/web_user/scummvm.ini', text);
+							FS.writeFile('/home/web_user/scummvm.ini', text);
 							resolve(true);
 						})
 						.catch((err) => reject);

@@ -7,11 +7,11 @@ const static = require('node-static');
 var file = new (static.Server)("./");
 const server = http.createServer(function (req, res) {
     file.serve(req, res);
-}).listen(8080, async () => {
+}).listen({ host: 'localhost', port: 0 },async () => {
     const browser = await puppeteer.launch({ headless: true });
     const page = await browser.newPage();
 
-    await page.goto('http://localhost:8080/scummvm.html#--add --path=/data/games --recursive');
+    await page.goto('http://localhost:' + server.address().port + '/scummvm.html#--add --path=/data/games --recursive');
 
     await page.screenshot({ path: 'example.png' });
     const regex = /Added ([0-9]+) games/;
