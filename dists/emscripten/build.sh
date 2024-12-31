@@ -345,6 +345,10 @@ if [[ "games" =~ $(echo ^\(${TASKS}\)$) || "build" =~ $(echo ^\(${TASKS}\)$) ]];
     mv testbed "${ROOT_FOLDER}/build-emscripten/games/testbed"
   fi
 
+  if [[ "playground3d" =~ $(echo ^\(${_bundle_games// /|}\)$) ]]; then
+    _bundle_games="${_bundle_games//playground3d/}"
+    mkdir "${ROOT_FOLDER}/build-emscripten/games/playground3d"
+  fi
   if [ -n "$_bundle_games" ]; then
     echo "Fetching games: $_bundle_games"
     mkdir -p "${DIST_FOLDER}/games/"
