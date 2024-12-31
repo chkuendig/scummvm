@@ -173,7 +173,9 @@ bool BaseRenderOpenGL3DShader::setup2D(bool force) {
 
 		_alphaRef = 0.0f;
 
+#ifndef EMSCRIPTEN // https://github.com/scummvm/scummvm/commit/bfa7d4866d0f29725891dfc710261d8f1180f6dc broke this
 		glPolygonMode(GL_FRONT, GL_FILL);
+#endif
 		glFrontFace(GL_CCW);  // WME DX have CW
 		glEnable(GL_CULL_FACE);
 		glDisable(GL_STENCIL_TEST);
@@ -186,7 +188,9 @@ bool BaseRenderOpenGL3DShader::setup3D(Camera3D *camera, bool force) {
 	if (_state != RSTATE_3D || force) {
 		_state = RSTATE_3D;
 
+#ifndef EMSCRIPTEN // https://github.com/scummvm/scummvm/commit/bfa7d4866d0f29725891dfc710261d8f1180f6dc broke this
 		glEnable(GL_NORMALIZE);
+#endif
 
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
@@ -202,7 +206,9 @@ bool BaseRenderOpenGL3DShader::setup3D(Camera3D *camera, bool force) {
 
 		setAmbientLightRenderState();
 
+#ifndef EMSCRIPTEN // https://github.com/scummvm/scummvm/commit/bfa7d4866d0f29725891dfc710261d8f1180f6dc broke this
 		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+#endif
 
 
 		if (camera)
@@ -307,7 +313,9 @@ bool BaseRenderOpenGL3DShader::setupLines() {
 	if (_state != RSTATE_LINES) {
 		_state = RSTATE_LINES;
 
+#ifndef EMSCRIPTEN // https://github.com/scummvm/scummvm/commit/bfa7d4866d0f29725891dfc710261d8f1180f6dc broke this
 		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+#endif
 		glDisable(GL_DEPTH_TEST);
 		glFrontFace(GL_CW); // WME DX have CCW
 		glEnable(GL_CULL_FACE);
