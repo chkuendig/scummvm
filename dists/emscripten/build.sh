@@ -57,6 +57,9 @@ _libfaad=false
 _libmad=false
 _libmpeg2=false
 _libtheoradec=false
+_libvpx=false
+_fluidlite=false
+
 # parse inputs
 for i in "$@"; do
   case $i in
@@ -66,6 +69,10 @@ for i in "$@"; do
     ;;
   --enable-faad)
     _libfaad=true
+    CONFIGURE_ARGS+=" $i"
+    ;;
+  --enable-fluidlite)
+    _fluidlite=true
     CONFIGURE_ARGS+=" $i"
     ;;
   --enable-mad)
@@ -80,6 +87,11 @@ for i in "$@"; do
     _libtheoradec=true
     CONFIGURE_ARGS+=" $i"
     ;;
+  --enable-vpx)
+    _libvpx=true
+    CONFIGURE_ARGS+=" $i"
+    ;;
+
   --bundle-games=*)
     str="${i#*=}"
     _bundle_games="${str//,/ }"
@@ -211,6 +223,21 @@ if [ "$_libfaad" = true ]; then
   LIBS_FLAGS="${LIBS_FLAGS} --with-faad-prefix=$LIBS_FOLDER/build"
 fi
 
+if [ "$_fluidlite" = true ]; then
+  if [[ ! -f "$LIBS_FOLDER/build/lib/fluidlite.a" ]]; then
+    echo "building fluidlite-d59d232"
+    cd "$LIBS_FOLDER"
+    wget -nc --content-disposition "https://github.com/divideconcept/FluidLite/archive/d59d232.tar.gz"
+    tar -xf FluidLite-d59d2328818f913b7d1a6a59aed695c47a8ce388.tar.gz
+    cd "$LIBS_FOLDER/FluidLite-d59d2328818f913b7d1a6a59aed695c47a8ce388/"
+    CFLAGS="-fPIC -Oz" emconfigure ./configure --host=wasm32-unknown-none --build=wasm32-unknown-none --prefix="$LIBS_FOLDER/build/"
+    emmake make -j 5
+    emmake make install
+  fi
+  LIBS_FLAGS="${LIBS_FLAGS} --with-faad-prefix=$LIBS_FOLDER/build"
+fi
+
+
 if [ "$_libmad" = true ]; then
   if [[ ! -f "$LIBS_FOLDER/build/lib/libmad.a" ]]; then
     echo "building libmad-0.15.1b"
@@ -248,6 +275,20 @@ if [ "$_libtheoradec" = true ]; then
     wget -nc "https://downloads.xiph.org/releases/theora/libtheora-1.1.1.tar.xz"
     tar -xf libtheora-1.1.1.tar.xz
     cd "$LIBS_FOLDER/libtheora-1.1.1/"
+    CFLAGS="-fPIC -s USE_OGG=1 -Oz" emconfigure ./configure --host=wasm32-unknown-none --build=wasm32-unknown-none --prefix="$LIBS_FOLDER/build/" --disable-asm
+    emmake make -j 5
+    emmake make install
+  fi
+  LIBS_FLAGS="${LIBS_FLAGS} --with-theoradec-prefix=$LIBS_FOLDER/build"
+fi
+
+if [ "$_libvpx" = true ]; then
+  if [[ ! -f "$LIBS_FOLDER/build/lib/libvpx.a" ]]; then
+    echo "build libvpx-1.15.0"
+    cd "$LIBS_FOLDER"
+    wget -nc --content-disposition "https://github.com/webmproject/libvpx/archive/refs/tags/v1.15.0.tar.gz"
+    tar -xf libvpx-1.15.0.tar.gz
+    cd "$LIBS_FOLDER/libvpx-1.15.0/"
     CFLAGS="-fPIC -s USE_OGG=1 -Oz" emconfigure ./configure --host=wasm32-unknown-none --build=wasm32-unknown-none --prefix="$LIBS_FOLDER/build/" --disable-asm
     emmake make -j 5
     emmake make install
