@@ -71,7 +71,7 @@ public:
 	bool isGameDataFound() { return _isGameDataFound; }
 	void setGameDataFound(bool status) { _isGameDataFound = status; }
 
-#ifdef USE_LIBCURL
+#ifdef USE_CLOUD
 	bool isCloudTestCallbackCalled() const { return _isCloudTestCallbackCalled; }
 	void setCloudTestCallbackCalled(bool status) { _isCloudTestCallbackCalled = status; }
 
