@@ -14,15 +14,3 @@ EmscriptenIdbfsIoStream::~EmscriptenIdbfsIoStream() {
 	fs_factory->persistIDBFS();
 	warning("Persist IDBFS done");
 }
-
-EmscriptenIdbfsIoStream *EmscriptenIdbfsIoStream::makeFromPath(const Common::String &path, bool writeMode) {
-	warning("EmscriptenIdbfsIoStream::makeFromPath %s", path.c_str());
-#if defined(HAS_FSEEKO64)
-	FILE *handle = fopen64(path.c_str(), writeMode ? "wb" : "rb");
-#else
-	FILE *handle = fopen(path.c_str(), writeMode ? "wb" : "rb");
-#endif
-	if (handle)
-		return new EmscriptenIdbfsIoStream(handle);
-	return nullptr;
-}

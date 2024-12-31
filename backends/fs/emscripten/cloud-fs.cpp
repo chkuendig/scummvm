@@ -184,10 +184,10 @@ Common::SeekableReadStream *CloudFilesystemNode::createReadStream() {
 		}
 		warning("*CloudFilesystemNode::createReadStream() file written %s", fsCachePath.c_str());
 	}
-	return PosixIoStream::makeFromPath(fsCachePath, false);
+	return PosixIoStream::makeFromPath(fsCachePath, StdioStream::WriteMode_Read);
 }
 
-Common::SeekableWriteStream *CloudFilesystemNode::createWriteStream() {
+Common::SeekableWriteStream *CloudFilesystemNode::createWriteStream(bool atomic) {
 	return 0;
 }
 

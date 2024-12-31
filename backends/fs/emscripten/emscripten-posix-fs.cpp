@@ -58,11 +58,12 @@ bool EmscriptenPOSIXFilesystemNode::getChildren(AbstractFSList &myList, ListMode
 	return POSIXFilesystemNode::getChildren(myList, mode, hidden);
 }
 
-Common::SeekableWriteStream *EmscriptenPOSIXFilesystemNode::createWriteStream() {
+Common::SeekableWriteStream *EmscriptenPOSIXFilesystemNode::createWriteStream(bool atomic) {
 	if (_path.hasPrefix(getenv("HOME"))) {
 		warning("POSIXFilesystemNode::createWriteStream HOME %s", _path.c_str());
-		return EmscriptenIdbfsIoStream::makeFromPath(getPath(), true);
+		return EmscriptenIdbfsIoStream::makeFromPath(getPath(), atomic ?
+			StdioStream::WriteMode_WriteAtomic : StdioStream::WriteMode_Write);
 	}
 	warning("POSIXFilesystemNode::createWriteStream %s", _path.c_str());
-	return POSIXFilesystemNode::createWriteStream();
+	return POSIXFilesystemNode::createWriteStream(false);
 }

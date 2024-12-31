@@ -31,7 +31,7 @@ public:
 	EmscriptenPOSIXFilesystemNode();
 	bool getChildren(AbstractFSList &myList, ListMode mode, bool hidden) const override;
 	AbstractFSNode *makeNode(const Common::String &path) const override;
-	Common::SeekableWriteStream *createWriteStream() override;
+	Common::SeekableWriteStream *createWriteStream(bool atomic) override;
 };
 
 #endif

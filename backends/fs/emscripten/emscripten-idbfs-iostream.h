@@ -32,7 +32,6 @@ public:
 		EmscriptenIdbfsIoStream(void *handle);
 	~EmscriptenIdbfsIoStream();
 
-	static EmscriptenIdbfsIoStream *makeFromPath(const Common::String &path, bool writeMode);
 };
 
 #endif

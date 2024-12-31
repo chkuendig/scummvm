@@ -204,10 +204,10 @@ Common::SeekableReadStream *HTTPFilesystemNode::createReadStream() {
 		}
 		debug(5, "*HTTPFilesystemNode::createReadStream() file written %s", fsCachePath.c_str());
 	}
-	return PosixIoStream::makeFromPath(fsCachePath, false);
+	return PosixIoStream::makeFromPath(fsCachePath, StdioStream::WriteMode_Read);
 }
 
-Common::SeekableWriteStream *HTTPFilesystemNode::createWriteStream() {
+Common::SeekableWriteStream *HTTPFilesystemNode::createWriteStream(bool atomic) {
 	return 0;
 }
 
