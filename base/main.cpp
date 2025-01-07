@@ -687,7 +687,7 @@ extern "C" int scummvm_main(int argc, const char * const argv[]) {
 	}
 #endif
 
-#if defined(USE_CLOUD) && defined(USE_LIBCURL)
+#if defined(USE_CLOUD) && ( defined(USE_LIBCURL) || defined(EMSCRIPTEN) )
 	CloudMan.init();
 	CloudMan.syncSaves();
 #endif
