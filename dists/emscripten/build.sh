@@ -57,6 +57,7 @@ _libfaad=false
 _libmad=false
 _libmpeg2=false
 _libtheoradec=false
+_libvpx=false
 # parse inputs
 for i in "$@"; do
   case $i in
@@ -80,6 +81,11 @@ for i in "$@"; do
     _libtheoradec=true
     CONFIGURE_ARGS+=" $i"
     ;;
+  --enable-vpx)
+    _libvpx=true
+    CONFIGURE_ARGS+=" $i"
+    ;;
+
   --bundle-games=*)
     str="${i#*=}"
     _bundle_games="${str//,/ }"
@@ -253,6 +259,20 @@ if [ "$_libtheoradec" = true ]; then
     emmake make install
   fi
   LIBS_FLAGS="${LIBS_FLAGS} --with-theoradec-prefix=$LIBS_FOLDER/build"
+fi
+
+if [ "$_libvpx" = true ]; then
+  if [[ ! -f "$LIBS_FOLDER/build/lib/libvpx.a" ]]; then
+    echo "build libvpx-1.15.0"
+    cd "$LIBS_FOLDER"
+    wget -nc --content-disposition "https://github.com/webmproject/libvpx/archive/refs/tags/v1.15.0.tar.gz"
+    tar -xf libvpx-1.15.0.tar.gz
+    cd "$LIBS_FOLDER/libvpx-1.15.0/"
+    CFLAGS="-fPIC -Oz" emconfigure ./configure --disable-vp8-encoder --disable-vp9-encoder --prefix="$LIBS_FOLDER/build/" 
+    emmake make -j 5
+    emmake make install
+  fi
+  LIBS_FLAGS="${LIBS_FLAGS} --with-vpx-prefix=$LIBS_FOLDER/build"
 fi
 
 #################################
