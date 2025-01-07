@@ -58,6 +58,8 @@ _libmad=false
 _libmpeg2=false
 _libtheoradec=false
 _libvpx=false
+_fluidlite=false
+
 # parse inputs
 for i in "$@"; do
   case $i in
@@ -67,6 +69,10 @@ for i in "$@"; do
     ;;
   --enable-faad)
     _libfaad=true
+    CONFIGURE_ARGS+=" $i"
+    ;;
+  --enable-fluidlite)
+    _fluidlite=true
     CONFIGURE_ARGS+=" $i"
     ;;
   --enable-mad)
@@ -216,6 +222,21 @@ if [ "$_libfaad" = true ]; then
   fi
   LIBS_FLAGS="${LIBS_FLAGS} --with-faad-prefix=$LIBS_FOLDER/build"
 fi
+
+if [ "$_fluidlite" = true ]; then
+  if [[ ! -f "$LIBS_FOLDER/build/lib/libfluidlite.a" ]]; then
+    echo "building fluidlite-d59d232"
+    cd "$LIBS_FOLDER"
+    wget -nc --content-disposition "https://github.com/divideconcept/FluidLite/archive/d59d232.tar.gz"
+    tar -xf FluidLite-d59d2328818f913b7d1a6a59aed695c47a8ce388.tar.gz
+    cd "$LIBS_FOLDER/FluidLite-d59d2328818f913b7d1a6a59aed695c47a8ce388/"
+    emcmake cmake -B "build/"   -DFLUIDLITE_BUILD_STATIC:BOOL="1"  -DCMAKE_INSTALL_PREFIX="$LIBS_FOLDER/build/" -DCMAKE_INSTALL_LIBDIR="lib"
+    cmake --build "build/"  
+    cmake --install "build/"  
+  fi
+  LIBS_FLAGS="${LIBS_FLAGS} --with-fluidlite-prefix=$LIBS_FOLDER/build"
+fi
+
 
 if [ "$_libmad" = true ]; then
   if [[ ! -f "$LIBS_FOLDER/build/lib/libmad.a" ]]; then

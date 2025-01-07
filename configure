@@ -3258,6 +3258,7 @@ EOF
 		append_var LDFLAGS "-s INITIAL_MEMORY=128MB -s TOTAL_STACK=32MB -s ALLOW_MEMORY_GROWTH=1"
 		append_var LDFLAGS "-s ASYNCIFY=1 -s ASYNCIFY_STACK_SIZE=1048576"
 
+		append_var LDFLAGS "-s EXPORTED_FUNCTIONS=[_main,_malloc,_free] -s EXPORTED_RUNTIME_METHODS=[ccall]" # needed to send files from JS to C
 		if test "$_debug_build" = yes; then
 			_optimization_level=-O2
 			append_var LDFLAGS "-O2 -g3 -s ASSERTIONS=2"
@@ -3616,7 +3617,10 @@ if test -n "$_host"; then
 			;;
 		wasm*-emscripten)
 			_backend="sdl"
+			_seq_midi=no
+			_timidity=no
 			# Disable SDL_Net and ENet (no sockets in the browser)
+			_sndio=no
 			_enet=no
 			_sdlnet=no
 			# Emscripten backend uses emscripten_fetch not libcurl

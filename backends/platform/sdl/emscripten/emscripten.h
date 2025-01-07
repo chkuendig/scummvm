@@ -34,6 +34,8 @@ typedef Common::BaseCallback<const Common::String *> *CloudConnectionCallback;
 extern "C" {
 void clipboard_paste_callback(char *paste_data); // pass clipboard paste data from JS to backend
 void cloud_connection_json_callback(char *str);       // pass cloud storage activation data from JS to setup wizard
+void store_file(char const *filename, char const *mime_type, char *buffer, size_t buffer_size); // upload file to home direcory storage
+
 }
 class OSystem_Emscripten : public OSystem_POSIX {
 	friend void ::clipboard_paste_callback(char *paste_data);
@@ -58,6 +60,7 @@ public:
 #endif
 	void exportFile(const Common::Path &filename);
 	void init() override;
+	void addSysArchivesToSearchSet(Common::SearchSet &s, int priority = 0) override;
 
 #ifdef USE_CLOUD
 	void setCloudConnectionCallback(CloudConnectionCallback cb) { _cloudConnectionCallback = cb; }

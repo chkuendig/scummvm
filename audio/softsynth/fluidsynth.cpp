@@ -364,6 +364,17 @@ int MidiDriver_FluidSynth::open() {
 	}
 #endif
 
+
+#if defined(EMSCRIPTEN) && defined(FS_HAS_STREAM_SUPPORT)
+	// In Emscripten, when loading data over http we need to wrap IO to make it work
+	// We can only do this with FluidSynth 2.0
+	if (!isUsingInMemorySoundFontData) {
+		Common::FSNode fsnode(getSoundFontPath());
+		_engineSoundFontData = fsnode.createReadStream();
+		isUsingInMemorySoundFontData = _engineSoundFontData != nullptr;
+	}
+#endif
+
 	_settings = new_fluid_settings();
 
 	// The default gain setting is ridiculously low - at least for me. This
