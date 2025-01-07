@@ -19,24 +19,25 @@
  *
  */
 
-#ifndef BACKENDS_FS_POSIX_POSIXIOSTREAM_H
-#define BACKENDS_FS_POSIX_POSIXIOSTREAM_H
+#ifndef EMSCRIPTEN_FILESYSTEM_FACTORY_H
+#define EMSCRIPTEN_FILESYSTEM_FACTORY_H
 
-#include "backends/fs/stdiostream.h"
+#include "backends/fs/fs-factory.h"
+#include "common/singleton.h"
 
 /**
- * A file input / output stream using POSIX interfaces
+ * Creates POSIXFilesystemNode objects.
+ *
+ * Parts of this class are documented in the base interface class, FilesystemFactory.
  */
-class PosixIoStream : public StdioStream {
+class EmscriptenFilesystemFactory : public FilesystemFactory {
 public:
-	static StdioStream *makeFromPath(const Common::String &path, StdioStream::WriteMode writeMode) {
-		return StdioStream::makeFromPathHelper(path, writeMode, [](void *handle) -> StdioStream * {
-			return new PosixIoStream(handle);
-		});
-	}
-	PosixIoStream(void *handle);
 
-	int64 size() const override;
+	EmscriptenFilesystemFactory();
+	AbstractFSNode *makeRootFileNode() const override;
+	AbstractFSNode *makeCurrentDirectoryFileNode() const override;
+	AbstractFSNode *makeFileNodePath(const Common::String &path) const override;
+	void persistIDBFS();
 };
 
-#endif
+#endif /*EMSCRIPTEN_FILESYSTEM_FACTORY_H*/

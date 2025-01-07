@@ -1,5 +1,5 @@
 /* 
- * Based on https://github.com/jvilk/BrowserFS/blob/master/scripts/make_http_index.ts
+ * Based on https://github.com/jvilk/BrowserFS/blob/8cf568c64fa1230e2fcbfc817254bd0c56bc2d13/scripts/make_http_index.ts
  * Copyright (c) 2013, 2014, 2015, 2016, 2017 John Vilk and other BrowserFS contributors.
  * MIT License  https://github.com/jvilk/BrowserFS/blob/master/LICENSE
  */
@@ -33,6 +33,10 @@ function rdSync(dpath, tree, name) {
             if (fstat.isDirectory()) {
                 const child = tree[file] = {};
                 rdSync(fpath, child, file);
+                const fsListing = JSON.stringify(child);
+                const fname = fpath + "/index.json"
+                fs.writeFileSync(fname, fsListing, { encoding: 'utf8' })
+                tree[file] = {};
             }
             else {
                 tree[file] = fstat.size;
