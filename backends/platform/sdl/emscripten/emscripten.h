@@ -32,13 +32,16 @@ typedef Common::BaseCallback<const Common::String *> *CloudConnectionCallback;
 #endif
 
 extern "C" {
+void clipboard_paste_callback(char *paste_data); // pass clipboard paste data from JS to backend
 void cloud_connection_json_callback(char *str);       // pass cloud storage activation data from JS to setup wizard
 }
 class OSystem_Emscripten : public OSystem_POSIX {
+	friend void ::clipboard_paste_callback(char *paste_data);
 #ifdef USE_CLOUD
 	friend void ::cloud_connection_json_callback(char *str);
 #endif
 protected:
+	Common::String _clipboardCache = "";
 #ifdef USE_CLOUD
 	CloudConnectionCallback _cloudConnectionCallback;
 #endif
@@ -61,6 +64,9 @@ public:
 	bool openUrl(const Common::String &url) override;
 #endif // USE_CLOUD
 
+	bool hasTextInClipboard() override;
+	Common::U32String getTextFromClipboard() override;
+	bool setTextInClipboard(const Common::U32String &text) override;
     
 protected:
 	Common::Path getDefaultConfigFileName() override;

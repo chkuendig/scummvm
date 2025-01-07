@@ -67,6 +67,23 @@ EM_JS(void, downloadFile, (const char *filenamePtr, char *dataPtr, int dataSize)
 	}, 0);
 });
 
+/*
+ * Experimental Clipboard Support.
+ * Works in Chrome but not in Safari and Firefox (Mac):
+ * - Firefox (Mac) doesn't recognize meta/cmd key - https://stackoverflow.com/a/71656492
+ * - Safari requires workarounds for paste ( https://stackoverflow.com/a/17105405 ) and copy seems to be triggered at the wrong time (causing a NotAllowedError)
+ */
+EM_JS(void, clipboard_copy, (char const *content_ptr), {
+	navigator.clipboard.writeText(UTF8ToString(content_ptr));
+});
+
+EM_JS(void, clipboard_add_paste_listener, (), {
+	document.addEventListener(
+		'paste', (event) => {
+			Module._clipboard_paste_callback(stringToNewUTF8(event.clipboardData.getData('text/plain')));
+		});
+});
+
 #ifdef USE_CLOUD
 /* Listener to feed the activation JSON from the wizard at cloud.scummvm.org back 
  * Usage: Run the following on the final page of the activation flow:
@@ -83,6 +100,11 @@ EM_JS(bool, cloud_connection_open_oauth_window, (char const *url), {
 #endif
 
 extern "C" {
+void EMSCRIPTEN_KEEPALIVE clipboard_paste_callback(char *paste_data) {
+	OSystem_Emscripten *emscripten_g_system = dynamic_cast<OSystem_Emscripten *>(g_system);
+	emscripten_g_system->_clipboardCache = Common::String(paste_data);
+}
+
 #ifdef USE_CLOUD
 void EMSCRIPTEN_KEEPALIVE cloud_connection_json_callback(char *str) {
 	warning("cloud_connection_callback: %s", str);
@@ -101,6 +123,9 @@ void OSystem_Emscripten::init() {
 	// Initialze File System Factory
 	EmscriptenFilesystemFactory *fsFactory = new EmscriptenFilesystemFactory();
 	_fsFactory = fsFactory;
+
+	// setup JS clipboard listener
+	clipboard_add_paste_listener();
 
 	// Invoke parent implementation of this method
 	OSystem_SDL::init();
@@ -175,6 +200,23 @@ void OSystem_Emscripten::exportFile(const Common::Path &filename) {
 	file.close();
 	downloadFile(exportName.c_str(), bytes, size);
 	delete[] bytes;
+}
+
+bool OSystem_Emscripten::hasTextInClipboard() {
+	return _clipboardCache.size() > 0;
+}
+
+Common::U32String OSystem_Emscripten::getTextFromClipboard() {
+	if (!hasTextInClipboard())
+		return Common::U32String();
+	return _clipboardCache.decode();
+}
+
+bool OSystem_Emscripten::setTextInClipboard(const Common::U32String &text) {
+	// The encoding we need to use is UTF-8.
+	_clipboardCache = text.encode();
+	clipboard_copy(_clipboardCache.c_str());
+	return 0;
 }
 
 #ifdef USE_CLOUD
