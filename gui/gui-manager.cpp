@@ -268,16 +268,25 @@ Common::Keymap *GuiManager::getKeymap() const {
 	act = new Action(kStandardActionCut, _("Cut"));
 	act->setCustomEngineActionEvent(kActionCut);
 	act->addDefaultInputMapping("C+x");
+#ifdef EMSCRIPTEN
+	act->addDefaultInputMapping("M+x");
+#endif
 	guiMap->addAction(act);
 
 	act = new Action(kStandardActionPaste, _("Paste"));
 	act->setCustomEngineActionEvent(kActionPaste);
 	act->addDefaultInputMapping("C+v");
+#ifdef EMSCRIPTEN
+	act->addDefaultInputMapping("M+v");
+#endif
 	guiMap->addAction(act);
 
 	act = new Action(kStandardActionCopy, _("Copy"));
 	act->setCustomEngineActionEvent(kActionCopy);
 	act->addDefaultInputMapping("C+c");
+#ifdef EMSCRIPTEN
+	act->addDefaultInputMapping("M+c");
+#endif
 	guiMap->addAction(act);
 #endif
 
