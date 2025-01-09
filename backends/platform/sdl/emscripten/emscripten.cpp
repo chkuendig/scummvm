@@ -50,7 +50,9 @@ EM_JS(void, toggleFullscreen, (bool enable), {
 
 EM_JS(void, downloadFile, (const char *filenamePtr, char *dataPtr, int dataSize), {
 	const view = new Uint8Array(Module.HEAPU8.buffer, dataPtr, dataSize);
-	const blob = new Blob([view], {
+    // Copy the view to a new array (Blob constructor cant handle SharedArrayBuffers)
+    const copy = new Uint8ClampedArray( [view] );
+	const blob = new Blob([copy], {
 			type:
 				'octet/stream'
 		});
@@ -87,15 +89,34 @@ EM_JS(void, clipboard_add_paste_listener, (), {
 
 #ifdef USE_CLOUD
 /* Listener to feed the activation JSON from the wizard at cloud.scummvm.org back 
- * Usage: Run the following on the final page of the activation flow:
- * 		  window.opener.postMessage(document.getElementById("json").value,"*")
+ * Get the OAuth response token from the php session. ScummVM Webassembly is polling the authentication service  
+ * regularly to check if the authorization has finished. If done, the token is immediately cleared. (by setting clear=true)
+ * 
+ * Usually in a typical OAuth scenario this isn't needed as the authentication page could communicate with initiating page via sendMessage to transmit the token, 
+ * but since we are using pthreads, the initiating page has to run with cross origin isolation to access SharedArrayBuffer. Which means that the two pages
+ * can't connect (even if they were on the same domain as the authentication redirects to the authentication provider, breaking the "same-origin"). 
+ * This is a well known issues, see e.g. the notice at https://web.dev/articles/coop-coep#integrate_coop_and_coep. By using this polling mechanism, we can 
+ * work around this issue to get the token as long as the CORP (Cross-Origin-Resource-Policy) is set to cross-origin.
  */
 EM_JS(bool, cloud_connection_open_oauth_window, (char const *url), {
 	oauth_window = window.open(UTF8ToString(url));
-	window.addEventListener("message", (event) => {
-		Module._cloud_connection_json_callback(stringToNewUTF8( JSON.stringify(event.data)));
-		oauth_window.close()
-	}, {once : true});
+	const intervalID = setInterval(async () => {
+	 	try {
+			// TODO: this should give up after a certain time (e.g. 2mins) to avoid infinitely polling the cloud service (user could still manually enter the token)
+            const response = await fetch("https://cloud.scummvm.org/response_token/?clear=true",{ credentials: 'include' });
+            if (!response.ok) {
+              throw new Error(`Response status: ${response.status}`);
+            }
+            const json = await response.json();
+            if(Object.keys(json).length > 0){
+                clearInterval(intervalID);
+				Module._cloud_connection_json_callback(stringToNewUTF8( JSON.stringify(json)));
+            }
+            console.log(json);
+          } catch (error) {
+            console.error(error.message);
+          }
+	}, 500);
 	return true;
 });
 #endif

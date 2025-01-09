@@ -3255,8 +3255,11 @@ EOF
 		add_line_to_config_mk 'EMSCRIPTEN = 1'
 		_port_mk="backends/platform/sdl/emscripten/emscripten.mk"
 		append_var LDFLAGS "-s FORCE_FILESYSTEM -lidbfs.js"
-		append_var LDFLAGS "-s INITIAL_MEMORY=512MB -s TOTAL_STACK=32MB -s ALLOW_MEMORY_GROWTH=1" #consider INITIAL_HEAP
-		append_var LDFLAGS "-s ASYNCIFY=1 -s ASYNCIFY_STACK_SIZE=8388608" # TODO: try -sJSPI
+        append_var LDFLAGS "-s INITIAL_MEMORY=512MB -s TOTAL_STACK=32MB -s ALLOW_MEMORY_GROWTH=1" #consider INITIAL_HEAP
+        append_var LDFLAGS "-s ASYNCIFY=1 -s ASYNCIFY_STACK_SIZE=8388608" # TODO: try -sJSPI
+
+		append_var CXXFLAGS "-pthread -Wno-pthreads-mem-growth"
+		append_var LDFLAGS "-pthread -sPTHREAD_POOL_SIZE=4 sPTHREADS_DEBUG=1" #-sDYLINK_DEBUG=1 " #-sPTHREADS_DEBUG=1"
 		append_var LDFLAGS "-s EXPORTED_FUNCTIONS=[_main,_malloc,_free] -s EXPORTED_RUNTIME_METHODS=[ccall]" # needed to send files from JS to C
 		if test "$_debug_build" = yes; then
 			_optimization_level=-O2
@@ -4973,11 +4976,11 @@ PLUGIN_LDFLAGS		+= -Wl,-T$(srcdir)/backends/plugins/ds/plugin.ld -mthumb -mthumb
 		_plugin_prefix="lib"
 		_plugin_suffix=".so"
 		append_var DEFINES "-DUNCACHED_PLUGINS"
-		append_var CXXFLAGS "-fPIC"
+		append_var CXXFLAGS "-fPIC -pthread"
 		append_var LIBS ""
 _mak_plugins='
 PLUGIN_EXTRA_DEPS =
-PLUGIN_LDFLAGS  += -s SIDE_MODULE=1 -s ASYNCIFY=1 -s ASYNCIFY_IMPORTS=["*"] -s EXPORT_ALL=1
+PLUGIN_LDFLAGS  += -s SIDE_MODULE=1 -s ASYNCIFY=1 -s ASYNCIFY_IMPORTS=["*"] -s EXPORT_ALL=1 -pthread
 PRE_OBJS_FLAGS  := -s MAIN_MODULE=1 -s EXPORT_ALL=1
 POST_OBJS_FLAGS :=
 '
