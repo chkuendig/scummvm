@@ -31,7 +31,7 @@ LIBS_FOLDER="$DIST_FOLDER/libs"
 TASKS=()
 CONFIGURE_ARGS=()
 _verbose=false
-EMSDK_VERSION="3.1.51"
+EMSDK_VERSION="3.1.74"
 EMSCRIPTEN_VERSION="$EMSDK_VERSION"
 
 usage="\
@@ -166,7 +166,7 @@ fi
 #################################
 # Download + Install Libraries (if not part of Emscripten-Ports, these are handled by configure)
 #################################
-
+#TODO: THese could/should use the external port facility https://github.com/emscripten-core/emscripten/pull/21316
 if [[ ! -d "$LIBS_FOLDER/build" ]]; then
   mkdir -p "$LIBS_FOLDER/build"
 fi
@@ -237,7 +237,7 @@ if [ "$_libmpeg2" = true ]; then
     wget -nc "http://libmpeg2.sourceforge.net/files/libmpeg2-0.5.1.tar.gz"
     tar -xf libmpeg2-0.5.1.tar.gz
     cd "$LIBS_FOLDER/libmpeg2-0.5.1/"
-    CFLAGS="-fPIC -Oz" emconfigure ./configure --host=wasm32-unknown-none --prefix="$LIBS_FOLDER/build/" --disable-sdl
+    CFLAGS="-fPIC -Oz" emconfigure ./configure --build=wasm32-unknown-none --prefix="$LIBS_FOLDER/build/" --disable-sdl
     emmake make -j 5
     emmake make install
   fi

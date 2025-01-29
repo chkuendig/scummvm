@@ -23,7 +23,6 @@
 #include <stdio.h>
 
 #include "backends/fs/emscripten/emscripten-fs-factory.h"
-#include "backends/fs/emscripten/emscripten-idbfs-iostream.h"
 #include "backends/fs/emscripten/emscripten-posix-fs.h"
 #include "backends/fs/emscripten/http-fs.h"
 #include "backends/fs/posix/posix-fs.h"
@@ -58,12 +57,3 @@ bool EmscriptenPOSIXFilesystemNode::getChildren(AbstractFSList &myList, ListMode
 	return POSIXFilesystemNode::getChildren(myList, mode, hidden);
 }
 
-Common::SeekableWriteStream *EmscriptenPOSIXFilesystemNode::createWriteStream(bool atomic) {
-	if (_path.hasPrefix(getenv("HOME"))) {
-		warning("POSIXFilesystemNode::createWriteStream HOME %s", _path.c_str());
-		return EmscriptenIdbfsIoStream::makeFromPath(getPath(), atomic ?
-			StdioStream::WriteMode_WriteAtomic : StdioStream::WriteMode_Write);
-	}
-	warning("POSIXFilesystemNode::createWriteStream %s", _path.c_str());
-	return POSIXFilesystemNode::createWriteStream(false);
-}
