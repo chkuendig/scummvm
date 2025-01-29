@@ -35,7 +35,7 @@
 EM_ASYNC_JS(void, _initIDBFS, (const char *pathPtr), {
 	const path = UTF8ToString(pathPtr);
 	console.log("Mount IDBFS at "+path);
-	FS.mount(IDBFS, {}, path);
+	FS.mount(IDBFS, { autoPersist: true }, path);
 	// sync from persisted state into memory 
 	await (new Promise((resolve, reject) => {
 			FS.syncfs(true, (err) => {

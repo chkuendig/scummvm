@@ -97,7 +97,6 @@ ifdef EMSCRIPTEN
 MODULE_OBJS += \
 	fs/emscripten/emscripten-fs-factory.o \
 	fs/emscripten/emscripten-posix-fs.o \
-	fs/emscripten/emscripten-idbfs-iostream.o \
 	fs/emscripten/http-fs.o \
 	networking/emscripten/connectionmanager-emscripten.o \
 	networking/emscripten/curlfilerequest.o \
