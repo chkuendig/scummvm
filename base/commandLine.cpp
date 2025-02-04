@@ -332,7 +332,7 @@ void registerDefaults() {
 
 	ConfMan.registerDefault("enable_unsupported_game_warning", true);
 
-#ifdef USE_FLUIDSYNTH
+#if defined(USE_FLUIDSYNTH) || defined(USE_FLUIDLITE)
 	ConfMan.registerDefault("soundfont", "Roland_SC-55.sf2");
 #endif
 
