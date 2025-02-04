@@ -63,6 +63,10 @@ ScummVM relies heavily on Asyncify (see note above), and this comes with a quite
 *   Don't use asyncify but rewrite main loop to improve performance.
 *   Look into Stack Switching (emscripten-core/emscripten#16779) or multithreading as an alternative to Asyncify.
 
+### MIDI/MT32 Sound Options
+MIDI currently works a few ways:
+- Fluidlite can be used as a software synthesizer (using the Roland_SC-55 soundfont by default)
+- Integrated Yamaha OPL emulators (DosBOX, Nuked etc.) work fine 
 ### Storage Integration
 Most basic storage features are available:
 * Loading of assets via HTTP for both scummvm data (plugins, themes, shaders etc) as well as game data. A few features are still missing:
