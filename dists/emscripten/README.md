@@ -63,6 +63,10 @@ ScummVM relies heavily on Asyncify (see note above), and this comes with a quite
 *   Don't use asyncify but rewrite main loop to improve performance.
 *   Look into Stack Switching (emscripten-core/emscripten#16779) or multithreading as an alternative to Asyncify.
 
+### MIDI/MT32 Sound Options
+MIDI currently works a few ways:
+- Fluidlite can be used as a software synthesizer (using the Roland_SC-55 soundfont by default)
+- Integrated Yamaha OPL emulators (DosBOX, Nuked etc.) work fine 
 ### Storage Integration
 *   BrowserFS seems abandoned and never did a stable 2.0.0 release. It's worth replacing it.  
     * `scummvm_fs.js` is an early prototype for a custom FS which can be adopted for ScummVM specific needs, i.e.
