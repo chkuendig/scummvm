@@ -53,6 +53,9 @@
 #ifdef USE_IMGUI
 #include "testbed/imgui.h"
 #endif
+#ifdef EMSCRIPTEN
+#include "backends/platform/sdl/emscripten/emscripten.h"
+#endif
 
 namespace Testbed {
 
@@ -89,6 +92,9 @@ void TestbedExitDialog::init() {
 	_yOffset += 5;
 	addButtonXY(_xOffset + 80, _yOffset, 120, 24, "Rerun test suite", kCmdRerunTestbed);
 	addButtonXY(_xOffset + 240, _yOffset, 60, 24, "Close", GUI::kCloseCmd);
+	#ifdef EMSCRIPTEN
+		addButtonXY(_xOffset + 340, _yOffset, 60, 24, "Open Log", kCmdOpenLogfile);
+	#endif
 }
 
 void TestbedExitDialog::handleCommand(GUI::CommandSender *sender, uint32 cmd, uint32 data) {
@@ -100,6 +106,13 @@ void TestbedExitDialog::handleCommand(GUI::CommandSender *sender, uint32 cmd, ui
 		ConfParams.setRerunFlag(true);
 		cmd = GUI::kCloseCmd;
 		break;
+#ifdef EMSCRIPTEN
+	case kCmdOpenLogfile:
+		OSystem_Emscripten *emscripten_g_system = dynamic_cast<OSystem_Emscripten*>(g_system);
+		Common::Path path = Common::Path(ConfParams.getLogDirectory()) ;
+		emscripten_g_system->exportFile(path.appendComponent(ConfParams.getLogFilename()));
+		break;
+#endif
 	}
 
 	GUI::Dialog::handleCommand(sender, cmd, data);
