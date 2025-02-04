@@ -34,16 +34,12 @@ This folder contains a script to help build scummvm with Emscripten, it automati
   *  `libs`: Download and compile the required 3rd-party libraries required to build certain engines (libmad, a52dec etc)
   *   `configure`: Run the configure script with emconfigure with the recommended settings for a simple demo page 
   *   `make`: Run the make scripts with emmake
-  *   `games`: Download some demos and set up all data require for the demo page. See `--bundle-games=` below.
   *   `dist`: Copy all files into a single build-emscripten folder to bring it all together
-  *   `add-games`: Runs ScummVM once to add all bundled games to the default `scummvm.ini`
-  *   `icons`: Adds additional icons to the `gui-icons.dat` file. Please note that the `scummvm-icons` repository needs to be located in the parent folder of the project.
 * `clean`: Cleanup build artifacts (keeps libs + emsdk in place)
 * `run`: Start webserver and launch ScummVM in Chrome  
   
 **Options:**
 *  `-h`, `--help`: print a short help text
-*  `--bundle-games=<games>`: comma-separated list of demos and freeware games to bundle. Either specify a target (e.g. `comi` or a target and a specific file after a `/` , e.g. `comi/comi-win-large-demo-en.zip`)
 *  `-v`, `--verbose`: print all commands run by the script
 *  `--*`: all other options are passed on to the scummvm configure script
 
@@ -51,10 +47,7 @@ Independent of the command executed, the script sets up a pre-defined emsdk envi
 
 **Example:**
 
-See e.g. [chkuendig/scummvm-demo/.github/workflows/main.yml](https://github.com/chkuendig/scummvm-demo/blob/main/.github/workflows/main.yml) for an example:
-```
-./dists/emscripten/build.sh build --verbose --disable-all-engines --enable-plugins --default-dynamic  --enable-engine=adl,testbed,scumm,scumm_7_8,grim,monkey4,mohawk,myst,riven,sci32,agos2,sword2,drascula,sky,lure,queen,testbed,director,stark --bundle-games=testbed,comi/comi-win-large-demo-en.zip,warlock,sky/BASS-Floppy-1.3.zip,drascula/drascula-audio-mp3-2.0.zip,monkey4,feeble,queen/FOTAQ_Floppy.zip,ft,grim/grim-win-demo2-en.zip,lsl7,lure,myst,phantasmagoria,riven,hires1,tlj,sword2
-```
+See e.g. [chkuendig/scummvm-demo/.github/workflows/main.yml](https://github.com/chkuendig/scummvm-demo/blob/main/.github/workflows/main.yml) for an example on how do deploy this.
 
 ## Current Status of Port
 In general, ScummVM runs in the browser sufficiently to run all demos and freeware games.
