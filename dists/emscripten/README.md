@@ -16,7 +16,7 @@ See [chkuendig/scummvm-demo](http://github.com/chkuendig/scummvm-demo/) on how a
 ## About Webassembly and Emscripten
 Emscripten is an LLVM/Clang-based compiler that compiles C and C++ source code to WebAssembly for execution in web browsers. 
 
-**Note:** In general most code can be crosscompiled to webassembly just fine. There's a few minor things which are different, but the mayor difference comnes down to how instructions are processed: Javascript and webassembly do support asynchronous/non-blocking code, but in general everything is running in the same [event loop](https://developer.mozilla.org/en-US/docs/Web/JavaScript/EventLoop). This means also that webassembly code has to pause for the browser to do it's operations - render the page, process inputs, run I/O and so on. One consequence of this is that the page is not re-drawn until the webassembly code "yields" to the browser. Emscripten provides as much tooling as possible for this, but there's sometimes still a need to manually add a call to sleep into some engines.
+**Note:** In general most code can be cross-compiled to Webassembly just fine. There's a few minor things which are different, but the mayor difference comes down to how instructions are processed: Javascript and Webassembly do support asynchronous/non-blocking code, but in general everything is running in the same [event loop](https://developer.mozilla.org/en-US/docs/Web/JavaScript/EventLoop). This means also that Wwebassembly code has to pause for the browser to do it's operations - render the page, process inputs, run I/O and so on. One consequence of this is that the page is not re-drawn until the Webassembly code "yields" to the browser. Emscripten provides as much tooling as possible for this, but there's sometimes still a need to manually add a call to sleep into some engines.
 
 ## How to build for Webassembly
 This folder contains a script to help build scummvm with Emscripten, it automatically downloads the correct emsdk version and also takes care of bundling the data and setting up a few demo games.
@@ -30,11 +30,9 @@ This folder contains a script to help build scummvm with Emscripten, it automati
 
 **Tasks:** space separated list of tasks to run. These can be:  
 * `build`: Run all tasks to build the complete app. These tasks are:
-  *  `setup`: Download + install EMSDK and emscripten
-  *  `libs`: Download and compile the required 3rd-party libraries required to build certain engines (libmad, a52dec etc)
-  *   `configure`: Run the configure script with emconfigure with the recommended settings for a simple demo page 
-  *   `make`: Run the make scripts with emmake
-  *   `dist`: Copy all files into a single build-emscripten folder to bring it all together
+* `configure`: Run the configure script with emconfigure with the recommended settings for a simple demo page 
+* `make`: Run the make scripts with emmake
+* `dist`: Copy all files into a single build-emscripten folder to bring it all together
 * `clean`: Cleanup build artifacts (keeps libs + emsdk in place)
 * `run`: Start webserver and launch ScummVM in Chrome  
   
