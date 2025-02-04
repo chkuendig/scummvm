@@ -31,7 +31,7 @@ LIBS_FOLDER="$DIST_FOLDER/libs"
 TASKS=()
 CONFIGURE_ARGS=()
 _verbose=false
-EMSDK_VERSION="3.1.51"
+EMSDK_VERSION="${EMSDK_VERSION:-4.0.1}"
 EMSCRIPTEN_VERSION="$EMSDK_VERSION"
 
 usage="\
@@ -115,7 +115,7 @@ fi
 # Setup Toolchain
 #################################
 
-# Activate Emscripten
+# Download Emscripten
 if [[ ! -d "$DIST_FOLDER/emsdk-$EMSDK_VERSION" ]]; then
   echo "$DIST_FOLDER/emsdk-$EMSDK_VERSION not found. Installing Emscripten"
   cd "$DIST_FOLDER"
@@ -125,7 +125,6 @@ if [[ ! -d "$DIST_FOLDER/emsdk-$EMSDK_VERSION" ]]; then
     wget -nc --content-disposition --no-check-certificate "https://github.com/emscripten-core/emsdk/archive/refs/tags/${EMSDK_VERSION}.tar.gz"
     tar -xf "emsdk-${EMSDK_VERSION}.tar.gz"
   fi
-
 fi
 
 cd "$DIST_FOLDER/emsdk-${EMSDK_VERSION}"
@@ -160,7 +159,6 @@ fi
 #################################
 # Download + Install Libraries (if not part of Emscripten-Ports, these are handled by configure)
 #################################
-
 if [[ ! -d "$LIBS_FOLDER/build" ]]; then
   mkdir -p "$LIBS_FOLDER/build"
 fi
@@ -216,7 +214,7 @@ if [ "$_libmpeg2" = true ]; then
     wget -nc "http://libmpeg2.sourceforge.net/files/libmpeg2-0.5.1.tar.gz"
     tar -xf libmpeg2-0.5.1.tar.gz
     cd "$LIBS_FOLDER/libmpeg2-0.5.1/"
-    CFLAGS="-fPIC -Oz" emconfigure ./configure --host=wasm32-unknown-none --prefix="$LIBS_FOLDER/build/" --disable-sdl
+    CFLAGS="-fPIC -Oz" emconfigure ./configure --build=wasm32-unknown-none --prefix="$LIBS_FOLDER/build/" --disable-sdl
     emmake make -j 5
     emmake make install
   fi
@@ -290,9 +288,5 @@ fi
 if [[ "run" =~ $(echo ^\(${TASKS}\)$) ]]; then
   echo "Run ScummVM"
   cd "${ROOT_FOLDER}/build-emscripten/"
-  # emrun doesn't support range requests. Once it will, we don't need node-static anymore
   emrun --browser=chrome scummvm.html
-
-  # TODO: https://github.com/cloudhead/node-static/issues/241 means node-static doesn't work either.
-  # $EMSDK_NPX -p node-static static .
 fi
