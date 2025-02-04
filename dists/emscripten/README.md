@@ -67,6 +67,7 @@ ScummVM relies heavily on Asyncify (see note above), and this comes with a quite
 MIDI currently works a few ways:
 - Fluidlite can be used as a software synthesizer (using the Roland_SC-55 soundfont by default)
 - Integrated Yamaha OPL emulators (DosBOX, Nuked etc.) work fine 
+- Roland MT-32 emulation works once MT32 roms are provided (can be drag&dropped into the browser window)
 ### Storage Integration
 *   BrowserFS seems abandoned and never did a stable 2.0.0 release. It's worth replacing it.  
     * `scummvm_fs.js` is an early prototype for a custom FS which can be adopted for ScummVM specific needs, i.e.

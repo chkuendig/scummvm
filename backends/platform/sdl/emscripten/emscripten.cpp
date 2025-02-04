@@ -29,6 +29,7 @@
 #include "backends/fs/emscripten/emscripten-fs-factory.h"
 #include "backends/platform/sdl/emscripten/emscripten.h"
 #include "common/file.h"
+#include "common/translation.h"
 
 // Inline JavaScript, 
 // see https://emscripten.org/docs/porting/connecting_cpp_and_javascript/Interacting-with-code.html
@@ -105,6 +106,40 @@ void EMSCRIPTEN_KEEPALIVE clipboard_paste_callback(char *paste_data) {
 	emscripten_g_system->_clipboardCache = Common::String(paste_data);
 }
 
+EMSCRIPTEN_KEEPALIVE void  store_file(char const *filename_c_str, char const *mime_type, char *buffer, size_t buffer_size){
+	// Store a file - this function is called from javascript when a file is sent via drag & drop.
+	// The file was not uploaded.
+  	if (! buffer || buffer_size == 0) {
+ 	   	warning("File not uploaded %s",filename_c_str);
+		return;
+  	}
+  
+  	/// Ok
+  	warning("File uploaded %s",filename_c_str);
+	const Common::Path &path =  Common::Path(Common::String::format("%s/%s", getenv("HOME"),filename_c_str));
+	Common::DumpFile out;
+	if (!out.open(path)) {
+		warning("Could not open file %s!", path.toString().c_str());
+		return;
+	}
+	out.write(buffer, buffer_size);
+	Common::String filename = Common::String(filename_c_str);
+	if ((filename.equals("MT32_PCM.ROM") || filename.equals("MT32_CONTROL.ROM")) && 
+			Common::File::exists(Common::Path("MT32_PCM.ROM")) &&
+			Common::File::exists(Common::Path("MT32_CONTROL.ROM"))) {
+		g_system->displayMessageOnOSD(_("Roland MT-32 ROMs uploaded successfully"));
+		warning("Roland MT-32 ROMs uploaded successfully");
+	} else if ((filename.equals("CM32L_PCM.ROM") || filename.equals("CM32L_CONTROL.ROM")) && 
+			Common::File::exists(Common::Path("CM32L_PCM.ROM")) &&
+			Common::File::exists(Common::Path("CM32L_CONTROL.ROM"))) {
+		g_system->displayMessageOnOSD(_("Roland CM-32L ROMs uploaded successfully"));
+		warning("Roland CM-32L ROMs uploaded successfully");
+	} else {
+		warning("File %s saved to successfully to %s", filename_c_str, getenv("HOME"));
+	}
+
+}
+
 #ifdef USE_CLOUD
 void EMSCRIPTEN_KEEPALIVE cloud_connection_json_callback(char *str) {
 	warning("cloud_connection_callback: %s", str);
@@ -177,6 +212,18 @@ bool OSystem_Emscripten::displayLogFile() {
 
 	exportFile(_logFilePath);
 	return true;
+}
+
+void OSystem_Emscripten::addSysArchivesToSearchSet(Common::SearchSet &s, int priority) {
+	// Invoke parent implementation of this method
+	OSystem_POSIX::addSysArchivesToSearchSet(s, priority);
+
+	// Add home folder 
+	Common::Path homePath = Common::Path(getenv("HOME"));
+	if (!homePath.empty()) {
+		// Success: search with a depth of 2 so the shaders are found
+		s.add("HOME", new Common::FSDirectory(homePath, 2), priority);
+	}
 }
 
 #ifdef USE_OPENGL
