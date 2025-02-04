@@ -3243,8 +3243,8 @@ EOF
 			_optimization_level=-O2
 			append_var LDFLAGS "-O2 -g3 -s ASSERTIONS=2"
 		else
-			_optimization_level=-O3
-			append_var LDFLAGS "-O3"
+			_optimization_level=-Os
+			append_var LDFLAGS "-Os"
 		fi
 
 		# activate emscripten-ports
@@ -4908,12 +4908,23 @@ PLUGIN_LDFLAGS		+= -Wl,-T$(srcdir)/backends/plugins/ds/plugin.ld -mthumb -mthumb
 		append_var DEFINES "-DUNCACHED_PLUGINS"
 		append_var CXXFLAGS "-fPIC"
 		append_var LIBS ""
+		if test "$_optimizations" = yes ; then
+			# limit exports plugins need to provide 
+			exported_functions='["_PLUGIN_getVersion","_PLUGIN_getType","_PLUGIN_getTypeVersion","_PLUGIN_getObject"]'			
+ _mak_plugins='
+PLUGIN_EXTRA_DEPS =
+PLUGIN_LDFLAGS  += -s SIDE_MODULE=2 -s ASYNCIFY=1 -s ASYNCIFY_IMPORTS=["*"] -s EXPORT_ALL=1 -s EXPORTED_FUNCTIONS='$exported_functions'
+PRE_OBJS_FLAGS  := -s MAIN_MODULE=2 -s AUTOLOAD_DYLIBS=0
+POST_OBJS_FLAGS := plugins/lib*.so
+'
+		else
 _mak_plugins='
 PLUGIN_EXTRA_DEPS =
-PLUGIN_LDFLAGS  += -s SIDE_MODULE=1 -s ASYNCIFY=1 -s ASYNCIFY_IMPORTS=["*"] -s EXPORT_ALL=1
+PLUGIN_LDFLAGS  += -s SIDE_MODULE=1 -s ASYNCIFY=1 -s ASYNCIFY_IMPORTS=["*"] -s EXPORT_ALL=1 
 PRE_OBJS_FLAGS  := -s MAIN_MODULE=1 -s EXPORT_ALL=1
 POST_OBJS_FLAGS :=
 '
+		fi
 		;;
 	freebsd* | openbsd*)
 		_plugin_prefix="lib"

@@ -289,7 +289,7 @@ fi
 if [[ "make" =~ $(echo ^\(${TASKS}\)$) || "build" =~ $(echo ^\(${TASKS}\)$) ]]; then
   cd "${ROOT_FOLDER}"
   echo "Running make"
-  emmake make
+  emmake make -j 5
 fi
 
 # The following steps copy stuff to build-emscripten:
