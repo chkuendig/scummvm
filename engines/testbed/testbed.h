@@ -34,9 +34,11 @@ namespace Testbed {
 class TestbedConfigManager;
 
 enum {
-	kTestbedLogOutput = 1,
-	kTestbedEngineDebug,
-
+	kTestbedLogOutput = 1 << 0,
+	kTestbedEngineDebug = 1 << 2,
+	#ifdef EMSCRIPTEN
+		kCmdOpenLogfile = 'oplf',
+	#endif
 	kCmdRerunTestbed = 'crtb'
 };
 

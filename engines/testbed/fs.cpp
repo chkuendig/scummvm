@@ -133,15 +133,18 @@ TestExitStatus FStests::testReadFile() {
  * it is same by reading the file again.
  */
 TestExitStatus FStests::testWriteFile() {
-	const Common::Path &path = ConfMan.getPath("path");
-	Common::FSNode gameRoot(path);
-	if (!gameRoot.exists()) {
+	Common::FSNode testDirectory(ConfMan.getPath("path"));
+	if (!testDirectory.isWritable()){
+		// redirect to savepath if game-data directory is not writable.
+		testDirectory = Common::FSNode(ConfMan.getPath("savepath"));
+	}
+	if (!testDirectory.exists()) {
 		Testsuite::logPrintf("Couldn't open the game data directory %s",
-				path.toString(Common::Path::kNativeSeparator).c_str());
+				testDirectory.getPath().toString(Common::Path::kNativeSeparator).c_str());
 		 return kTestFailed;
 	}
 
-	Common::FSNode fileToWrite = gameRoot.getChild("testbed.out");
+	Common::FSNode fileToWrite = testDirectory.getChild("testbed.out");
 
 	Common::WriteStream *ws = fileToWrite.createWriteStream();
 
@@ -176,15 +179,18 @@ TestExitStatus FStests::testWriteFile() {
  * This test creates a directory testbed.dir, and confirms if the directory is created successfully
  */
 TestExitStatus FStests::testCreateDir() {
-	const Common::Path &path = ConfMan.getPath("path");
-	Common::FSNode gameRoot(path);
-	if (!gameRoot.exists()) {
+	Common::FSNode testDirectory(ConfMan.getPath("path"));
+	if (!testDirectory.isWritable()){
+		// redirect to savepath if game-data directory is not writable.
+		testDirectory = Common::FSNode(ConfMan.getPath("savepath"));
+	}
+	if (!testDirectory.exists()) {
 		Testsuite::logPrintf("Couldn't open the game data directory %s",
-				path.toString(Common::Path::kNativeSeparator).c_str());
+				testDirectory.getPath().toString(Common::Path::kNativeSeparator).c_str());
 		 return kTestFailed;
 	}
 
-	Common::FSNode dirToCreate = gameRoot.getChild("testbed.dir");
+	Common::FSNode dirToCreate = testDirectory.getChild("testbed.dir");
 
 	// TODO: Delete the directory after creating it
 	if (dirToCreate.exists()) {
