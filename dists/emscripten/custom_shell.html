@@ -50,6 +50,9 @@
       height: 100%;
       overflow: hidden;
       display: block;
+      box-sizing: border-box;
+      -moz-box-sizing: border-box;
+      -webkit-box-sizing: border-box;
     }
 
     @media (orientation: landscape) {
@@ -141,12 +144,76 @@
 </head>
 
 <body>
+  <script>
+    function storeFiles(file) {
+      const file_reader = new FileReader();
+      file_reader.onload = (event) => {
+        const uint8Arr = new Uint8Array(event.target.result);
+        const data_ptr = Module["_malloc"](uint8Arr.length);
+        const data_on_heap = new Uint8Array(Module["HEAPU8"].buffer, data_ptr, uint8Arr.length);
+        data_on_heap.set(uint8Arr);
+        Module["ccall"]('store_file', 'number', ['string', 'string', 'number', 'number'], [event.target.filename, event.target.mime_type, data_on_heap.byteOffset, uint8Arr.length]);
+        Module["_free"](data_ptr);
+      };
+      file_reader.filename = file.name;
+      file_reader.mime_type = file.type;
+      file_reader.readAsArrayBuffer(file);
+    }
+    function handleDroppedFiles(files) {
+      filenames = files.map((file) => file.name);
+      if (files.length == 2 && (
+        (filenames.includes("MT32_PCM.ROM") && filenames.includes("MT32_CONTROL.ROM")) ||
+        (filenames.includes("CM32L_PCM.ROM") && filenames.includes("CM32L_CONTROL.ROM"))
+      )) {
+        console.log("MT32 files detected");
+        files.forEach((file) => storeFiles(file))
+      }
+    }
+    function dragLeaveHandler(ev) {
+      document.getElementById("canvas").style.opacity = 1;
+      document.getElementById("canvas").style.border = "none";
+      // Prevent default behavior (Prevent file from being opened)
+      ev.preventDefault();
+    }
+
+    function dragOverHandler(ev) {
+      document.getElementById("canvas").style.opacity = 0.5;
+      document.getElementById("canvas").style.border = "3px dashed white";
+
+
+      // Prevent default behavior (Prevent file from being opened)
+      ev.preventDefault();
+    }
+    function dropHandler(ev) {
+      document.getElementById("canvas").style.opacity = 1;
+      document.getElementById("canvas").style.border = "none";
+      console.log("File(s) dropped");
+
+      // Prevent default behavior (Prevent file from being opened)
+      ev.preventDefault();
+
+      if (ev.dataTransfer.items) {
+        // Use DataTransferItemList interface to access the file(s)
+        handleDroppedFiles(
+          [...ev.dataTransfer.items]
+            .filter((item) => item.kind == "file")
+            .map(item => item.getAsFile())
+        );
+      } else {
+        // Use DataTransfer interface to access the file(s)
+        handleDroppedFiles([...ev.dataTransfer.files])
+      }
+    }
+
+  </script>
   <div class="emscripten">
     <progress value="0" max="100" id="progress"></progress>
   </div>
   <div class="emscripten" id="status">Downloading ScummVM...</div>
   <div class="emscripten_border">
-    <canvas class="emscripten" id="canvas" oncontextmenu="event.preventDefault()" tabindex=-1></canvas>
+    <canvas class="emscripten" id="canvas" oncontextmenu="event.preventDefault()" tabindex=-1
+      ondrop="dropHandler(event);" ondragover="dragOverHandler(event);"
+      ondragleave="dragLeaveHandler(event);"></canvas>></canvas>
   </div>
   <textarea id="output" rows="8"></textarea>
 
