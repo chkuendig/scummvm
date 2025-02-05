@@ -113,6 +113,10 @@ ifdef USE_CLOUD
 MODULE_OBJS += \
 	fs/emscripten/cloud-fs.o 
 endif
+ifdef USE_TTS
+MODULE_OBJS += \
+	text-to-speech/emscripten/emscripten-text-to-speech.o
+endif
 endif
 
 ifdef USE_SDL_NET
