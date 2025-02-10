@@ -46,7 +46,7 @@ Options:
   -h, --help         print this help, then exit
   -v, --verbose      print all commands run by the script
   --*                all other options are passed on to the configure script
-                     Note: --enable-a52, --enable-faad, --enable-mad, --enable-mpeg2,
+                     Note: --enable-a52, --enable-faad, --enable-mad, --enable-mpeg2, --enable-openmpt 
                      --enable-theoradec and --enable-vpx also download and build the dependency
 "
 
@@ -54,6 +54,7 @@ _liba52=false
 _libfaad=false
 _libmad=false
 _libmpeg2=false
+_libopenmpt=false
 _libtheoradec=false
 _libvpx=false
 _fluidlite=false
@@ -79,6 +80,10 @@ for i in "$@"; do
     ;;
   --enable-mpeg2)
     _libmpeg2=true
+    CONFIGURE_ARGS+=" $i"
+    ;;
+  --enable-openmpt) 
+    _libopenmpt=true
     CONFIGURE_ARGS+=" $i"
     ;;
   --enable-theoradec)
@@ -242,6 +247,19 @@ if [ "$_libmpeg2" = true ]; then
   LIBS_FLAGS="${LIBS_FLAGS} --with-mpeg2-prefix=$LIBS_FOLDER/build"
 fi
 
+if [ "$_libopenmpt" = true ]; then
+  if [[ ! -f "$LIBS_FOLDER/build/lib/libopenmpt.a" ]]; then
+    echo "building libopenmpt-0.7.13"
+    cd "$LIBS_FOLDER"
+    wget -nc "https://lib.openmpt.org/files/libopenmpt/src/libopenmpt-0.6.22+release.makefile.tar.gz"
+    tar -xf libopenmpt-0.6.22+release.makefile.tar.gz
+    cd "$LIBS_FOLDER/libopenmpt-0.6.22+release/"
+    CFLAGS="-fPIC -Oz" emmake make -j 5 CONFIG=emscripten EMSCRIPTEN_TARGET=wasm
+    emmake make install CONFIG=emscripten EMSCRIPTEN_TARGET=wasm PREFIX="$LIBS_FOLDER/build/"
+  fi
+  LIBS_FLAGS="${LIBS_FLAGS} --with-openmpt-prefix=$LIBS_FOLDER/build"
+fi
+
 if [ "$_libtheoradec" = true ]; then
   if [[ ! -f "$LIBS_FOLDER/build/lib/libtheora.a" ]]; then
     echo "build libtheora-1.1.1"
@@ -270,6 +288,8 @@ if [ "$_libvpx" = true ]; then
   LIBS_FLAGS="${LIBS_FLAGS} --with-vpx-prefix=$LIBS_FOLDER/build"
 fi
 
+
+# https://lib.openmpt.org/files/libopenmpt/src/libopenmpt-0.7.13+release.makefile.tar.gz
 #################################
 # Configure
 #################################
