@@ -1507,6 +1507,11 @@ for ac_option in $@; do
 		LIBUNITY_CFLAGS="-I$arg/include"
 		LIBUNITY_LIBS="-L$arg/lib"
 		;;
+	--with-openmpt-prefix=*)
+		arg=`echo $ac_option | cut -d '=' -f 2`
+		LIBOPENMPT_CFLAGS="-I$arg/include"
+		LIBOPENMPT_LIBS="-L$arg/lib"
+		;;
 	--with-gtk-prefix=*)
 		arg=`echo $ac_option | cut -d '=' -f 2`
 		GTK_CFLAGS="-I$arg/include"
