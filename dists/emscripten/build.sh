@@ -46,8 +46,9 @@ Options:
   -h, --help         print this help, then exit
   -v, --verbose      print all commands run by the script
   --*                all other options are passed on to the configure script
-                     Note: --enable-a52, --enable-faad, --enable-mad, --enable-mpeg2, --enable-openmpt 
-                     --enable-theoradec and --enable-vpx also download and build the dependency
+                     Note: --enable-a52, --enable-faad, --enable-fluidlite, --enable-mad, --enable-mpeg2, 
+                     --enable-openmpt, --enable-retrowave, --enable-theoradec and --enable-vpx 
+                     also download and build the required library before running configure or make.
 "
 
 _liba52=false
@@ -250,6 +251,20 @@ if [ "$_libmpeg2" = true ]; then
     emmake make install
   fi
   LIBS_FLAGS="${LIBS_FLAGS} --with-mpeg2-prefix=$LIBS_FOLDER/build"
+fi
+
+if [ "$_libmpcdec" = true ]; then
+  if [[ ! -f "$LIBS_FOLDER/build/lib/libmpcdec.a" ]]; then
+    echo "building libmpcdec-1.2.6"
+    cd "$LIBS_FOLDER"
+    wget -nc "https://files.musepack.net/source/libmpcdec-1.2.6.tar.bz2"
+    tar -xf libmpcdec-1.2.6.tar.bz2
+    cd "$LIBS_FOLDER/libmpcdec-1.2.6/"
+    CFLAGS="-Oz" emconfigure ./configure --host=wasm32-unknown-none --build=wasm32-unknown-none --prefix="$LIBS_FOLDER/build/" --with-pic --enable-fpm=no
+    emmake make -j 5
+    emmake make install 
+  fi
+  LIBS_FLAGS="${LIBS_FLAGS} --with-mpcdec-prefix=$LIBS_FOLDER/build"
 fi
 
 if [ "$_libopenmpt" = true ]; then
