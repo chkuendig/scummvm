@@ -29,7 +29,7 @@
 #include "common/debug.h"
 #include "common/file.h"
 
-Common::HashMap<Common::String, AbstractFSList> HTTPFilesystemNode::_httpFolders = Common::HashMap<Common::String, AbstractFSList>();
+//Common::HashMap<Common::String, AbstractFSList> HTTPFilesystemNode::_httpFolders = Common::HashMap<Common::String, AbstractFSList>();
 
 HTTPFilesystemNode::HTTPFilesystemNode(const Common::String &path, const Common::String &displayName, const Common::String &baseUrl, bool isValid, bool isDirectory, int size) : _path(path), _displayName(displayName), _baseUrl(baseUrl), _isValid(isValid), _isDirectory(isDirectory), _size(size) {
 	debug(5, "HTTPFilesystemNode::HTTPFilesystemNode(%s, %s)", path.c_str(), baseUrl.c_str());
@@ -216,7 +216,6 @@ Common::SeekableReadStream *HTTPFilesystemNode::createReadStream() {
 		debug(5, "*HTTPFilesystemNode::createReadStream() file written %s", fsCachePath.c_str());
 	} else if (_size == 0) {
 		debug(5, "HTTPFilesystemNode::createReadStream() file empty %s", _path.c_str());
-		Common::String fsCachePath = Common::normalizePath("/.cache/" + _path, '/');
 		Common::DumpFile *_localFile = new Common::DumpFile();
 		if (!_localFile->open(Common::Path(fsCachePath), true)) {
 			error("Storage: unable to open file to download into");

@@ -101,8 +101,8 @@ protected:
 public:
 #ifdef USE_LIBCURL
 	ConnectionManager();
-	virtual ~ConnectionManager() = 0;
 #endif
+	virtual ~ConnectionManager() = 0;
 
 #ifdef USE_LIBCURL
 	/**

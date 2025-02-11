@@ -38,18 +38,18 @@ class NetworkReadStream : public Common::ReadStream {
 #ifdef USE_LIBCURL
 	CURL *_easy;
 	Common::MemoryReadWriteStream _backingStream;
-#endif
-	bool _keepAlive;
 	long _keepAliveIdle, _keepAliveInterval;
 	bool _eos, _requestComplete;
 	char *_errorBuffer;
-	uint32 _errorCode;
 	const byte *_sendingContentsBuffer;
 	uint32 _sendingContentsSize;
 	uint32 _sendingContentsPos;
 	byte *_bufferCopy; // To use with old curl version where CURLOPT_COPYPOSTFIELDS is not available
-	Common::String _responseHeaders;
 	uint64 _progressDownloaded, _progressTotal;
+#endif
+	bool _keepAlive;
+	uint32 _errorCode;
+	Common::String _responseHeaders;
 
 	virtual void resetStream() = 0;
 #ifdef USE_CURL

@@ -48,8 +48,6 @@ NetworkReadStreamEmscripten::NetworkReadStreamEmscripten(const char *url, curl_s
 
 	  _emscripten_fetch_url(url),
 	  _backingStream(DisposeAfterUse::YES), _keepAlive(keepAlive),
-	  _keepAliveIdle(keepAliveIdle),
-	  _keepAliveInterval(keepAliveInterval),
 	  _errorBuffer(nullptr),
 	  _errorCode(CURLE_OK) {
 
@@ -333,7 +331,7 @@ const char *NetworkReadStreamEmscripten::getError() const {
 
 long NetworkReadStreamEmscripten::httpResponseCode() const {
 	// return 200;
-	long responseCode = -1;
+	unsigned short responseCode = 0;
 	if (_emscripten_fetch)
 		responseCode = _emscripten_fetch->status;
 	debug(5, "EMSCRIPTEN CURL: NetworkReadStreamEmscripten::httpResponseCode %hu %hu ", _emscripten_fetch->status, responseCode);

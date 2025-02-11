@@ -44,7 +44,7 @@ class NetworkReadStreamEmscripten : public NetworkReadStream {
 	Request *_request;
 	Common::MemoryReadWriteStream _backingStream;
 	bool _keepAlive;
-	long _keepAliveIdle, _keepAliveInterval;
+	
 	bool _eos, _requestComplete;
 	char *_errorBuffer;
 	uint32 _errorCode;
