@@ -28,7 +28,7 @@ MODULE_OBJS := \
 	timer/default/default-timer.o
 
 ifdef USE_CLOUD
-ifdef USE_LIBCURL
+ifneq "$(or $(USE_LIBCURL),$(EMSCRIPTEN))" ""
 MODULE_OBJS += \
 	cloud/basestorage.o \
 	cloud/cloudicon.o \
@@ -98,6 +98,18 @@ MODULE_OBJS += \
 	fs/emscripten/emscripten-fs-factory.o \
 	fs/emscripten/emscripten-posix-fs.o \
 	fs/emscripten/http-fs.o
+ifdef USE_CLOUD
+MODULE_OBJS += \
+	networking/curl/curljsonrequest.o \
+	networking/curl/curlrequest.o \
+	networking/curl/postrequest.o \
+	networking/curl/request.o \
+	networking/curl/session.o \
+	networking/curl/sessionrequest.o \
+	networking/curl/url.o \
+	networking/emscripten/connectionmanager-emscripten.o \
+	networking/emscripten/networkreadstream-emscripten.o 
+endif
 endif
 
 ifdef USE_SDL_NET

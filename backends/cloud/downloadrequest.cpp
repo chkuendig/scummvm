@@ -22,6 +22,9 @@
 #include "backends/cloud/downloadrequest.h"
 #include "backends/networking/curl/connectionmanager.h"
 #include "common/textconsole.h"
+#ifdef EMSCRIPTEN
+#include "backends/networking/emscripten/networkreadstream-emscripten.h"
+#endif
 
 namespace Cloud {
 
@@ -60,6 +63,9 @@ void DownloadRequest::streamCallback(const Networking::NetworkReadStreamResponse
 	if (_ignoreCallback)
 		return;
 	_remoteFileStream = response.value;
+#ifdef EMSCRIPTEN
+	((Networking::NetworkReadStreamEmscripten *) _remoteFileStream)->setRequest(this);
+#endif
 }
 
 void DownloadRequest::streamErrorCallback(const Networking::ErrorResponse &error) {
