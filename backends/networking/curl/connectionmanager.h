@@ -28,22 +28,31 @@
 #include "common/hashmap.h"
 #include "common/mutex.h"
 
+#ifdef USE_LIBCURL
 typedef void CURL;
 typedef void CURLM;
 struct curl_slist;
+#endif
 
 namespace Networking {
 
 class NetworkReadStream;
 
+#ifdef USE_LIBCURL
 class ConnectionManager : public Common::Singleton<ConnectionManager> {
+#elif defined(EMSCRIPTEN)
+class ConnectionManager {
+#endif
+protected:
 	static const uint32 FRAMES_PER_SECOND = 100;
 	static const uint32 TIMER_INTERVAL = 1000000 / FRAMES_PER_SECOND;
 	static const uint32 CLOUD_PERIOD = 1; //every frame
 	static const uint32 CURL_PERIOD = 1; //every frame
 	static const uint32 DEBUG_PRINT_PERIOD = FRAMES_PER_SECOND; // once per second
 
+#ifdef USE_LIBCURL
 	friend void connectionsThread(void *); //calls handle()
+#endif
 
 	typedef Common::BaseCallback<Request *> *RequestCallback;
 
@@ -74,7 +83,9 @@ class ConnectionManager : public Common::Singleton<ConnectionManager> {
 		RequestWithCallback(Request *rq = nullptr, RequestCallback cb = nullptr): request(rq), onDeleteCallback(cb) {}
 	};
 
+#ifdef USE_LIBCURL
 	CURLM *_multi;
+#endif
 	bool _timerStarted;
 	Common::Array<RequestWithCallback> _requests, _addedRequests;
 	Common::Mutex _handleMutex, _addedRequestsMutex;
@@ -88,15 +99,19 @@ class ConnectionManager : public Common::Singleton<ConnectionManager> {
 	bool hasAddedRequests();
 
 public:
+#ifdef USE_LIBCURL
 	ConnectionManager();
-	~ConnectionManager() override;
+	virtual ~ConnectionManager() = 0;
+#endif
 
+#ifdef USE_LIBCURL
 	/**
 	 * All libcurl transfers are going through this ConnectionManager.
 	 * So, if you want to start any libcurl transfer, you must create
 	 * an easy handle and register it using this method.
 	 */
 	void registerEasyHandle(CURL *easy) const;
+#endif
 
 	/**
 	 * Use this method to add new Request into manager's queue.
@@ -111,20 +126,27 @@ public:
 	 *
 	 * @return the same Request pointer, just as a shortcut
 	 */
-	Request *addRequest(Request *request, RequestCallback callback = nullptr);
+	virtual Request *addRequest(Request *request, RequestCallback callback = nullptr) = 0;
 
 	/** Return URL-encoded version of given string. */
-	Common::String urlEncode(const Common::String &s) const;
 
+	virtual Common::String urlEncode(Common::String s) const = 0;
 	static uint32 getCloudRequestsPeriodInMicroseconds();
-
+#ifdef USE_LIBCURL
 	/** Return the path to the CA certificates bundle. */
-	static Common::String getCaCertPath();
+	static const char *getCaCertPath();
+#endif
 };
 
 /** Shortcut for accessing the connection manager. */
+#ifdef USE_LIBCURL
 #define ConnMan     Networking::ConnectionManager::instance()
+#endif
 
 } // End of namespace Networking
+
+#ifdef EMSCRIPTEN
+#include "backends/networking/emscripten/connectionmanager-emscripten.h"
+#endif
 
 #endif

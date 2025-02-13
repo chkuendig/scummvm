@@ -21,7 +21,11 @@
 
 #define FORBIDDEN_SYMBOL_ALLOW_ALL
 
+#ifdef USE_LIBCURL
 #include <curl/curl.h>
+#elif defined(EMSCRIPTEN)
+#include "backends/networking/emscripten/slist.h"
+#endif
 #include "backends/cloud/onedrive/onedrivestorage.h"
 #include "backends/cloud/cloudmanager.h"
 #include "backends/cloud/onedrive/onedrivecreatedirectoryrequest.h"
@@ -34,6 +38,9 @@
 #include "common/config-manager.h"
 #include "common/debug.h"
 #include "common/formats/json.h"
+#ifdef EMSCRIPTEN
+#include "backends/networking/emscripten/networkreadstream-emscripten.h"
+#endif
 
 namespace Cloud {
 namespace OneDrive {
@@ -152,10 +159,17 @@ void OneDriveStorage::fileInfoCallback(Networking::NetworkReadStreamCallback out
 
 	const char *url = result.getVal("@microsoft.graph.downloadUrl")->asString().c_str();
 	if (outerCallback)
+#ifndef EMSCRIPTEN
 		(*outerCallback)(Networking::NetworkReadStreamResponse(
 			response.request,
 			new Networking::NetworkReadStream(url, nullptr, "")
 		));
+#else 
+		(*outerCallback)(Networking::NetworkReadStreamResponse(
+			response.request,
+			new Networking::NetworkReadStreamEmscripten(url, nullptr, "")
+		));
+#endif
 
 	delete json;
 	delete outerCallback;
