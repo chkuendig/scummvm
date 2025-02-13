@@ -5,7 +5,18 @@
 # The default build target: just build the scummvm executable
 ######################################################################
 
+# Emscripten needs the plugins built first to create optimized builds
+ifdef EMSCRIPTEN
+ifneq (,$(findstring MAIN_MODULE=2,$(PRE_OBJS_FLAGS)))
+all: plugins $(EXECUTABLE) 
+else
 all: $(EXECUTABLE) plugins
+endif
+
+else
+all: $(EXECUTABLE) plugins
+endif
+
 
 ifdef SPLIT_DWARF
 all: $(EXECUTABLE).dwp
