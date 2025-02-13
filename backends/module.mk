@@ -93,6 +93,13 @@ MODULE_OBJS += \
 	networking/curl/url.o
 endif
 
+ifdef EMSCRIPTEN
+MODULE_OBJS += \
+	fs/emscripten/emscripten-fs-factory.o \
+	fs/emscripten/emscripten-posix-fs.o \
+	fs/emscripten/http-fs.o
+endif
+
 ifdef USE_SDL_NET
 MODULE_OBJS += \
 	networking/sdl_net/client.o \
