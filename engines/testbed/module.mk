@@ -18,7 +18,7 @@ MODULE_OBJS := \
 	video.o
 
 ifdef USE_CLOUD
-ifdef USE_LIBCURL
+ifneq "$(or $(USE_LIBCURL),$(EMSCRIPTEN))" ""
 MODULE_OBJS += \
 	cloud.o
 endif
