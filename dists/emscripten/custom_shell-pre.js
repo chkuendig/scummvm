@@ -12,3 +12,18 @@ if (window.location.hash.length > 0) {
 window.addEventListener("hashchange", function () {
 	location.reload(); // presumably the launch parameters changed
 });
+
+// MIDI support
+var midiOutputMap;
+if (!("requestMIDIAccess" in navigator)) {
+	console.error("No MIDI support in your browser.");
+} else {
+	navigator
+		.requestMIDIAccess({ sysex: true, software: true })
+		.then((midiAccess) => {
+			midiOutputMap = midiAccess.outputs;
+			midiAccess.onstatechange = (e) => {
+				midiOutputMap = e.target.outputs;
+			};
+		});
+}

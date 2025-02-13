@@ -69,6 +69,7 @@ Most Sound Features are available and work:
   - Integrated Yamaha OPL emulators (DosBOX, Nuked etc.) work  
   - Fluidlite can be used as a software synthesizer (using the Roland_SC-55 soundfont by default)
   - Roland MT-32 emulation works once MT32 roms are provided (can be drag&dropped into the browser window)
+  - Host midi devices can be used via the [Web MIDI API](https://developer.mozilla.org/en-US/docs/Web/API/Web_MIDI_API) 
 A few more things could be added in the future:
 - Text to Speech via the Web Speech API
 - Using a real OPL via the [WebUSB API](https://developer.mozilla.org/en-US/docs/Web/API/WebUSB_API) (needs hardware)
