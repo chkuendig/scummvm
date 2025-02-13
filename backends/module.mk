@@ -100,6 +100,7 @@ MODULE_OBJS += \
 	fs/emscripten/http-fs.o
 ifdef USE_CLOUD
 MODULE_OBJS += \
+	fs/emscripten/cloud-fs.o \
 	networking/curl/curljsonrequest.o \
 	networking/curl/curlrequest.o \
 	networking/curl/postrequest.o \
