@@ -20,7 +20,7 @@
  */
 
 #include "backends/networking/curl/request.h"
-
+#include "common/system.h"
 namespace Networking {
 
 ErrorResponse::ErrorResponse(Request *rq, const Common::String &resp):

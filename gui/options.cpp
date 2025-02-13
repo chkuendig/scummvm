@@ -57,7 +57,7 @@
 #include "widgets/edittext.h"
 
 #ifdef USE_CLOUD
-#ifdef USE_LIBCURL
+#if defined(USE_LIBCURL) || defined(EMSCRIPTEN)
 #include "backends/cloud/cloudmanager.h"
 #include "gui/cloudconnectionwizard.h"
 #include "gui/downloaddialog.h"
@@ -2197,7 +2197,7 @@ GlobalOptionsDialog::GlobalOptionsDialog(LauncherDialog *launcher)
 	_updatesPopUp = nullptr;
 #endif
 #ifdef USE_CLOUD
-#ifdef USE_LIBCURL
+#if defined(USE_LIBCURL) || defined(EMSCRIPTEN)
 	_selectedStorageIndex = CloudMan.getStorageIndex();
 	_storagePopUpDesc = nullptr;
 	_storagePopUp = nullptr;
@@ -2378,7 +2378,7 @@ void GlobalOptionsDialog::build() {
 	addMiscControls(miscContainer, "GlobalOptions_Misc_Container.", g_gui.useLowResGUI());
 
 #ifdef USE_CLOUD
-#ifdef USE_LIBCURL
+#if defined(USE_LIBCURL) || defined(EMSCRIPTEN)
 	//
 	// 8) The Cloud tab (remote storages)
 	//
@@ -2794,7 +2794,7 @@ void GlobalOptionsDialog::addMiscControls(GuiObject *boss, const Common::String 
 }
 
 #ifdef USE_CLOUD
-#ifdef USE_LIBCURL
+#if defined(USE_LIBCURL) || defined(EMSCRIPTEN)
 void GlobalOptionsDialog::addCloudControls(GuiObject *boss, const Common::String &prefix, bool lowres) {
 	_storagePopUpDesc = new StaticTextWidget(boss, prefix + "StoragePopupDesc", _("Active storage:"), _("Active cloud storage"));
 	_storagePopUp = new PopUpWidget(boss, prefix + "StoragePopup", Common::U32String(), kStoragePopUpCmd);
@@ -3087,7 +3087,7 @@ void GlobalOptionsDialog::apply() {
 #endif // USE_UPDATES
 
 #ifdef USE_CLOUD
-#ifdef USE_LIBCURL
+#if defined(USE_LIBCURL) || defined(EMSCRIPTEN)
 	if (CloudMan.getStorageIndex() != _selectedStorageIndex) {
 		if (!CloudMan.switchStorage(_selectedStorageIndex)) {
 			bool anotherStorageIsWorking = CloudMan.isWorking();
@@ -3460,7 +3460,7 @@ void GlobalOptionsDialog::handleCommand(CommandSender *sender, uint32 cmd, uint3
 		break;
 	}
 #ifdef USE_CLOUD
-#ifdef USE_LIBCURL
+#if defined(USE_LIBCURL) || defined(EMSCRIPTEN)
 	case kCloudTabContainerReflowCmd: {
 		setupCloudTab();
 		break;
@@ -3575,7 +3575,7 @@ void GlobalOptionsDialog::handleCommand(CommandSender *sender, uint32 cmd, uint3
 void GlobalOptionsDialog::handleTickle() {
 	OptionsDialog::handleTickle();
 #ifdef USE_CLOUD
-#ifdef USE_LIBCURL
+#if defined(USE_LIBCURL) || defined(EMSCRIPTEN)
 	if (_redrawCloudTab) {
 		reflowLayout(); // recalculates scrollbar as well
 		_redrawCloudTab = false;
@@ -3645,7 +3645,7 @@ void GlobalOptionsDialog::reflowLayout() {
 
 	OptionsDialog::reflowLayout();
 #ifdef USE_CLOUD
-#ifdef USE_LIBCURL
+#if defined(USE_LIBCURL) || defined(EMSCRIPTEN)
 	setupCloudTab();
 #endif // USE_LIBCURL
 #endif // USE_CLOUD
@@ -3656,7 +3656,7 @@ void GlobalOptionsDialog::reflowLayout() {
 }
 
 #ifdef USE_CLOUD
-#ifdef USE_LIBCURL
+#if defined(USE_LIBCURL) || defined(EMSCRIPTEN)
 void GlobalOptionsDialog::setupCloudTab() {
 	_selectedStorageIndex = (_storagePopUp ? _storagePopUp->getSelectedTag() : (uint32)Cloud::kStorageNoneId);
 
@@ -3846,7 +3846,7 @@ void GlobalOptionsDialog::reflowNetworkTabLayout() {
 #endif // USE_SDL_NET
 
 #ifdef USE_CLOUD
-#ifdef USE_LIBCURL
+#if defined(USE_LIBCURL) || defined(EMSCRIPTEN)
 void GlobalOptionsDialog::storageSavesSyncedCallback(const Cloud::Storage::BoolResponse &response) {
 	_redrawCloudTab = true;
 }
@@ -3858,7 +3858,7 @@ void GlobalOptionsDialog::storageErrorCallback(const Networking::ErrorResponse &
 	if (!response.interrupted)
 		g_system->displayMessageOnOSD(_("Request failed.\nCheck your Internet connection."));
 }
-#endif // USE_LIBCURL
+#endif // USE_LIBCURL || EMSCRIPTEN
 #endif // USE_CLOUD
 
 bool OptionsDialog::testGraphicsSettings() {

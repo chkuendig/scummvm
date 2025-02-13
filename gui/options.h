@@ -32,7 +32,7 @@
 #include "gui/fluidsynth-dialog.h"
 #endif
 
-#ifdef USE_LIBCURL
+#ifdef USE_CLOUD
 #include "backends/cloud/storage.h"
 #endif
 
@@ -339,7 +339,7 @@ protected:
 	void addMiscControls(GuiObject *boss, const Common::String &prefix, bool lowres);
 
 #ifdef USE_CLOUD
-#ifdef USE_LIBCURL
+#if defined(USE_LIBCURL) || defined(EMSCRIPTEN) 
 	//
 	// Cloud controls
 	//
