@@ -112,6 +112,10 @@ MODULE_OBJS += \
 	networking/emscripten/connectionmanager-emscripten.o \
 	networking/emscripten/networkreadstream-emscripten.o 
 endif
+ifdef USE_TTS
+MODULE_OBJS += \
+	text-to-speech/emscripten/emscripten-text-to-speech.o
+endif
 endif
 
 ifdef USE_SDL_NET
