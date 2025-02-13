@@ -31,6 +31,10 @@
 typedef Common::BaseCallback<const Common::String *> *CloudConnectionCallback;
 #endif
 
+#ifdef USE_TTS
+#include "backends/text-to-speech/emscripten/emscripten-text-to-speech.h"
+#endif 
+
 extern "C" {
 void clipboard_paste_callback(char *paste_data); // pass clipboard paste data from JS to backend
 void cloud_connection_json_callback(char *str);       // pass cloud storage activation data from JS to setup wizard
@@ -49,6 +53,7 @@ protected:
 #endif
 
 public:
+	void initBackend() override;
 	bool hasFeature(Feature f) override;
 	void setFeatureState(Feature f, bool enable) override;
 	bool getFeatureState(Feature f) override;

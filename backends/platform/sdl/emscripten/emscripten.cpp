@@ -166,6 +166,15 @@ void OSystem_Emscripten::init() {
 	OSystem_SDL::init();
 }
 
+void OSystem_Emscripten::initBackend() {
+#ifdef USE_TTS
+	// Initialize Text to Speech manager
+	_textToSpeechManager = new EmscriptenTextToSpeechManager();
+#endif
+	// Invoke parent implementation of this method
+	OSystem_POSIX::initBackend();
+}
+
 bool OSystem_Emscripten::hasFeature(Feature f) {
 	if (f == kFeatureFullscreenMode)
 		return true;

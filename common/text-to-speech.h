@@ -120,6 +120,12 @@ class TTSVoice {
 		 */
 		String getDescription() { return _description; };
 
+		/**
+		 * Sets the voice description, should probably be used only by the backends
+		 * that are directly communicating with the TTS engine.
+		 */
+		void setDescription(String description) { _description = description; };
+
 	protected:
 		Gender _gender; ///< Gender of the voice
 		Age _age; ///< Age of the voice
