@@ -79,7 +79,7 @@ class NetworkReadStreamEmscripten : public NetworkReadStream {
 	static void emscriptenDownloadSucceeded(emscripten_fetch_t *fetch);
 	static void emscriptenDownloadFailed(emscripten_fetch_t *fetch);
 	static void emscriptenDownloadProgress(emscripten_fetch_t *fetch);
-	static void emscriptenHandleDownload(emscripten_fetch_t *fetch, bool success);
+	void emscriptenDownloadFinished(bool success);
 
 private:
 	/* Default Constructor*/

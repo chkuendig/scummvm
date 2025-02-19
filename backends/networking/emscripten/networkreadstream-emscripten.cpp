@@ -51,7 +51,6 @@ NetworkReadStreamEmscripten::NetworkReadStreamEmscripten(const char *url, curl_s
 	  _errorBuffer(nullptr),
 	  _errorCode(CURLE_OK) {
 
-	debug(5, "EMSCRIPTEN CURL: NetworkReadStreamEmscripten default constructor url: %s", url);
 	resetStream();
 	emscripten_fetch_attr_init(_emscripten_fetch_attr);
 
@@ -77,7 +76,7 @@ NetworkReadStreamEmscripten::NetworkReadStreamEmscripten(const char *url, curl_s
 
 		while (tok != NULL) {
 			_emscripten_request_headers[i++] = tok;
-			debug(5, "_emscripten_request_headers %s", tok);
+			debug(10, "_emscripten_request_headers %s", tok);
 			tok = strtok(NULL, ":");
 		}
 
@@ -90,12 +89,10 @@ NetworkReadStreamEmscripten::NetworkReadStreamEmscripten(const char *url, curl_s
 	_emscripten_fetch_attr->requestHeaders = _emscripten_request_headers;
 	strcpy(_emscripten_fetch_attr->requestMethod, "GET"); // todo: move down to setup buffer contents
 	_emscripten_fetch_attr->attributes = EMSCRIPTEN_FETCH_LOAD_TO_MEMORY;
-	_emscripten_fetch_attr->onsuccess = emscriptenDownloadSucceeded;
+	_emscripten_fetch_attr->onsuccess = emscriptenDownloadSucceeded; // TODO: This needs to be handled with a C function (see how it's done in )
 	_emscripten_fetch_attr->onprogress = emscriptenDownloadProgress;
 	_emscripten_fetch_attr->onerror = emscriptenDownloadFailed;
 	_emscripten_fetch_attr->userData = this;
-
-	debug(5, "EMSCRIPTEN CURL: NetworkReadStreamEmscripten::initCurl %s", _emscripten_fetch_url);
 }
 
 /** Send <postFields>, using POST by default. */
@@ -115,45 +112,54 @@ NetworkReadStreamEmscripten::NetworkReadStreamEmscripten(const char *url, curl_s
 	setupBufferContents(buffer, bufferSize, uploading, usingPatch, post);
 }
 
-void NetworkReadStreamEmscripten::emscriptenHandleDownload(emscripten_fetch_t *fetch, bool success) {
-	NetworkReadStreamEmscripten *stream = (NetworkReadStreamEmscripten *)fetch->userData;
-	if (success)
-		debug(5, "NetworkReadStreamEmscripten::emscriptenHandleDownload Finished downloading %llu bytes from URL %s .", fetch->numBytes, fetch->url);
-	else
-		debug(5, "NetworkReadStreamEmscripten::emscriptenHandleDownload Downloading %s failed, HTTP failure status code: %d.", fetch->url, fetch->status);
-	if (fetch->numBytes > 0) {
-		stream->_backingStream.write(fetch->data, fetch->numBytes); // todo: maybe this could be done continously during onprogress?
-	}
-	stream->setProgress(fetch->numBytes, fetch->numBytes);
-	stream->finished(CURLE_OK); // todo: actually pass the result code from emscripten_fetch
-	if (stream->_request) {
-		
-		int64 readPos = stream->_backingStream.pos();
-		bool dataRead = true;
-		Request *request = stream->_request;
-		while (stream->_request && stream->_request->state() != FINISHED && dataRead && !ConnMan.timerStarted()) {
+void NetworkReadStreamEmscripten::emscriptenDownloadFinished(bool success) {
 
-			debug(9, "NetworkReadStreamEmscripten::emscriptenHandleDownload state %d %s", request->state(), fetch->url);
+	if (success) {
+		debug(5, "NetworkReadStreamEmscripten::emscriptenHandleDownload Finished downloading %llu bytes from URL %s. HTTP status code: %d", _emscripten_fetch->numBytes, _emscripten_fetch->url, _emscripten_fetch->status);
+	} else {
+		debug(5, "NetworkReadStreamEmscripten::emscriptenHandleDownload Downloading %s failed, HTTP failure status code: %d, status text: %s", _emscripten_fetch->url, _emscripten_fetch->status, _emscripten_fetch->statusText);
+	}
+	if (_emscripten_fetch->numBytes > 0) {
+		this->_backingStream.write(_emscripten_fetch->data, _emscripten_fetch->numBytes); // todo: maybe this could be done continously during onprogress?
+	}
+	this->setProgress(_emscripten_fetch->numBytes, _emscripten_fetch->numBytes);
+	if (success) {
+		this->finished(CURLE_OK); // TODO: actually pass the result code from emscripten_fetch
+
+	} else {
+		this->finished(-1);
+	}
+	if (this->_request) {
+
+		int64 readPos = this->_backingStream.pos();
+		bool dataRead = true;
+		Request *request = this->_request;
+		while (this->_request && this->_request->state() != FINISHED && dataRead && !ConnMan.timerStarted()) {
+
+			debug(9, "NetworkReadStreamEmscripten::emscriptenHandleDownload state %d %s", request->state(), _emscripten_fetch->url);
 			if (request->state() == PROCESSING) {
 				request->handle();
 			} else if (request->state() == RETRY) {
 				request->handleRetry();
 			}
 
-			debug(9, "NetworkReadStreamEmscripten::emscriptenHandleDownload state updated %d %s ", request->state(), fetch->url);
+			debug(9, "NetworkReadStreamEmscripten::emscriptenHandleDownload state updated %d %s ", request->state(), _emscripten_fetch->url);
 
-			dataRead = (stream->_backingStream.pos() != readPos); // we check if handle is reading any data, if so we continue calling it (this is a workaround as emscripten doesn't have a timer)
-			readPos = stream->_backingStream.pos();
-
+			dataRead = (this->_backingStream.pos() != readPos); // we check if handle is reading any data, if so we continue calling it (this is a workaround as emscripten doesn't have a timer)
+			readPos = this->_backingStream.pos();
 		}
 	}
 }
 
 void NetworkReadStreamEmscripten::emscriptenDownloadSucceeded(emscripten_fetch_t *fetch) {
-	// debug(5,"NetworkReadStreamEmscripten::emscriptenDownloadSucceeded %s", fetch->url);
-	emscriptenHandleDownload(fetch, true);
+	NetworkReadStreamEmscripten *stream = (NetworkReadStreamEmscripten *)fetch->userData;
+	stream->emscriptenDownloadFinished(true);
 }
 
+void NetworkReadStreamEmscripten::emscriptenDownloadFailed(emscripten_fetch_t *fetch) {
+	NetworkReadStreamEmscripten *stream = (NetworkReadStreamEmscripten *)fetch->userData;
+	stream->emscriptenDownloadFinished(false);
+}
 void NetworkReadStreamEmscripten::emscriptenDownloadProgress(emscripten_fetch_t *fetch) {
 	/*
 	if (fetch->totalBytes) {
@@ -176,22 +182,15 @@ void NetworkReadStreamEmscripten::emscriptenDownloadProgress(emscripten_fetch_t 
 	if (stream) {
 		stream->setProgress(fetch->dataOffset, fetch->totalBytes);
 	}
-	
 	if (stream->_request) {
 		Request *request = stream->_request;
-			if (request->state() == PROCESSING)
-				request->handle();
+		if (request->state() == PROCESSING)
+			request->handle();
 	}
-}
-
-void NetworkReadStreamEmscripten::emscriptenDownloadFailed(emscripten_fetch_t *fetch) {
-	emscriptenHandleDownload(fetch, false);
 }
 
 void NetworkReadStreamEmscripten::resetStream() {
 	_eos = _requestComplete = false;
-	// todo: implement emscripten_fetch_close
-	// debug(5,"EMSCRIPTEN CURL: NetworkReadStreamEmscripten::resetStream url set %s", _emscripten_fetch_url);
 	_sendingContentsSize = _sendingContentsPos = 0;
 	_progressDownloaded = _progressTotal = 0;
 	_bufferCopy = nullptr;
@@ -199,13 +198,12 @@ void NetworkReadStreamEmscripten::resetStream() {
 
 bool NetworkReadStreamEmscripten::reuseCurl(const char *url, curl_slist *headersList) {
 	if (!_keepAlive) {
-		debug(5, "NetworkReadStreamEmscripten: Can't reuse curl handle (was not setup as keep-alive)");
+		debug(5, "NetworkReadStreamEmscripten: Can't reuse stream (was not setup as keep-alive)");
 		return false;
 	}
 
 	resetStream();
 
-	// debug(5, "EMSCRIPTEN CURL: NetworkReadStreamEmscripten::reuseCurl");
 	return true;
 }
 
@@ -215,26 +213,23 @@ void NetworkReadStreamEmscripten::setupBufferContents(const byte *buffer, uint32
 		strcpy(_emscripten_fetch_attr->requestMethod, "PUT");
 		_emscripten_fetch_attr->requestDataSize = bufferSize;
 		_emscripten_fetch_attr->requestData = (const char *)buffer;
-
 	} else if (usingPatch) {
 		strcpy(_emscripten_fetch_attr->requestMethod, "PATCH");
 	} else {
 		if (post || bufferSize != 0) {
-
 			strcpy(_emscripten_fetch_attr->requestMethod, "POST");
 			_emscripten_fetch_attr->requestDataSize = bufferSize;
 			_emscripten_fetch_attr->requestData = (const char *)buffer;
 		}
 	}
-
+	debug(5, "NetworkReadStreamEmscripten::setupBufferContents uploading %s usingPatch %s post %s ->method %s", uploading ? "true" : "false", usingPatch ? "true" : "false", post ? "true" : "false", _emscripten_fetch_attr->requestMethod);
 	_emscripten_fetch = emscripten_fetch(_emscripten_fetch_attr, _emscripten_fetch_url);
-	debug(5, "EMSCRIPTEN CURL: NetworkReadStreamEmscripten::setupBufferContents");
 }
 
 void NetworkReadStreamEmscripten::setupFormMultipart(const Common::HashMap<Common::String, Common::String> &formFields, const Common::HashMap<Common::String, Common::Path> &formFiles) {
 	// set POST multipart upload form fields/files
 
-	error("EMSCRIPTEN CURL: NetworkReadStreamEmscripten::setupFormMultipart");
+	error("NetworkReadStreamEmscripten::setupFormMultipart Not implemented");
 }
 
 bool NetworkReadStreamEmscripten::reuse(const char *url, curl_slist *headersList, Common::String postFields, bool uploading, bool usingPatch) {
@@ -273,9 +268,10 @@ NetworkReadStream::~NetworkReadStream() {}
 
 NetworkReadStreamEmscripten::~NetworkReadStreamEmscripten() {
 
-	if (_emscripten_fetch)
-		// emscripten_fetch_close(_emscripten_fetch);
-		debug(5, "EMSCRIPTEN CURL: NetworkReadStreamEmscripten emscripten_fetch_close");
+	if (_emscripten_fetch) {
+		debug(5, "~NetworkReadStreamEmscripten: emscripten_fetch_close");
+		emscripten_fetch_close(_emscripten_fetch);
+	}
 	free(_bufferCopy);
 	free(_errorBuffer);
 }
@@ -307,16 +303,13 @@ uint32 NetworkReadStreamEmscripten::read(void *dataPtr, uint32 dataSize) {
 
 void NetworkReadStreamEmscripten::finished(uint32 errorCode) {
 	_requestComplete = true;
-
-	const char *url = _emscripten_fetch_url;
-	debug(5, "EMSCRIPTEN CURL: NetworkReadStreamEmscripten::finished %i %s ", errorCode, url);
-
 	_errorCode = errorCode;
 
 	if (_errorCode == CURLE_OK) {
-		debug(9, "NetworkReadStreamEmscripten: %s - Request succeeded", url);
+		debug(9, "NetworkReadStreamEmscripten::finished %s - Request succeeded", _emscripten_fetch_url);
 	} else {
-		debug(5,"NetworkReadStreamEmscripten: %s - Request failed (%d - %s)", url, _errorCode, getError());
+		_errorBuffer = _emscripten_fetch->statusText;
+		warning("NetworkReadStreamEmscripten::finished %s - Request failed (%d - %s)", _emscripten_fetch_url, _errorCode, getError());
 	}
 }
 
@@ -325,7 +318,6 @@ bool NetworkReadStreamEmscripten::hasError() const {
 }
 
 const char *NetworkReadStreamEmscripten::getError() const {
-	debug(5, "EMSCRIPTEN CURL: NetworkReadStreamEmscripten::getError");
 	return _errorBuffer;
 }
 
@@ -334,14 +326,13 @@ long NetworkReadStreamEmscripten::httpResponseCode() const {
 	unsigned short responseCode = 0;
 	if (_emscripten_fetch)
 		responseCode = _emscripten_fetch->status;
-	debug(5, "EMSCRIPTEN CURL: NetworkReadStreamEmscripten::httpResponseCode %hu %hu ", _emscripten_fetch->status, responseCode);
+	debug(5, "NetworkReadStreamEmscripten::httpResponseCode %hu %hu ", _emscripten_fetch->status, responseCode);
 	return responseCode;
 }
 
 Common::String NetworkReadStreamEmscripten::currentLocation() const {
-	Common::String result = "";
-	debug(5, "EMSCRIPTEN CURL: NetworkReadStreamEmscripten::currentLocation");
-	return result;
+	debug(5, "NetworkReadStreamEmscripten::currentLocation %s", _emscripten_fetch_url);
+	return Common::String(_emscripten_fetch_url);
 }
 
 Common::String NetworkReadStreamEmscripten::responseHeaders() const {

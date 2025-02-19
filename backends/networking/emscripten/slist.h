@@ -4,8 +4,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-// TODO: these bits could probably be implemented on top of Common::List
-// but currently it's copied from https://github.com/curl/curl/blob/master/lib/slist.c
+// This is copied from https://github.com/curl/curl/blob/master/lib/slist.c to allow reusing the same 
+// code in the Emscripten backend as used for libcurl. 
+// TODO: This could probably be implemented on top of Common::List for cleaner code.
 
 /***************************************************************************
  *                                  _   _ ____  _
@@ -31,11 +32,13 @@
  *
  ***************************************************************************/
 
-
-typedef enum {
-  CURLE_OK = 0, // just here until we cleanup networkreadstream.cpp and  sessionrequest.cpp
+typedef enum 
+{
+  CURLE_OK = 0, // the only CURLcode value used/checked in ScummVM
 } CURLcode;
-struct curl_slist {
+
+struct curl_slist 
+{
   char *data;
   struct curl_slist *next;
 };
