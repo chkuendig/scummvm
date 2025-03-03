@@ -20,7 +20,14 @@
  *
  */
 
+#ifdef __EMSCRIPTEN__
+#define FORBIDDEN_SYMBOL_EXCEPTION_FILE
+#define FORBIDDEN_SYMBOL_EXCEPTION_getenv
+#include <emscripten.h>
+#endif // __EMSCRIPTEN__
+
 #include "common/scummsys.h"
+
 
 #if defined(SDL_BACKEND)
 
@@ -40,12 +47,20 @@ static Uint32 timer_handler(Uint32 interval, void *param) {
 }
 #endif
 
+#ifdef __EMSCRIPTEN__
+void nop(void) {}
+#endif
+
 SdlTimerManager::SdlTimerManager() {
 #if !SDL_VERSION_ATLEAST(3, 0, 0)
 	// Initializes the SDL timer subsystem
 	if (SDL_InitSubSystem(SDL_INIT_TIMER) == -1) {
 		error("Could not initialize SDL: %s", SDL_GetError());
 	}
+#endif
+#ifdef __EMSCRIPTEN__
+// https://github.com/emscripten-core/emscripten/pull/4184
+emscripten_set_main_loop(nop, 0, 0);
 #endif
 
 	// Creates the timer callback

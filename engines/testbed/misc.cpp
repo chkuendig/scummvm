@@ -131,15 +131,7 @@ TestExitStatus MiscTests::testTimers() {
 }
 
 TestExitStatus MiscTests::testMutexes() {
-#ifdef EMSCRIPTEN
-// TODO: This doesn't work in emscripten and actually crashes everything
-/*
-implement main loop in testbed to see if it fixes things: https://wiki.libsdl.org/SDL2/README/emscripten
-Alternaitve, maybe we can port the SDL timers directly to scummvm backend to worka around some of the issues:
-https://github.com/libsdl-org/SDL/pull/4648
-// */
-	return kTestFailed;
-#endif
+
 	if (ConfParams.isSessionInteractive()) {
 		if (Testsuite::handleInteractiveInput("Testing the Mutual Exclusion API implementation", "Continue", "Skip", kOptionRight)) {
 			Testsuite::logPrintf("Info! Mutex tests skipped by the user.\n");
