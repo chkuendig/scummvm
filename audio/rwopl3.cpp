@@ -32,6 +32,7 @@
 #include <RetroWaveLib/Platform/Linux_SPI.h>
 #include <RetroWaveLib/Platform/POSIX_SerialPort.h>
 #include <RetroWaveLib/Platform/Win32_SerialPort.h>
+#include <RetroWaveLib/Platform/Web_SerialPort.h>
 
 #include "common/config-manager.h"
 #include "common/debug.h"
@@ -54,7 +55,7 @@ OPL::~OPL() {
 
 		switch (_connType) {
 		case RWCONNTYPE_POSIX_SERIAL:
-#if defined(__unix__) || (defined(__APPLE__) && defined(__MACH__))
+#if (defined(__unix__) && !defined(EMSCRIPTEN)) || (defined(__APPLE__) && defined(__MACH__))
 			retrowave_deinit_posix_serialport(&_retrowaveGlobalContext);
 #endif
 			break;
@@ -66,6 +67,11 @@ OPL::~OPL() {
 		case RWCONNTYPE_LINUX_SPI:
 #if defined(__linux__)
 			retrowave_deinit_linux_spi(&_retrowaveGlobalContext);
+#endif
+			break;
+		case RWCONNTYPE_WEB_SERIAL:
+#ifdef EMSCRIPTEN
+			retrowave_deinit_web_serialport(&_retrowaveGlobalContext);
 #endif
 			break;
 		}
@@ -90,7 +96,7 @@ bool OPL::init() {
 		if (port.empty()) {
 			warning("RWOPL3: Missing port specification.");
 		} else {
-#if defined(__linux__) || defined(__unix__) || (defined(__APPLE__) && defined(__MACH__))
+#if defined(__linux__) || (defined(__unix__) && !defined(EMSCRIPTEN)) || (defined(__APPLE__) && defined(__MACH__))
 			char buf[128];
 			snprintf(buf, sizeof(buf) - 1, "/dev/%s", port.c_str());
 
@@ -101,6 +107,11 @@ bool OPL::init() {
 #ifdef WIN32
 			rc = retrowave_init_win32_serialport(&_retrowaveGlobalContext, port.c_str());
 			_connType = RWCONNTYPE_WIN32_SERIAL;
+#endif
+
+#ifdef EMSCRIPTEN
+			rc = retrowave_init_web_serialport(&_retrowaveGlobalContext);
+			_connType = RWCONNTYPE_WEB_SERIAL;
 #endif
 		}
 	} else if (bus == "spi") {
