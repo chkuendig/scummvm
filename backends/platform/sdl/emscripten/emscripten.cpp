@@ -81,10 +81,11 @@ EM_JS(void, clipboard_copy, (char const *content_ptr), {
 });
 
 EM_JS(void, clipboard_add_paste_listener, (), {
-	document.addEventListener(
+	//todo: FIx document is not defined when running multithreaded 
+	/*document.addEventListener(
 		'paste', (event) => {
 			Module._clipboard_paste_callback(stringToNewUTF8(event.clipboardData.getData('text/plain')));
-		});
+		});*/
 });
 
 #ifdef USE_CLOUD
