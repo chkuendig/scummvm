@@ -34,19 +34,8 @@
 // Inline JavaScript, 
 // see https://emscripten.org/docs/porting/connecting_cpp_and_javascript/Interacting-with-code.html
 
-EM_JS(bool, isFullscreen, (), {
-	return !!document.fullscreenElement;
-});
 
-EM_JS(void, toggleFullscreen, (bool enable), {
-	let canvas = document.getElementById('canvas');
-	if (enable && !document.fullscreenElement) {
-		canvas.requestFullscreen();
-	}
-	if (!enable && document.fullscreenElement) {
-		document.exitFullscreen();
-	}
-});
+
 
 EM_JS(void, downloadFile, (const char *filenamePtr, char *dataPtr, int dataSize), {
 	const view = new Uint8Array(Module.HEAPU8.buffer, dataPtr, dataSize);
@@ -198,7 +187,10 @@ bool OSystem_Emscripten::hasFeature(Feature f) {
 
 bool OSystem_Emscripten::getFeatureState(Feature f) {
 	if (f == kFeatureFullscreenMode) {
-		return isFullscreen();
+		const bool result = MAIN_THREAD_EM_ASM_INT({
+			return !!document.fullscreenElement;
+		});
+		return result;
 	} else {
 		return OSystem_POSIX::getFeatureState(f);
 	}
@@ -206,7 +198,16 @@ bool OSystem_Emscripten::getFeatureState(Feature f) {
 
 void OSystem_Emscripten::setFeatureState(Feature f, bool enable) {
 	if (f == kFeatureFullscreenMode) {
-		toggleFullscreen(enable);
+		MAIN_THREAD_EM_ASM({
+			var enable = !!$0;
+			let canvas = document.getElementById('canvas');
+			if (enable && !document.fullscreenElement) {
+				canvas.requestFullscreen();
+			}
+			if (!enable && document.fullscreenElement) {
+				document.exitFullscreen();
+			}
+		}, enable);
 	} else {
 		OSystem_POSIX::setFeatureState(f, enable);
 	}

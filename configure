@@ -3259,21 +3259,24 @@ EOF
         append_var LDFLAGS "-s ASYNCIFY=1 -s ASYNCIFY_STACK_SIZE=8388608" # TODO: try -sJSPI
 
 		append_var CXXFLAGS "-pthread "
-		append_var LDFLAGS "-pthread -sPROXY_TO_PTHREAD=1 -sOFFSCREENCANVAS_SUPPORT=1" #-sDYLINK_DEBUG=1 " #-sPTHREADS_DEBUG=1"
+		append_var LDFLAGS "-pthread -sPTHREAD_POOL_SIZE -sPROXY_TO_PTHREAD=1 -sOFFSCREENCANVAS_SUPPORT=1 -sOFFSCREEN_FRAMEBUFFER=1" #-sDYLINK_DEBUG=1 " #-sPTHREADS_DEBUG=1"
 		append_var LDFLAGS "-s EXPORTED_FUNCTIONS=[_main,_malloc,_free] -s EXPORTED_RUNTIME_METHODS=[ccall]" # needed to send files from JS to C
 		if test "$_debug_build" = yes; then
 			_optimization_level=-O2
-			append_var LDFLAGS "-O2 -g3 -s ASSERTIONS=2"
+			append_var LDFLAGS "-O2 -g3 -s ASSERTIONS=2 -sDYLINK_DEBUG -sPTHREADS_DEBUG"	
 		else
 			_optimization_level=-O3
 			append_var LDFLAGS "-O3"
 		fi
 
 		# activate emscripten-ports
-		if test "$_sdl" != no; then # we enable SDL2 by default
-			append_var LDFLAGS "-s USE_SDL=2 "
-		fi
-
+		
+		# we enable SDL3 by default
+		_sdlversion="3.2.4"
+		_sdl=yes
+		append_var LDFLAGS "-s USE_SDL=3"
+		#append_var LDFLAGS "-s USE_SDL=3"
+	
 		# We explicitly disable optional libraries if not enabled. "auto" would depend
 		# on whether the port has been used before (and is detected) which is unpredictable.
 		if test "$_freetype2" = yes; then
@@ -4205,7 +4208,9 @@ case $_backend in
 		_sdl=auto
 		;;
 	sdl)
-		_sdl=auto
+		if test "$_host_os" != "emscripten"; then
+			_sdl=auto
+		fi
 		;;
 	switch)
 		_sdl=auto
@@ -4270,7 +4275,9 @@ echo "...check complete"
 #
 echocheck "pkg-config"
 _pkg_config=no
-command -v $_pkgconfig >/dev/null 2>&1 && _pkg_config=yes
+if test "$_host_os" != "emscripten"; then #emscripten doesn't have pkg-config, but this script might detect the system version
+	command -v $_pkgconfig >/dev/null 2>&1 && _pkg_config=yes
+fi 
 echo "$_pkg_config"
 
 if test "$_pkg_config" = yes && test -n "$_host" && test -z "$PKG_CONFIG_LIBDIR" && test "$_pkgconfig" = pkg-config; then
@@ -4281,6 +4288,7 @@ fi
 # Setup SDL specifics for SDL based backends
 #
 if test "$_sdl" = auto ; then
+	echo "Checking for SDL... sdl = auto"
 	if test "$_pkg_config" = "yes" && ($_pkgconfig --exists sdl || $_pkgconfig --exists sdl2); then
 		find_sdlconfig
 		_sdlversion=`$_sdlconfig --version`
