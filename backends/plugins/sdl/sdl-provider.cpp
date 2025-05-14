@@ -28,6 +28,7 @@
 #include "backends/plugins/dynamic-plugin.h"
 #include "common/fs.h"
 
+#include "common/file.h"
 #include "backends/platform/sdl/sdl-sys.h"
 
 class SDLPlugin : public DynamicPlugin {
@@ -55,7 +56,21 @@ public:
 
 	bool loadPlugin() {
 		assert(!_dlHandle);
-		_dlHandle = SDL_LoadObject(_filename.toString(Common::Path::kNativeSeparator).c_str());
+		Common::String fsCachePath = Common::normalizePath("/.cache/" + _filename.toString(Common::Path::kNativeSeparator), '/');
+		/* load file just for the heck of it*/
+	Common::File file;
+		Common::FSNode node(_filename);
+	file.open(node);
+	if (!file.isOpen()) {
+		warning("Could not open file %s!", _filename.toString(Common::Path::kNativeSeparator).c_str());
+		return false;
+	}
+	const int32 size = file.size();
+	char *bytes = new char[size + 1];
+	file.read(bytes, size);
+	file.close();
+	warning("File %s loaded, should now be avaialble at %s", _filename.toString(Common::Path::kNativeSeparator).c_str(), fsCachePath.c_str());
+		_dlHandle = SDL_LoadObject(fsCachePath.c_str());
 
 		if (!_dlHandle) {
 			warning("Failed loading plugin '%s' (%s)", _filename.toString(Common::Path::kNativeSeparator).c_str(), SDL_GetError());

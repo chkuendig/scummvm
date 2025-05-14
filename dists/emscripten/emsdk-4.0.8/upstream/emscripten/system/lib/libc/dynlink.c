@@ -326,6 +326,7 @@ static void do_thread_sync(void* arg) {
   dbg("do_thread_sync");
   struct promise_result* info = arg;
   if(emscripten_is_main_runtime_thread()) {
+    printf("\n dlopen was called on the main thread.  This is not supported.\n Please use the async version of dlopen.\n");
      info->result =true;
      return;
   }
