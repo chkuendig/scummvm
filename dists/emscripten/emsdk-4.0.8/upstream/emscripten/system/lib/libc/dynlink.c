@@ -325,6 +325,11 @@ struct promise_result {
 static void do_thread_sync(void* arg) {
   dbg("do_thread_sync");
   struct promise_result* info = arg;
+  if(emscripten_is_main_runtime_thread()) {
+     info->result =true;
+     return;
+  }
+
   info->result = _emscripten_dlsync_self();
 }
 
