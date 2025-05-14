@@ -3262,8 +3262,8 @@ EOF
 		append_var LDFLAGS "-pthread -sPTHREAD_POOL_SIZE -sPROXY_TO_PTHREAD=1 -sOFFSCREENCANVAS_SUPPORT=1 -sOFFSCREEN_FRAMEBUFFER=1" #-sDYLINK_DEBUG=1 " #-sPTHREADS_DEBUG=1"
 		append_var LDFLAGS "-s EXPORTED_FUNCTIONS=[_main,_malloc,_free] -s EXPORTED_RUNTIME_METHODS=[ccall]" # needed to send files from JS to C
 		if test "$_debug_build" = yes; then
-			_optimization_level=-O2
-			append_var LDFLAGS "-O2 -g3 -s ASSERTIONS=2 -sDYLINK_DEBUG -sPTHREADS_DEBUG"	
+			_optimization_level=-O1
+			append_var LDFLAGS "-O1 -g -s ASSERTIONS=2 -sDYLINK_DEBUG"	
 		else
 			_optimization_level=-O3
 			append_var LDFLAGS "-O3"
