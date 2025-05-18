@@ -319,7 +319,7 @@ bool AtariGraphicsManager::hasFeature(OSystem::Feature f) const {
 		return false;
 	}
 
-	// TODO: kFeatureDisplayLogFile?, kFeatureClipboardSupport, kFeatureSystemBrowserDialog
+	// TODO: kFeatureDisplayFile?, kFeatureClipboardSupport, kFeatureSystemBrowserDialog
 }
 
 void AtariGraphicsManager::setFeatureState(OSystem::Feature f, bool enable) {

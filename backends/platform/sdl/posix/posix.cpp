@@ -98,7 +98,7 @@ void OSystem_POSIX::initBackend() {
 }
 
 bool OSystem_POSIX::hasFeature(Feature f) {
-	if (f == kFeatureDisplayLogFile)
+	if (f == kFeatureDisplayFile)
 		return true;
 #ifdef HAS_POSIX_SPAWN
 	if (f == kFeatureOpenUrl)
@@ -365,7 +365,11 @@ Common::Path OSystem_POSIX::getDefaultLogFileName() {
 }
 
 bool OSystem_POSIX::displayLogFile() {
-	if (_logFilePath.empty())
+	return displayFile(_logFilePath, true);
+}
+
+bool OSystem_POSIX::displayFile(const Common::Path &fileName, bool isText) {
+	if (fileName.empty())
 		return false;
 
 	// FIXME: This may not work perfectly when in fullscreen mode.
@@ -380,7 +384,7 @@ bool OSystem_POSIX::displayLogFile() {
 	} else if (pid == 0) {
 
 		// Try xdg-open first
-		execlp("xdg-open", "xdg-open", _logFilePath.toString(Common::Path::kNativeSeparator).c_str(), (char *)0);
+		execlp("xdg-open", "xdg-open", fileName.toString(Common::Path::kNativeSeparator).c_str(), (char *)0);
 
 		// If we're here, that clearly failed.
 
@@ -388,8 +392,8 @@ bool OSystem_POSIX::displayLogFile() {
 		// xdg-open is successfully executed but returns an error code.
 
 		// Try xterm+less next
-
-		execlp("xterm", "xterm", "-e", "less", _logFilePath.toString(Common::Path::kNativeSeparator).c_str(), (char *)0);
+		if(isText) 	
+			execlp("xterm", "xterm", "-e", "less", fileName.toString(Common::Path::kNativeSeparator).c_str(), (char *)0);
 
 		// TODO: If less does not exist we could fall back to 'more'.
 		// However, we'll have to use 'xterm -hold' for that to prevent the

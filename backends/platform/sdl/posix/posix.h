@@ -29,6 +29,7 @@ public:
 	bool hasFeature(Feature f) override;
 
 	bool displayLogFile() override;
+	bool displayFile(const Common::Path &fileName, bool isText) override;
 
 	void init() override;
 	void initBackend() override;

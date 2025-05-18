@@ -144,7 +144,7 @@ OSystem_SDL::GraphicsManagerType OSystem_Win32::getDefaultGraphicsManager() cons
 #endif
 
 bool OSystem_Win32::hasFeature(Feature f) {
-	if (f == kFeatureDisplayLogFile || f == kFeatureOpenUrl)
+	if (f == kFeatureDisplayFile || f == kFeatureOpenUrl)
 		return true;
 
 #ifdef USE_SYSDIALOGS
@@ -156,26 +156,32 @@ bool OSystem_Win32::hasFeature(Feature f) {
 }
 
 bool OSystem_Win32::displayLogFile() {
-	if (_logFilePath.empty())
+	return displayFile(_logFilePath, true);
+}
+
+bool OSystem_Win32::displayFile(const Common::Path &fileName, bool isText) {
+	if (fileName.empty())
 		return false;
+	TCHAR *tFilePath = Win32::stringToTchar(fileName.toString(Common::Path::kNativeSeparator));
+	
+	if(isText){
+		// Try opening the log file with the default text editor
+		// log files should be registered as "txtfile" by default and thus open in the default text editor
+		SHELLEXECUTEINFO sei;
 
-	// Try opening the log file with the default text editor
-	// log files should be registered as "txtfile" by default and thus open in the default text editor
-	TCHAR *tLogFilePath = Win32::stringToTchar(_logFilePath.toString(Common::Path::kNativeSeparator));
-	SHELLEXECUTEINFO sei;
+		memset(&sei, 0, sizeof(sei));
+		sei.fMask  = SEE_MASK_FLAG_NO_UI;
+		sei.hwnd   = getHwnd();
+		sei.lpFile = tFilePath;
+		sei.nShow  = SW_SHOWNORMAL;
 
-	memset(&sei, 0, sizeof(sei));
-	sei.fMask  = SEE_MASK_FLAG_NO_UI;
-	sei.hwnd   = getHwnd();
-	sei.lpFile = tLogFilePath;
-	sei.nShow  = SW_SHOWNORMAL;
-
-	if (ShellExecuteEx(&sei)) {
-		free(tLogFilePath);
-		return true;
+		if (ShellExecuteEx(&sei)) {
+			free(tFilePath);
+			return true;
+		}
+		// ShellExecute with the default verb failed, try the "Open with..." dialog
 	}
 
-	// ShellExecute with the default verb failed, try the "Open with..." dialog
 	PROCESS_INFORMATION processInformation;
 	STARTUPINFO startupInfo;
 	memset(&processInformation, 0, sizeof(processInformation));
@@ -183,7 +189,7 @@ bool OSystem_Win32::displayLogFile() {
 	startupInfo.cb = sizeof(startupInfo);
 
 	TCHAR cmdLine[MAX_PATH * 2];  // CreateProcess may change the contents of cmdLine
-	_stprintf(cmdLine, TEXT("rundll32 shell32.dll,OpenAs_RunDLL %s"), tLogFilePath);
+	_stprintf(cmdLine, TEXT("rundll32 shell32.dll,OpenAs_RunDLL %s"), tFilePath);
 	BOOL result = CreateProcess(nullptr,
 	                            cmdLine,
 	                            nullptr,
@@ -194,7 +200,7 @@ bool OSystem_Win32::displayLogFile() {
 	                            nullptr,
 	                            &startupInfo,
 	                            &processInformation);
-	free(tLogFilePath);
+	free(tFilePath);
 	if (result) {
 		CloseHandle(processInformation.hProcess);
 		CloseHandle(processInformation.hThread);

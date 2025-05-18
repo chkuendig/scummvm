@@ -458,8 +458,7 @@ void SdlGraphicsManager::saveScreenshot() {
 
 #ifdef EMSCRIPTEN
 		// Users can't access the virtual emscripten filesystem in the browser, so we export the generated screenshot file via OSystem_Emscripten::exportFile.
-		OSystem_Emscripten *emscripten_g_system = dynamic_cast<OSystem_Emscripten*>(g_system);
-		emscripten_g_system->exportFile(screenshotsPath.appendComponent(filename));
+		g_system->displayFile(screenshotsPath.appendComponent(filename), false);
 #endif
 	} else {
 		if (screenshotsPath.empty())

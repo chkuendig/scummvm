@@ -154,7 +154,7 @@ void OSystem_MacOSX::addSysArchivesToSearchSet(Common::SearchSet &s, int priorit
 }
 
 bool OSystem_MacOSX::hasFeature(Feature f) {
-	if (f == kFeatureDisplayLogFile || f == kFeatureClipboardSupport || f == kFeatureOpenUrl)
+	if (f == kFeatureDisplayFile || f == kFeatureClipboardSupport || f == kFeatureOpenUrl)
 		return true;
 
 #ifdef USE_SYSDIALOGS
@@ -166,14 +166,18 @@ bool OSystem_MacOSX::hasFeature(Feature f) {
 }
 
 bool OSystem_MacOSX::displayLogFile() {
+	return displayFile(_logFilePath, true);
+}
+
+bool OSystem_MacOSX::displayFile(const Common::Path &fileName, bool isText) {
 	// Use LaunchServices to open the log file, if possible.
 
-	if (_logFilePath.empty())
+	if (fileName.empty())
 		return false;
 
-	Common::String logFilePath(_logFilePath.toString(Common::Path::kNativeSeparator));
+	Common::String filePath(fileName.toString(Common::Path::kNativeSeparator));
 
-	CFURLRef url = CFURLCreateFromFileSystemRepresentation(kCFAllocatorDefault, (const UInt8 *)logFilePath.c_str(), logFilePath.size(), false);
+	CFURLRef url = CFURLCreateFromFileSystemRepresentation(kCFAllocatorDefault, (const UInt8 *)filePath.c_str(), filePath.size(), false);
 	OSStatus err = LSOpenCFURLRef(url, NULL);
 	CFRelease(url);
 

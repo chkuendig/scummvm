@@ -126,7 +126,7 @@ Common::HardwareInputSet *OSystem_PS3::getHardwareInputSet() {
 }
 
 bool OSystem_PS3::hasFeature(Feature f) {
-	if (f == kFeatureDisplayLogFile ||
+	if (f == kFeatureDisplayFile ||
 	    f == kFeatureOpenUrl ||
 	    f == kFeatureSystemBrowserDialog ||
 	    f == kFeatureClipboardSupport) {

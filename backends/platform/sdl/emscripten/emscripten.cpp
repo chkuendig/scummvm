@@ -106,11 +106,7 @@ Common::Path OSystem_Emscripten::getDefaultIconsPath() {
 }
 
 bool OSystem_Emscripten::displayLogFile() {
-	if (_logFilePath.empty())
-		return false;
-
-	exportFile(_logFilePath);
-	return true;
+	return displayFile(_logFilePath, true);
 }
 
 #ifdef USE_OPENGL
@@ -119,13 +115,15 @@ OSystem_SDL::GraphicsManagerType OSystem_Emscripten::getDefaultGraphicsManager()
 }
 #endif
 
-void OSystem_Emscripten::exportFile(const Common::Path &filename) {
+bool OSystem_Emscripten::displayFile(const Common::Path &filename, bool isText) {
+	if (filename.empty())
+		return false;
 	Common::File file;
 	Common::FSNode node(filename);
 	file.open(node);
 	if (!file.isOpen()) {
 		warning("Could not open file %s!", filename.toString(Common::Path::kNativeSeparator).c_str());
-		return;
+		return false;
 	}
 	Common::String exportName = filename.getLastComponent().toString(Common::Path::kNativeSeparator);
 	const int32 size = file.size();
@@ -134,5 +132,6 @@ void OSystem_Emscripten::exportFile(const Common::Path &filename) {
 	file.close();
 	downloadFile(exportName.c_str(), bytes, size);
 	delete[] bytes;
+	return true;
 }
 #endif

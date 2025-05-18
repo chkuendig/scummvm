@@ -42,6 +42,8 @@ public:
 
 	bool displayLogFile() override;
 
+	bool displayFile(const Common::Path &fileName, bool isText) override;
+
 	bool openUrl(const Common::String &url) override;
 
 	void logMessage(LogMessageType::Type type, const char *message) override;

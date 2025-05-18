@@ -531,7 +531,7 @@ public:
 		 *
 		 * This feature has no associated state.
 		 */
-		kFeatureDisplayLogFile,
+		kFeatureDisplayFile,
 
 		/**
 		 * The presence of this feature indicates whether the system clipboard is
@@ -1904,31 +1904,49 @@ public:
 	virtual void messageBox(LogMessageType::Type type, const char *message) {}
 
 	/**
-	 * Open the log file in a way that allows the user to review it,
+	 * Open the default log file in a way that allows the user to review it,
 	 * and possibly email it (or parts of it) to the ScummVM team,
 	 * for example as part of a bug report.
 	 *
+	 * The kFeatureDisplayFile feature flag can be used to
+	 * test whether this call has been implemented by the active
+	 * backend.
+	 *
+	 * @return True on success, false if an error occurred.
+	 *
+	 */
+	virtual bool displayLogFile() { return false; }
+
+	/**
+	 * Open a file in a way that allows the user to review it,
+	 * and possibly email it (or parts of it) to the ScummVM team,
+	 * for example as part of a bug report.
+	 * 
 	 * On a desktop operating system, this would typically launch
 	 * some kind of an (external) text editor / viewer.
 	 * On a phone, it can also cause a context switch to another
 	 * application. Finally, on some ports, it might not be supported
 	 * at all, and do nothing.
 	 *
-	 * The kFeatureDisplayLogFile feature flag can be used to
+	 * The kFeatureDisplayFile feature flag can be used to
 	 * test whether this call has been implemented by the active
 	 * backend.
+
+	 * @param fileName   Path of the file.
+	 * @param isText     If true, backend will try to directly open a text editor.
 	 *
 	 * @return True on success, false if an error occurred.
 	 *
-	 * @note An error might mean that the log file did not exist,
-	 * or that the editor could not launch. However, a return value of true does
+	 * @note An error might mean that the file did not exist,
+	 * or that the viewer could not launch. However, a return value of true does
 	 * not guarantee that the user will actually see the log file.
 	 *
 	 * @note It is up to the backend to ensure that the system is in a state
-	 * that allows the user to actually see the displayed log files. This
+	 * that allows the user to actually see the displayed files. This
 	 * might for example require leaving fullscreen mode.
 	 */
-	virtual bool displayLogFile() { return false; }
+	virtual bool displayFile(const Common::Path &fileName, bool isText) { return false; }
+
 
 	/**
 	 * Check whether there is text available in the clipboard.

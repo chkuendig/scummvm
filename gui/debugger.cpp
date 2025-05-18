@@ -631,7 +631,7 @@ bool Debugger::cmdHelp(int argc, const char **argv) {
 }
 
 bool Debugger::cmdOpenLog(int argc, const char **argv) {
-	if (g_system->hasFeature(OSystem::kFeatureDisplayLogFile))
+	if (g_system->hasFeature(OSystem::kFeatureDisplayFile))
 		g_system->displayLogFile();
 	else
 		debugPrintf("Opening the log file not supported on this system\n");
