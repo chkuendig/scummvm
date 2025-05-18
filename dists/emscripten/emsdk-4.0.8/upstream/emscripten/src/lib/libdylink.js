@@ -1038,6 +1038,8 @@ var LibraryDylink = {
     dbg(`loadDynamicLibrary: ${libName} handle: ${handle}`);
     dbg(`existing: ${Object.keys(LDSO.loadedLibsByName)}`);
 #endif
+    var randl = Math.random();
+    console.warn('loadDynamicLibrary: ' + randl);
     // when loadDynamicLibrary did not have flags, libraries were loaded
     // globally & permanently
 
@@ -1068,6 +1070,7 @@ var LibraryDylink = {
       if (handle) {
         LDSO.loadedLibsByHandle[handle] = dso;
       }
+      console.warn("loadDynamicLibrary 1");
       return flags.loadAsync ? Promise.resolve(true) : true;
     }
 
@@ -1084,6 +1087,8 @@ var LibraryDylink = {
       dbg(`checking sharedModules: ${libName}: ${sharedMod ? 'found' : 'not found'}`);
 #endif
       if (sharedMod) {
+
+      console.warn("loadDynamicLibrary 2");
         return flags.loadAsync ? Promise.resolve(sharedMod) : sharedMod;
       }
 #endif
@@ -1094,6 +1099,7 @@ var LibraryDylink = {
         var dataSize = {{{ makeGetValue('handle', C_STRUCTS.dso.file_data_size, '*') }}};
         if (data && dataSize) {
           var libData = HEAP8.slice(data, data + dataSize);
+          console.warn("loadDynamicLibrary 3");
           return flags.loadAsync ? Promise.resolve(libData) : libData;
         }
       }
@@ -1105,19 +1111,25 @@ var LibraryDylink = {
 #endif
       if (f) {
         var libData = FS.readFile(f, {encoding: 'binary'});
+        console.warn("loadDynamicLibrary 4");
         return flags.loadAsync ? Promise.resolve(libData) : libData;
       }
 #endif
 
       var libFile = locateFile(libName);
       if (flags.loadAsync) {
+
+      console.warn("loadDynamicLibrary 5");
         return asyncLoad(libFile);
       }
 
       // load the binary synchronously
       if (!readBinary) {
+      console.warn("loadDynamicLibrary 6");
         throw new Error(`${libFile}: file not found, and synchronous loading of external files is not available`);
       }
+
+      console.warn("loadDynamicLibrary 7");
       return readBinary(libFile);
     }
 
@@ -1130,15 +1142,18 @@ var LibraryDylink = {
       dbg(`checking preloadedWasm: ${libName}: ${preloaded ? 'found' : 'not found'}`);
 #endif
       if (preloaded) {
+      console.warn("loadDynamicLibrary 8");
         return flags.loadAsync ? Promise.resolve(preloaded) : preloaded;
       }
 #endif
 
       // module not preloaded - load lib data and create new module from it
       if (flags.loadAsync) {
+      console.warn("loadDynamicLibrary 9");
         return loadLibData().then((libData) => loadWebAssemblyModule(libData, flags, libName, localScope, handle));
       }
 
+      console.warn("loadDynamicLibrary 10");
       return loadWebAssemblyModule(loadLibData(), flags, libName, localScope, handle);
     }
 
@@ -1159,6 +1174,7 @@ var LibraryDylink = {
 #if DYLINK_DEBUG
       dbg("loadDynamicLibrary: done (async)");
 #endif
+      console.warn("loadDynamicLibrary 111");
       return getExports().then((exports) => {
         moduleLoaded(exports);
         return true;
@@ -1169,6 +1185,7 @@ var LibraryDylink = {
 #if DYLINK_DEBUG
     dbg("loadDynamicLibrary: done");
 #endif
+      console.warn("loadDynamicLibrary 12");
     return true;
   },
 
@@ -1206,6 +1223,9 @@ var LibraryDylink = {
   // void* dlopen(const char* filename, int flags);
   $dlopenInternal__deps: ['$dlSetError', '$PATH'],
   $dlopenInternal: (handle, jsflags) => {
+
+    var randl = Math.random();
+    console.warn('dlopenInternal: ' + randl);
     // void *dlopen(const char *file, int mode);
     // http://pubs.opengroup.org/onlinepubs/009695399/functions/dlopen.html
     var filename = UTF8ToString(handle + {{{ C_STRUCTS.dso.name }}});
@@ -1247,11 +1267,17 @@ var LibraryDylink = {
 #endif
   _dlopen_js: {{{ asyncIf(ASYNCIFY == 2) }}} (handle) => {
 #if ASYNCIFY
-    return Asyncify.handleSleep((wakeUp) => {
+    var randl = Math.random();
+    console.warn('dlopen: async' + randl);
+    var retval = Asyncify.handleSleep((wakeUp) => {
+      /// THIS DOESN'T TRIGGER???
+      console.warn('dlopen: Asyncify.handleSleep' + randl);
       dlopenInternal(handle, { loadAsync: true })
         .then(wakeUp)
         .catch(() => wakeUp(0));
     });
+    console.warn('dlopen: async done: ' + randl + " -> "+ retval);
+    return retval;
 #else
     return dlopenInternal(handle, { loadAsync: false });
 #endif

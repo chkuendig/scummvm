@@ -31,7 +31,7 @@
 #include "pthread_impl.h"
 #include "emscripten_internal.h"
 
-//#define DYLINK_DEBUG
+#define DYLINK_DEBUG
 
 #ifdef DYLINK_DEBUG
 #define dbg(fmt, ...) emscripten_dbgf(fmt, ##__VA_ARGS__)
@@ -118,7 +118,7 @@ int __dl_invalid_handle(void* h) {
   for (p = head; p; p = p->next)
     if (p->sym_index == -1 && p->dso == h)
       return 0;
-  dbg("__dl_invalid_handle %p", h);
+  emscripten_outf("__dl_invalid_handle %p \n", h);
   error("Invalid library handle %p", (void*)h);
   return 1;
 }
@@ -151,8 +151,8 @@ void new_dlevent(struct dso* p, int sym_index) {
 }
 
 static void load_library_done(struct dso* p) {
-  dbg("load_library_done: dso=%p mem_addr=%p mem_size=%zu "
-      "table_addr=%p table_size=%zu",
+  emscripten_outf("load_library_done: dso=%p mem_addr=%p mem_size=%zu "
+      "table_addr=%p table_size=%zu \n",
       p,
       p->mem_addr,
       p->mem_size,
@@ -273,7 +273,10 @@ void _emscripten_dlsync_self_async(em_promise_t promise) {
 // that are currently loaded.
 bool _emscripten_dlsync_self() {
   // Should only ever be called from a background thread.
-  dbg("_emscripten_dlsync_sel) %d", emscripten_is_main_runtime_thread());
+  int emscripten_is_main_runtime_thread_result =
+    emscripten_is_main_runtime_thread();
+   emscripten_outf("_emscripten_dlsync_self: emscripten_is_main_runtime_thread %d \n",
+       emscripten_is_main_runtime_thread_result);
   assert(!emscripten_is_main_runtime_thread());
   if (thread_local_tail == tail) {
     dbg("_emscripten_dlsync_self: already in sync");
@@ -283,7 +286,7 @@ bool _emscripten_dlsync_self() {
   while (thread_local_tail->next) {
     struct dlevent* p = thread_local_tail->next;
     if (p->sym_index != -1) {
-      dbg("_emscripten_dlsync_self: id=%d %s sym_index=%d",
+      dbg("_dlsym_catchup_js: id=%d %s sym_index=%d",
           p->id,
           p->dso->name,
           p->sym_index);
@@ -325,12 +328,6 @@ struct promise_result {
 static void do_thread_sync(void* arg) {
   dbg("do_thread_sync");
   struct promise_result* info = arg;
-  if(emscripten_is_main_runtime_thread()) {
-    printf("\n dlopen was called on the main thread.  This is not supported.\n Please use the async version of dlopen.\n");
-     info->result =true;
-     return;
-  }
-
   info->result = _emscripten_dlsync_self();
 }
 
