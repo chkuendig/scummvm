@@ -314,10 +314,11 @@ addToLibrary({
     // and other async methods for simple examples of usage.
     handleSleep(startAsync) {
 #if ASSERTIONS
+      assert(Asyncify.state !== Asyncify.State.Disabled, 'Asyncify cannot be done during or after the runtime exits');
 #endif
       if (ABORT) return;
-      dbg(`ASYNCIFY: handleSleep ${Asyncify.state}`);
 #if ASYNCIFY_DEBUG
+      dbg(`ASYNCIFY: handleSleep ${Asyncify.state}`);
 #endif
       if (Asyncify.state === Asyncify.State.Normal) {
         // Prepare to sleep. Call startAsync, and see what happens:
@@ -345,8 +346,8 @@ addToLibrary({
           // too).
           assert(!Asyncify.exportCallStack.length, 'Waking up (starting to rewind) must be done from JS, without compiled code on the stack.');
 #endif
-dbg(`ASYNCIFY: start rewind ${Asyncify.currData}`);
 #if ASYNCIFY_DEBUG
+          dbg(`ASYNCIFY: start rewind ${Asyncify.currData}`);
 #endif
           Asyncify.state = Asyncify.State.Rewinding;
           runAndAbortIfError(() => _asyncify_start_rewind(Asyncify.currData));
@@ -395,8 +396,8 @@ dbg(`ASYNCIFY: start rewind ${Asyncify.currData}`);
           Asyncify.state = Asyncify.State.Unwinding;
           // TODO: reuse, don't alloc/free every sleep
           Asyncify.currData = Asyncify.allocateData();
-          dbg(`ASYNCIFY: start unwind ${Asyncify.currData}`);
 #if ASYNCIFY_DEBUG
+          dbg(`ASYNCIFY: start unwind ${Asyncify.currData}`);
 #endif
           if (typeof MainLoop != 'undefined' && MainLoop.func) {
             MainLoop.pause();
@@ -405,8 +406,8 @@ dbg(`ASYNCIFY: start rewind ${Asyncify.currData}`);
         }
       } else if (Asyncify.state === Asyncify.State.Rewinding) {
         // Stop a resume.
-        dbg('ASYNCIFY: stop rewind');
 #if ASYNCIFY_DEBUG
+        dbg('ASYNCIFY: stop rewind');
 #endif
         Asyncify.state = Asyncify.State.Normal;
         runAndAbortIfError(_asyncify_stop_rewind);

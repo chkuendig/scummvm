@@ -2043,7 +2043,7 @@ addToLibrary({
   $runtimeKeepalivePush: () => {
     runtimeKeepaliveCounter += 1;
 #if RUNTIME_DEBUG
-//    dbg(`runtimeKeepalivePush -> counter=${runtimeKeepaliveCounter}`);
+    dbg(`runtimeKeepalivePush -> counter=${runtimeKeepaliveCounter}`);
 #endif
   },
 
@@ -2055,7 +2055,7 @@ addToLibrary({
 #endif
     runtimeKeepaliveCounter -= 1;
 #if RUNTIME_DEBUG
-//    dbg(`runtimeKeepalivePop -> counter=${runtimeKeepaliveCounter}`);
+    dbg(`runtimeKeepalivePop -> counter=${runtimeKeepaliveCounter}`);
 #endif
   },
 

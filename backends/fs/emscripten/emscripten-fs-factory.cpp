@@ -31,36 +31,10 @@
 #endif
 
 #include <emscripten.h>
+extern "C" {
+  extern void _initIDBFS(em_proxying_ctx* ctx, const char *pathPtr);
+}
 
-EM_ASYNC_JS(void, _initIDBFS, (const char *pathPtr), {
-	const path = UTF8ToString(pathPtr);
-	console.log("Mount IDBFS at "+path);
-	FS.mount(IDBFS, { autoPersist: true }, path);
-	// sync from persisted state into memory 
-	await (new Promise((resolve, reject) => {
-			FS.syncfs(true, (err) => {
-				if (err) {
-					reject(err);
-				} else if(!FS.analyzePath("/home/web_user/scummvm.ini").exists) { 
-					// if we don't have a settings file yet, we try to download it
-					// this allows setting up a default scummvm.ini with some games already added 
-					fetch("scummvm.ini")
-						.then((response) => response.ok ? response.text() : "")
-						.then((text) => {
-							FS.writeFile('/home/web_user/scummvm.ini', text);
-							resolve(true);
-						})
-						.catch((err) => reject);
-				} else {
-					resolve(true);
-				}
-			});
-		})).catch(err => {
-			alert("Error initializing files: " + err);
-			throw err;
-	});
-	console.log("Data synced from IDBFS");
-});
 
 EM_JS(void, _persistIDBFS, (), { 
 	// Making this synchronous with EM_ASYNC_JS breaks  (somewhere in Asyncify) when syncing saves from cloud 
@@ -80,6 +54,7 @@ void EmscriptenFilesystemFactory::persistIDBFS() {
 	_persistIDBFS();
 }
 EmscriptenFilesystemFactory::EmscriptenFilesystemFactory() {
+	// see https://github.com/emscripten-core/emscripten/blob/main/test/pthread/test_pthread_proxying_cpp.cpp
 	_initIDBFS(getenv("HOME"));
 }
 

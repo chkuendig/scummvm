@@ -3256,7 +3256,8 @@ EOF
 		_port_mk="backends/platform/sdl/emscripten/emscripten.mk"
 		append_var LDFLAGS "-s FORCE_FILESYSTEM -lidbfs.js"
         append_var LDFLAGS "-s INITIAL_MEMORY=512MB -s TOTAL_STACK=32MB " #consider INITIAL_HEAP
-        append_var LDFLAGS "-s ASYNCIFY=1 -s ASYNCIFY_STACK_SIZE=8388608" # TODO: try -sJSPI
+    #    append_var LDFLAGS "-s ASYNCIFY=1 -s ASYNCIFY_STACK_SIZE=8388608" # TODO: try -sJSPI
+	append LDFLAGS "--js-library  ./dists/emscripten/libscummvm.js
 
 		append_var CXXFLAGS "-pthread "
 		append_var LDFLAGS "-pthread -sPTHREAD_POOL_SIZE -sPROXY_TO_PTHREAD=1 -sOFFSCREENCANVAS_SUPPORT=1 -sOFFSCREEN_FRAMEBUFFER=1" #-sDYLINK_DEBUG=1 " #-sPTHREADS_DEBUG=1"
@@ -4988,7 +4989,7 @@ PLUGIN_LDFLAGS		+= -Wl,-T$(srcdir)/backends/plugins/ds/plugin.ld -mthumb -mthumb
 		append_var LIBS ""
 _mak_plugins='
 PLUGIN_EXTRA_DEPS =
-PLUGIN_LDFLAGS  += -s SIDE_MODULE=1 -s ASYNCIFY=1 -s ASYNCIFY_IMPORTS=["*"] -s EXPORT_ALL=1 -pthread
+PLUGIN_LDFLAGS  += -s SIDE_MODULE=1 -s EXPORT_ALL=1 -pthread
 PRE_OBJS_FLAGS  := -s MAIN_MODULE=1 -s EXPORT_ALL=1
 POST_OBJS_FLAGS :=
 '
