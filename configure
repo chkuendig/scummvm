@@ -3257,7 +3257,6 @@ EOF
 		append_var LDFLAGS "-s FORCE_FILESYSTEM -lidbfs.js"
         append_var LDFLAGS "-s INITIAL_MEMORY=512MB -s TOTAL_STACK=32MB " #consider INITIAL_HEAP
     #    append_var LDFLAGS "-s ASYNCIFY=1 -s ASYNCIFY_STACK_SIZE=8388608" # TODO: try -sJSPI
-	append LDFLAGS "--js-library  ./dists/emscripten/libscummvm.js
 
 		append_var CXXFLAGS "-pthread "
 		append_var LDFLAGS "-pthread -sPTHREAD_POOL_SIZE -sPROXY_TO_PTHREAD=1 -sOFFSCREENCANVAS_SUPPORT=1 -sOFFSCREEN_FRAMEBUFFER=1" #-sDYLINK_DEBUG=1 " #-sPTHREADS_DEBUG=1"

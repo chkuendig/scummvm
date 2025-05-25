@@ -31,9 +31,6 @@
 #endif
 
 #include <emscripten.h>
-extern "C" {
-  extern void _initIDBFS(em_proxying_ctx* ctx, const char *pathPtr);
-}
 
 
 EM_JS(void, _persistIDBFS, (), { 
@@ -50,12 +47,40 @@ EM_JS(void, _persistIDBFS, (), {
 	});
 });
 
+EM__JS(void, _initIDBFS, (const char *pathPtr), {
+	const path = UTF8ToString(pathPtr);
+	console.log("Mount IDBFS at "+path);
+	FS.mount(IDBFS, { autoPersist: true }, path);
+	// sync from persisted state into memory 
+	
+			FS.syncfs(true, (err) => {
+				if (err) {
+					reject(err);
+				} else if(!FS.analyzePath("/home/web_user/scummvm.ini").exists) { 
+					// if we don't have a settings file yet, we try to download it
+					// this allows setting up a default scummvm.ini with some games already added 
+					fetch("scummvm.ini")
+						.then((response) => response.ok ? response.text() : "")
+						.then((text) => {
+							FS.writeFile('/home/web_user/scummvm.ini', text);
+							resolve(true);
+						})
+						.catch((err) => reject);
+				} else {
+					resolve(true);
+				}
+			});
+		
+
+	console.log("Data synced from IDBFS");
+});
+
 void EmscriptenFilesystemFactory::persistIDBFS() {
-	_persistIDBFS();
+	//_persistIDBFS();
 }
 EmscriptenFilesystemFactory::EmscriptenFilesystemFactory() {
 	// see https://github.com/emscripten-core/emscripten/blob/main/test/pthread/test_pthread_proxying_cpp.cpp
-	_initIDBFS(getenv("HOME"));
+	//_initIDBFS(getenv("HOME"));
 }
 
 AbstractFSNode *EmscriptenFilesystemFactory::makeCurrentDirectoryFileNode() const {
