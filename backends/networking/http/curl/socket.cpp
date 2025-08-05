@@ -22,6 +22,7 @@
 #define FORBIDDEN_SYMBOL_ALLOW_ALL
 #include <curl/curl.h>
 #include "backends/networking/http/connectionmanager.h"
+#include "backends/networking/http/curl/connectionmanager-curl.h"
 #include "backends/networking/http/curl/socket.h"
 #include "common/debug.h"
 #include "common/system.h"
@@ -83,7 +84,8 @@ bool CurlSocket::connect(const Common::String &url) {
 #if defined NINTENDO_SWITCH || defined PSP2
 		curl_easy_setopt(_easy, CURLOPT_SSL_VERIFYPEER, 0);
 #endif
-		Common::String caCertPath = ConnMan.getCaCertPath();
+
+		Common::String caCertPath = dynamic_cast<ConnectionManagerCurl &>(ConnMan).getCaCertPath();
 		if (!caCertPath.empty()) {
 			curl_easy_setopt(_easy, CURLOPT_CAINFO, caCertPath.c_str());
 		}

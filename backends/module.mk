@@ -80,6 +80,8 @@ endif
 ifdef USE_LIBCURL
 MODULE_OBJS += \
 	networking/http/connectionmanager.o \
+	networking/http/networkreadstream.o \
+	networking/http/curl/connectionmanager-curl.o \
 	networking/http/curl/networkreadstream-curl.o \
 	networking/http/curl/socket.o \
 	networking/http/curl/url.o \
@@ -101,13 +103,15 @@ ifdef USE_CLOUD
 MODULE_OBJS += \
 	fs/emscripten/cloud-fs.o \
 	networking/http/connectionmanager.o \
+	networking/http/networkreadstream.o \
+	networking/http/emscripten/connectionmanager-emscripten.o \
+	networking/http/emscripten/networkreadstream-emscripten.o \
 	networking/http/httpjsonrequest.o \
 	networking/http/httprequest.o \
 	networking/http/postrequest.o \
 	networking/http/request.o \
 	networking/http/session.o \
-	networking/http/sessionrequest.o \
-	networking/http/emscripten/networkreadstream-emscripten.o 
+	networking/http/sessionrequest.o 
 endif
 ifdef USE_TTS
 MODULE_OBJS += \
