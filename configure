@@ -3647,11 +3647,8 @@ if test -n "$_host"; then
 			_enet=no    # Disable ENet (no sockets in the browser)
 			_sdlnet=no  # Disable SDL_Net (no sockets in the browser)
 			_libcurl=no # Emscripten backend uses emscripten_fetch not libcurl
-			_curl=no # Disable cloud unless it's manually enabled
 			if test "$_cloud" != yes; then
 				_cloud=no
-			else
-				append_var LDFLAGS "-sFETCH"
 			fi
 			_seq_midi=no
 			_timidity=no
@@ -5950,7 +5947,8 @@ echo "$_libcurl"
 define_in_config_if_yes "$_libcurl" "USE_LIBCURL"
 
 echocheck "HTTP client"
-if test "$_host_os" = "emscripten"; then
+if test "$_host_os" = "emscripten" &&  test "$_cloud" = "yes"; then
+	append_var LDFLAGS "-sFETCH"
 	_http=yes
 	echo "Emscripten"
 elif test "$_libcurl" = "yes"; then
