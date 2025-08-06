@@ -19,8 +19,6 @@
  *
  */
 
-#define FORBIDDEN_SYMBOL_ALLOW_ALL
-
 #include "backends/cloud/googledrive/googledrivestorage.h"
 #include "backends/cloud/cloudmanager.h"
 #include "backends/cloud/googledrive/googledrivetokenrefresher.h"

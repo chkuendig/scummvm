@@ -19,8 +19,6 @@
  *
  */
 
-#define FORBIDDEN_SYMBOL_ALLOW_ALL
-
 #include "backends/cloud/box/boxstorage.h"
 #include "backends/cloud/box/boxlistdirectorybyidrequest.h"
 #include "backends/cloud/box/boxtokenrefresher.h"

@@ -19,8 +19,6 @@
  *
  */
 
-#define FORBIDDEN_SYMBOL_ALLOW_ALL
-
 #include "backends/networking/http/httprequest.h"
 #include "backends/networking/http/connectionmanager.h"
 #include "backends/networking/http/networkreadstream.h"

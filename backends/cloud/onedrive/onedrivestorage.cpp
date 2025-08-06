@@ -19,8 +19,6 @@
  *
  */
 
-#define FORBIDDEN_SYMBOL_ALLOW_ALL
-
 #include "backends/cloud/onedrive/onedrivestorage.h"
 #include "backends/cloud/cloudmanager.h"
 #include "backends/cloud/onedrive/onedrivecreatedirectoryrequest.h"

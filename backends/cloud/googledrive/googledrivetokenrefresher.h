@@ -32,7 +32,6 @@ class GoogleDriveStorage;
 
 class GoogleDriveTokenRefresher: public Networking::HttpJsonRequest {
 	GoogleDriveStorage *_parentStorage;
-	Common::Array<Common::String> _headers;
 
 	void tokenRefreshed(const Storage::BoolResponse &response);
 
@@ -40,9 +39,6 @@ class GoogleDriveTokenRefresher: public Networking::HttpJsonRequest {
 public:
 	GoogleDriveTokenRefresher(GoogleDriveStorage *parent, Networking::JsonCallback callback, Networking::ErrorCallback ecb, const char *url);
 	~GoogleDriveTokenRefresher() override;
-
-	void setHeaders(const Common::Array<Common::String> &headers) override;
-	void addHeader(const Common::String &header) override;
 };
 
 } // End of namespace GoogleDrive
