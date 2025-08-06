@@ -33,7 +33,9 @@ namespace Networking {
 class ConnectionManager : public Common::Singleton<Networking::ConnectionManager> {
 	static const uint32 FRAMES_PER_SECOND = 100;
 	static const uint32 TIMER_INTERVAL = 1000000 / FRAMES_PER_SECOND;
+	// Period for iterating through requests to check if they are finished 
 	static const uint32 ITERATION_PERIOD = 1;                       // every frame
+	// Period requests are processed by the implementation specific Connectionmanager (if needed - e.g. curl_multi_info_read to update the state of the request) 
 	static const uint32 PROCESSING_PERIOD = 1;                        // every frame
 	static const uint32 DEBUG_PRINT_PERIOD = FRAMES_PER_SECOND; // once per second
 
