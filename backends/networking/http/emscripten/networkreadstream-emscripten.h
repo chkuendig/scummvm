@@ -37,6 +37,8 @@ private:
 	emscripten_fetch_t *_emscripten_fetch;
 	const char *_emscripten_fetch_url = nullptr;
 	char **_emscripten_request_headers;
+	bool _success;
+	char *_errorBuffer;
 
 public:
 	NetworkReadStreamEmscripten(const char *url, RequestHeaders *headersList, const Common::String &postFields, bool uploading, bool usingPatch, bool keepAlive, long keepAliveIdle, long keepAliveInterval);
@@ -61,7 +63,6 @@ public:
 	long httpResponseCode() const override;
 	Common::String currentLocation() const override;
 	Common::HashMap<Common::String, Common::String> responseHeadersMap() const override;
-	void setErrorCode(uint32 code) { _errorCode = code; }
 	void resetStream() override;
 
 	uint32 read(void *dataPtr, uint32 dataSize) override;

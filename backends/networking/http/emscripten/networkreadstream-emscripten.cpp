@@ -39,8 +39,6 @@
 #include "base/version.h"
 #include "common/debug.h"
 
-#define CURLE_OK 0x0 // the only CURLcode value used/checked in ScummVM
-
 namespace Networking {
 
 NetworkReadStream *NetworkReadStream::make(const char *url, RequestHeaders *headersList, const Common::String &postFields, bool uploading, bool usingPatch, bool keepAlive, long keepAliveIdle, long keepAliveInterval) {
@@ -104,7 +102,6 @@ void NetworkReadStreamEmscripten::emscriptenOnError(emscripten_fetch_t *fetch) {
 }
 
 void NetworkReadStreamEmscripten::emscriptenDownloadFinished(bool success) {
-	_errorCode = -1;
 	_requestComplete = true;
 	if (_emscripten_fetch->numBytes > 0) {
 		// TODO: This could be done continuously during emscriptenOnProgress?
@@ -114,7 +111,7 @@ void NetworkReadStreamEmscripten::emscriptenDownloadFinished(bool success) {
 
 	if (success) {
 		debug(5, "NetworkReadStreamEmscripten::emscriptenHandleDownload Finished downloading %llu bytes from URL %s. HTTP status code: %d", _emscripten_fetch->numBytes, _emscripten_fetch->url, _emscripten_fetch->status);
-		_errorCode = CURLE_OK; // TODO: actually pass the result code from emscripten_fetch
+		_success = true; // TODO: actually pass the result code from emscripten_fetch
 	} else {
 		debug(5, "NetworkReadStreamEmscripten::emscriptenHandleDownload Downloading %s failed, HTTP failure status code: %d, status text: %s", _emscripten_fetch->url, _emscripten_fetch->status, _emscripten_fetch->statusText);
 
@@ -124,7 +121,7 @@ void NetworkReadStreamEmscripten::emscriptenDownloadFinished(bool success) {
 		} else {
 			_errorBuffer = strdup("Unknown error");
 		}
-		warning("NetworkReadStreamEmscripten::finished %s - Request failed (%d - %s)", _emscripten_fetch_url, _errorCode, getError());
+		warning("NetworkReadStreamEmscripten::finished %s - Request failed (%s)", _emscripten_fetch_url, getError());
 	}
 }
 
@@ -132,9 +129,10 @@ void NetworkReadStreamEmscripten::resetStream() {
 	_eos = _requestComplete = false;
 	_sendingContentsSize = _sendingContentsPos = 0;
 	_progressDownloaded = _progressTotal = 0;
-	_bufferCopy = nullptr;
 	_emscripten_fetch = nullptr;
 	_emscripten_request_headers = nullptr;
+	free(_errorBuffer);
+	_errorBuffer = nullptr;
 }
 
 void NetworkReadStreamEmscripten::initEmscripten(const char *url, RequestHeaders *headersList) {
@@ -212,7 +210,7 @@ void NetworkReadStreamEmscripten::setupFormMultipart(const Common::HashMap<Commo
 /** Send <postFields>, using POST by default. */
 NetworkReadStreamEmscripten::NetworkReadStreamEmscripten(const char *url, RequestHeaders *headersList, const Common::String &postFields,
 		bool uploading, bool usingPatch, bool keepAlive, long keepAliveIdle, long keepAliveInterval) :
-		_emscripten_fetch_attr(new emscripten_fetch_attr_t()), _emscripten_fetch_url(url),
+		_emscripten_fetch_attr(new emscripten_fetch_attr_t()), _emscripten_fetch_url(url), _errorBuffer(nullptr),
 		NetworkReadStream(url, headersList, postFields, uploading, usingPatch, keepAlive, keepAliveIdle, keepAliveInterval) {
 	initEmscripten(url, headersList);
 	setupBufferContents((const byte *)postFields.c_str(), postFields.size(), uploading, usingPatch, false);
@@ -220,7 +218,7 @@ NetworkReadStreamEmscripten::NetworkReadStreamEmscripten(const char *url, Reques
 /** Send <formFields>, <formFiles>, using POST multipart/form. */
 NetworkReadStreamEmscripten::NetworkReadStreamEmscripten(const char *url, RequestHeaders *headersList, const Common::HashMap<Common::String,
 		Common::String> &formFields, const Common::HashMap<Common::String, Common::Path> &formFiles, bool keepAlive, long keepAliveIdle,
-		long keepAliveInterval) : _emscripten_fetch_attr(new emscripten_fetch_attr_t()), _emscripten_fetch_url(url),
+		long keepAliveInterval) : _emscripten_fetch_attr(new emscripten_fetch_attr_t()), _emscripten_fetch_url(url), _errorBuffer(nullptr),
 		NetworkReadStream(url, headersList, formFields, formFiles, keepAlive, keepAliveIdle, keepAliveInterval) {
 	initEmscripten(url, headersList);
 	setupFormMultipart(formFields, formFiles);
@@ -229,7 +227,7 @@ NetworkReadStreamEmscripten::NetworkReadStreamEmscripten(const char *url, Reques
 /** Send <buffer>, using POST by default. */
 NetworkReadStreamEmscripten::NetworkReadStreamEmscripten(const char *url, RequestHeaders *headersList, const byte *buffer, uint32 bufferSize,
 		bool uploading, bool usingPatch, bool post, bool keepAlive, long keepAliveIdle, long keepAliveInterval) :
-		_emscripten_fetch_attr(new emscripten_fetch_attr_t()), _emscripten_fetch_url(url),
+		_emscripten_fetch_attr(new emscripten_fetch_attr_t()), _emscripten_fetch_url(url), _errorBuffer(nullptr),
 		NetworkReadStream(url, headersList, buffer, bufferSize, uploading, usingPatch, post, keepAlive, keepAliveIdle, keepAliveInterval) {
 	initEmscripten(url, headersList);
 	setupBufferContents(buffer, bufferSize, uploading, usingPatch, post);
@@ -265,7 +263,7 @@ uint32 NetworkReadStreamEmscripten::read(void *dataPtr, uint32 dataSize) {
 }
 
 bool NetworkReadStreamEmscripten::hasError() const {
-	return _errorCode != CURLE_OK;
+	return !_success;
 }
 
 const char *NetworkReadStreamEmscripten::getError() const {
