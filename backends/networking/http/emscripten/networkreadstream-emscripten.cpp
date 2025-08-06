@@ -43,6 +43,18 @@
 
 namespace Networking {
 
+NetworkReadStream *NetworkReadStream::make(const char *url, RequestHeaders *headersList, const Common::String &postFields, bool uploading, bool usingPatch, bool keepAlive, long keepAliveIdle, long keepAliveInterval) {
+	return new NetworkReadStreamEmscripten(url, headersList, postFields, uploading, usingPatch, keepAlive, keepAliveIdle, keepAliveInterval);
+}
+
+NetworkReadStream *NetworkReadStream::make(const char *url, RequestHeaders *headersList, const Common::HashMap<Common::String, Common::String> &formFields, const Common::HashMap<Common::String, Common::Path> &formFiles, bool keepAlive, long keepAliveIdle, long keepAliveInterval) {
+	return new NetworkReadStreamEmscripten(url, headersList, formFields, formFiles, keepAlive, keepAliveIdle, keepAliveInterval);
+}
+
+NetworkReadStream *NetworkReadStream::make(const char *url, RequestHeaders *headersList, const byte *buffer, uint32 bufferSize, bool uploading, bool usingPatch, bool post, bool keepAlive, long keepAliveIdle, long keepAliveInterval) {
+	return new NetworkReadStreamEmscripten(url, headersList, buffer, bufferSize, uploading, usingPatch, post, keepAlive, keepAliveIdle, keepAliveInterval);
+}
+
 void NetworkReadStreamEmscripten::emscriptenOnReadyStateChange(emscripten_fetch_t *fetch) {
 	if (fetch->readyState != 2)
 		return;
@@ -198,21 +210,27 @@ void NetworkReadStreamEmscripten::setupFormMultipart(const Common::HashMap<Commo
 }
 
 /** Send <postFields>, using POST by default. */
-NetworkReadStreamEmscripten::NetworkReadStreamEmscripten(const char *url, RequestHeaders *headersList, const Common::String &postFields, bool uploading, bool usingPatch, bool keepAlive, long keepAliveIdle, long keepAliveInterval) : _emscripten_fetch_attr(new emscripten_fetch_attr_t()), _emscripten_fetch_url(url),
-																																																										NetworkReadStreamImplementation(url, headersList, postFields, uploading, usingPatch, keepAlive, keepAliveIdle, keepAliveInterval) {
+NetworkReadStreamEmscripten::NetworkReadStreamEmscripten(const char *url, RequestHeaders *headersList, const Common::String &postFields,
+		bool uploading, bool usingPatch, bool keepAlive, long keepAliveIdle, long keepAliveInterval) :
+		_emscripten_fetch_attr(new emscripten_fetch_attr_t()), _emscripten_fetch_url(url),
+		NetworkReadStream(url, headersList, postFields, uploading, usingPatch, keepAlive, keepAliveIdle, keepAliveInterval) {
 	initEmscripten(url, headersList);
 	setupBufferContents((const byte *)postFields.c_str(), postFields.size(), uploading, usingPatch, false);
 }
 /** Send <formFields>, <formFiles>, using POST multipart/form. */
-NetworkReadStreamEmscripten::NetworkReadStreamEmscripten(const char *url, RequestHeaders *headersList, const Common::HashMap<Common::String, Common::String> &formFields, const Common::HashMap<Common::String, Common::Path> &formFiles, bool keepAlive, long keepAliveIdle, long keepAliveInterval) : _emscripten_fetch_attr(new emscripten_fetch_attr_t()), _emscripten_fetch_url(url),
-																																																																										NetworkReadStreamImplementation(url, headersList, formFields, formFiles, keepAlive, keepAliveIdle, keepAliveInterval) {
+NetworkReadStreamEmscripten::NetworkReadStreamEmscripten(const char *url, RequestHeaders *headersList, const Common::HashMap<Common::String,
+		Common::String> &formFields, const Common::HashMap<Common::String, Common::Path> &formFiles, bool keepAlive, long keepAliveIdle,
+		long keepAliveInterval) : _emscripten_fetch_attr(new emscripten_fetch_attr_t()), _emscripten_fetch_url(url),
+		NetworkReadStream(url, headersList, formFields, formFiles, keepAlive, keepAliveIdle, keepAliveInterval) {
 	initEmscripten(url, headersList);
 	setupFormMultipart(formFields, formFiles);
 }
 
 /** Send <buffer>, using POST by default. */
-NetworkReadStreamEmscripten::NetworkReadStreamEmscripten(const char *url, RequestHeaders *headersList, const byte *buffer, uint32 bufferSize, bool uploading, bool usingPatch, bool post, bool keepAlive, long keepAliveIdle, long keepAliveInterval) : _emscripten_fetch_attr(new emscripten_fetch_attr_t()), _emscripten_fetch_url(url),
-																																																														NetworkReadStreamImplementation(url, headersList, buffer, bufferSize, uploading, usingPatch, post, keepAlive, keepAliveIdle, keepAliveInterval) {
+NetworkReadStreamEmscripten::NetworkReadStreamEmscripten(const char *url, RequestHeaders *headersList, const byte *buffer, uint32 bufferSize,
+		bool uploading, bool usingPatch, bool post, bool keepAlive, long keepAliveIdle, long keepAliveInterval) :
+		_emscripten_fetch_attr(new emscripten_fetch_attr_t()), _emscripten_fetch_url(url),
+		NetworkReadStream(url, headersList, buffer, bufferSize, uploading, usingPatch, post, keepAlive, keepAliveIdle, keepAliveInterval) {
 	initEmscripten(url, headersList);
 	setupBufferContents(buffer, bufferSize, uploading, usingPatch, post);
 }

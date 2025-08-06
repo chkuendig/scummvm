@@ -22,6 +22,8 @@
 #ifndef BACKENDS_NETWORKING_HTTP_CURL_NETWORKREADSTREAMCURL_H
 #define BACKENDS_NETWORKING_HTTP_CURL_NETWORKREADSTREAMCURL_H
 
+#define FORBIDDEN_SYMBOL_ALLOW_ALL
+
 #include "backends/networking/http/networkreadstream.h"
 #include "common/hash-str.h"
 #include "common/hashmap.h"
@@ -29,19 +31,18 @@
 #include "common/path.h"
 #include "common/str.h"
 #include "common/stream.h"
-typedef void CURL;
-struct curl_slist;
+
+#include <curl/curl.h>
 
 namespace Networking {
 
-class NetworkReadStreamCurl : public NetworkReadStreamImplementation {
+class NetworkReadStreamCurl : public NetworkReadStream {
 private:
 	CURL *_easy;
 	struct curl_slist *_headersSlist;
 	char *_errorBuffer;
-	uint32 _errorCode;
-	byte *_bufferCopy;
-	NetworkReadStreamCurl *_stream; // Back-reference for callbacks
+	CURLcode _errorCode;
+	byte *_bufferCopy; // To use with old curl version where CURLOPT_COPYPOSTFIELDS is not available
 	void initCurl(const char *url, RequestHeaders *headersList);
 	bool reuseCurl(const char *url, RequestHeaders *headersList);
 	void setupBufferContents(const byte *buffer, uint32 bufferSize, bool uploading, bool usingPatch, bool post) override;
@@ -55,7 +56,6 @@ private:
 
 	// CURL-specific methods
 	CURL *getEasyHandle() const { return _easy; }
-	void setErrorCode(uint32 code) { _errorCode = code; }
 
 public:
 	NetworkReadStreamCurl(const char *url, RequestHeaders *headersList, const Common::String &postFields, bool uploading, bool usingPatch, bool keepAlive, long keepAliveIdle, long keepAliveInterval);
@@ -65,7 +65,7 @@ public:
 	NetworkReadStreamCurl(const char *url, RequestHeaders *headersList, const byte *buffer, uint32 bufferSize, bool uploading, bool usingPatch, bool post, bool keepAlive, long keepAliveIdle, long keepAliveInterval);
 
 	~NetworkReadStreamCurl();
-	void finished(uint32 errorCode);
+	void finished(CURLcode errorCode);
 
 	/** Send <postFields>, using POST by default. */
 	bool reuse(const char *url, RequestHeaders *headersList, const Common::String &postFields, bool uploading = false, bool usingPatch = false) override;
@@ -90,7 +90,6 @@ public:
 	Common::HashMap<Common::String, Common::String> responseHeadersMap() const override;
 
 	bool hasError() const override;
-	uint32 getErrorCode() const { return _errorCode; }
 	const char *getError() const override;
 };
 

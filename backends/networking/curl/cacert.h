@@ -18,40 +18,16 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
+#ifndef BACKENDS_NETWORKING_CURL_CACERT_H
+#define BACKENDS_NETWORKING_CURL_CACERT_H
 
-#ifndef BACKENDS_NETWORKING_HTTP_CURL_CONNECTIONMANAGERCURL_H
-#define BACKENDS_NETWORKING_HTTP_CURL_CONNECTIONMANAGERCURL_H
-
-#define FORBIDDEN_SYMBOL_ALLOW_ALL
-
-#include "backends/networking/http/connectionmanager.h"
-
-#include <curl/curl.h>
+#include "common/str.h"
 
 namespace Networking {
 
-class ConnectionManagerCurl : public ConnectionManager {
-private:
-	CURLM *_multi;
+/** Return the path to the CA certificates bundle. */
+Common::String getCaCertPath();
 
-	void processTransfers() override;
-
-public:
-	ConnectionManagerCurl();
-	~ConnectionManagerCurl() override;
-
-	/**
-	 * All libcurl transfers are going through this ConnectionManager.
-	 * So, if you want to start any libcurl transfer, you must create
-	 * an easy handle and register it using this method.
-	 */
-	void registerEasyHandle(CURL *easy) const;
-
-	/** Return URL-encoded version of given string. */
-	Common::String urlEncode(const Common::String &s) const override;
-
-};
-
-} // End of namespace Networking
+}
 
 #endif

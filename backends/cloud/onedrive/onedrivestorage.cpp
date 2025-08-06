@@ -151,7 +151,7 @@ void OneDriveStorage::fileInfoCallback(Networking::NetworkReadStreamCallback out
 	if (outerCallback)
 		(*outerCallback)(Networking::NetworkReadStreamResponse(
 			response.request,
-			new Networking::NetworkReadStream(url, nullptr, "")
+			Networking::NetworkReadStream::make(url, nullptr, "")
 		));
 
 	delete json;

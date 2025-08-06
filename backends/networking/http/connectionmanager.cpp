@@ -22,29 +22,15 @@
 #include "backends/networking/http/connectionmanager.h"
 #include "backends/networking/http/networkreadstream.h"
 #include "common/debug.h"
-#include "common/fs.h"
 #include "common/system.h"
 #include "common/timer.h"
-
-#ifdef USE_LIBCURL
-#include "backends/networking/http/curl/connectionmanager-curl.h"
-#elif defined(EMSCRIPTEN)
-#include "backends/networking/http/emscripten/connectionmanager-emscripten.h"
-#endif
 
 namespace Common {
 
 DECLARE_SINGLETON(Networking::ConnectionManager);
 
-template<>
-Networking::ConnectionManager *Singleton<Networking::ConnectionManager>::makeInstance() {
-	// Create a new instance of the ConnectionManager based on the platform
-#ifdef USE_LIBCURL
-	return new Networking::ConnectionManagerCurl();
-#elif defined(EMSCRIPTEN)
-	return new Networking::ConnectionManagerEmscripten();
-#endif
-}
+/* The makeInstance function is defined in the platform specific source file */
+
 } // namespace Common
 
 namespace Networking {

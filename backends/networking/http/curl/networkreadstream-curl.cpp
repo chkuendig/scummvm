@@ -22,15 +22,25 @@
 #define FORBIDDEN_SYMBOL_ALLOW_ALL
 #define CURL_DISABLE_DEPRECATION
 
+#include "backends/networking/curl/cacert.h"
 #include "backends/networking/http/curl/networkreadstream-curl.h"
-#include "backends/networking/http/connectionmanager.h"
 #include "backends/networking/http/curl/connectionmanager-curl.h"
-#include "backends/networking/http/networkreadstream.h"
 #include "base/version.h"
 #include "common/debug.h"
-#include <curl/curl.h>
 
 namespace Networking {
+
+NetworkReadStream *NetworkReadStream::make(const char *url, RequestHeaders *headersList, const Common::String &postFields, bool uploading, bool usingPatch, bool keepAlive, long keepAliveIdle, long keepAliveInterval) {
+	return new NetworkReadStreamCurl(url, headersList, postFields, uploading, usingPatch, keepAlive, keepAliveIdle, keepAliveInterval);
+}
+
+NetworkReadStream *NetworkReadStream::make(const char *url, RequestHeaders *headersList, const Common::HashMap<Common::String, Common::String> &formFields, const Common::HashMap<Common::String, Common::Path> &formFiles, bool keepAlive, long keepAliveIdle, long keepAliveInterval) {
+	return new NetworkReadStreamCurl(url, headersList, formFields, formFiles, keepAlive, keepAliveIdle, keepAliveInterval);
+}
+
+NetworkReadStream *NetworkReadStream::make(const char *url, RequestHeaders *headersList, const byte *buffer, uint32 bufferSize, bool uploading, bool usingPatch, bool post, bool keepAlive, long keepAliveIdle, long keepAliveInterval) {
+	return new NetworkReadStreamCurl(url, headersList, buffer, bufferSize, uploading, usingPatch, post, keepAlive, keepAliveIdle, keepAliveInterval);
+}
 
 size_t NetworkReadStreamCurl::curlDataCallback(char *d, size_t n, size_t l, void *p) {
 	NetworkReadStreamCurl *stream = (NetworkReadStreamCurl *)p;
@@ -107,7 +117,7 @@ void NetworkReadStreamCurl::initCurl(const char *url, RequestHeaders *headersLis
 	curl_easy_setopt(_easy, CURLOPT_SSL_VERIFYPEER, 0);
 #endif
 
-	Common::String caCertPath = dynamic_cast<ConnectionManagerCurl &>(ConnMan).getCaCertPath();
+	Common::String caCertPath = getCaCertPath();
 	if (!caCertPath.empty()) {
 		curl_easy_setopt(_easy, CURLOPT_CAINFO, caCertPath.c_str());
 	}
@@ -147,14 +157,17 @@ bool NetworkReadStreamCurl::reuseCurl(const char *url, RequestHeaders *headersLi
 void NetworkReadStreamCurl::setupBufferContents(const byte *buffer, uint32 bufferSize, bool uploading, bool usingPatch, bool post) {
 	if (uploading) {
 		curl_easy_setopt(_easy, CURLOPT_UPLOAD, 1L);
-		curl_easy_setopt(_easy, CURLOPT_READDATA, _stream);
+		curl_easy_setopt(_easy, CURLOPT_READDATA, this);
 		curl_easy_setopt(_easy, CURLOPT_READFUNCTION, curlReadDataCallback);
+		_sendingContentsBuffer = buffer;
+		_sendingContentsSize = bufferSize;
 	} else if (usingPatch) {
 		curl_easy_setopt(_easy, CURLOPT_CUSTOMREQUEST, "PATCH");
 	} else {
 		if (post || bufferSize != 0) {
 			curl_easy_setopt(_easy, CURLOPT_POSTFIELDSIZE, bufferSize);
 #if LIBCURL_VERSION_NUM >= 0x071101
+			// CURLOPT_COPYPOSTFIELDS available since curl 7.17.1
 			curl_easy_setopt(_easy, CURLOPT_COPYPOSTFIELDS, buffer);
 #else
 			_bufferCopy = (byte *)malloc(bufferSize);
@@ -199,19 +212,22 @@ void NetworkReadStreamCurl::setupFormMultipart(const Common::HashMap<Common::Str
 }
 
 NetworkReadStreamCurl::NetworkReadStreamCurl(const char *url, RequestHeaders *headersList, const Common::String &postFields, bool uploading, bool usingPatch, bool keepAlive, long keepAliveIdle, long keepAliveInterval)
-	: NetworkReadStreamImplementation(url, headersList, postFields, uploading, usingPatch, keepAlive, keepAliveIdle, keepAliveInterval) {
+	: NetworkReadStream(url, headersList, postFields, uploading, usingPatch, keepAlive, keepAliveIdle, keepAliveInterval),
+	_errorBuffer(nullptr), _headersSlist(nullptr) {
 	initCurl(url, headersList);
 	setupBufferContents((const byte *)postFields.c_str(), postFields.size(), uploading, usingPatch, false);
 }
 
 NetworkReadStreamCurl::NetworkReadStreamCurl(const char *url, RequestHeaders *headersList, const Common::HashMap<Common::String, Common::String> &formFields, const Common::HashMap<Common::String, Common::Path> &formFiles, bool keepAlive, long keepAliveIdle, long keepAliveInterval)
-	: NetworkReadStreamImplementation(url, headersList, formFields, formFiles, keepAlive, keepAliveIdle, keepAliveInterval) {
+	: NetworkReadStream(url, headersList, formFields, formFiles, keepAlive, keepAliveIdle, keepAliveInterval),
+	_errorBuffer(nullptr), _headersSlist(nullptr) {
 	initCurl(url, headersList);
 	setupFormMultipart(formFields, formFiles);
 }
 
 NetworkReadStreamCurl::NetworkReadStreamCurl(const char *url, RequestHeaders *headersList, const byte *buffer, uint32 bufferSize, bool uploading, bool usingPatch, bool post, bool keepAlive, long keepAliveIdle, long keepAliveInterval)
-	: NetworkReadStreamImplementation(url, headersList, buffer, bufferSize, uploading, usingPatch, post, keepAlive, keepAliveIdle, keepAliveInterval) {
+	: NetworkReadStream(url, headersList, buffer, bufferSize, uploading, usingPatch, post, keepAlive, keepAliveIdle, keepAliveInterval),
+	_errorBuffer(nullptr), _headersSlist(nullptr) {
 	initCurl(url, headersList);
 	setupBufferContents(buffer, bufferSize, uploading, usingPatch, post);
 }
@@ -263,7 +279,7 @@ NetworkReadStreamCurl::~NetworkReadStreamCurl() {
 	}
 }
 
-void NetworkReadStreamCurl::finished(uint32 errorCode) {
+void NetworkReadStreamCurl::finished(CURLcode errorCode) {
 	_requestComplete = true;
 
 	char *url = nullptr;
@@ -283,7 +299,7 @@ bool NetworkReadStreamCurl::hasError() const {
 }
 
 const char *NetworkReadStreamCurl::getError() const {
-	return strlen(_errorBuffer) ? _errorBuffer : curl_easy_strerror((CURLcode)_errorCode);
+	return strlen(_errorBuffer) ? _errorBuffer : curl_easy_strerror(_errorCode);
 }
 
 long NetworkReadStreamCurl::httpResponseCode() const {

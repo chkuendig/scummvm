@@ -31,7 +31,7 @@ namespace Networking {
 
 class NetworkReadStream; // Forward declaration
 
-class NetworkReadStreamEmscripten : public NetworkReadStreamImplementation {
+class NetworkReadStreamEmscripten : public NetworkReadStream {
 private:
 	emscripten_fetch_attr_t *_emscripten_fetch_attr;
 	emscripten_fetch_t *_emscripten_fetch;
@@ -47,7 +47,8 @@ public:
 
 	~NetworkReadStreamEmscripten() override;
 	void initEmscripten(const char *url, RequestHeaders *headersList);
-	// NetworkReadStreamImplementation interface
+
+	// NetworkReadStream interface
 	bool reuse(const char *url, RequestHeaders *headersList, const Common::String &postFields, bool uploading = false, bool usingPatch = false) override { return false; }                                                 // no reuse for Emscripten
 	bool reuse(const char *url, RequestHeaders *headersList, const Common::HashMap<Common::String, Common::String> &formFields, const Common::HashMap<Common::String, Common::Path> &formFiles) override { return false; } // no reuse for Emscripten
 	bool reuse(const char *url, RequestHeaders *headersList, const byte *buffer, uint32 bufferSize, bool uploading = false, bool usingPatch = false, bool post = false) override { return false; }                         // no reuse for Emscripten
@@ -64,6 +65,7 @@ public:
 	void resetStream() override;
 
 	uint32 read(void *dataPtr, uint32 dataSize) override;
+
 	// Static callback functions
 	static void emscriptenOnSuccess(emscripten_fetch_t *fetch);
 	static void emscriptenOnError(emscripten_fetch_t *fetch);

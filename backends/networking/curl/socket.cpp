@@ -21,9 +21,10 @@
 
 #define FORBIDDEN_SYMBOL_ALLOW_ALL
 #include <curl/curl.h>
-#include "backends/networking/http/connectionmanager.h"
-#include "backends/networking/http/curl/connectionmanager-curl.h"
-#include "backends/networking/http/curl/socket.h"
+
+#include "backends/networking/curl/socket.h"
+#include "backends/networking/curl/cacert.h"
+
 #include "common/debug.h"
 #include "common/system.h"
 
@@ -85,7 +86,7 @@ bool CurlSocket::connect(const Common::String &url) {
 		curl_easy_setopt(_easy, CURLOPT_SSL_VERIFYPEER, 0);
 #endif
 
-		Common::String caCertPath = dynamic_cast<ConnectionManagerCurl &>(ConnMan).getCaCertPath();
+		Common::String caCertPath = getCaCertPath();
 		if (!caCertPath.empty()) {
 			curl_easy_setopt(_easy, CURLOPT_CAINFO, caCertPath.c_str());
 		}

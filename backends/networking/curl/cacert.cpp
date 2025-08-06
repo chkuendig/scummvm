@@ -19,39 +19,39 @@
  *
  */
 
-#ifndef BACKENDS_NETWORKING_HTTP_CURL_CONNECTIONMANAGERCURL_H
-#define BACKENDS_NETWORKING_HTTP_CURL_CONNECTIONMANAGERCURL_H
+#include "backends/networking/curl/cacert.h"
 
-#define FORBIDDEN_SYMBOL_ALLOW_ALL
-
-#include "backends/networking/http/connectionmanager.h"
-
-#include <curl/curl.h>
+#include "common/fs.h"
 
 namespace Networking {
 
-class ConnectionManagerCurl : public ConnectionManager {
-private:
-	CURLM *_multi;
+Common::String getCaCertPath() {
+#if defined(ANDROID_BACKEND)
+	// cacert path must exist on filesystem and be reachable by standard open syscall
+	// Lets use ScummVM internal directory
+	Common::String assetsPath = JNI::getScummVMAssetsPath();
+	return assetsPath + "/cacert.pem";
+#elif defined(DATA_PATH)
+	static enum {
+		kNotInitialized,
+		kFileNotFound,
+		kFileExists
+	} state = kNotInitialized;
 
-	void processTransfers() override;
+	if (state == kNotInitialized) {
+		Common::FSNode node(DATA_PATH "/cacert.pem");
+		state = node.exists() ? kFileExists : kFileNotFound;
+	}
 
-public:
-	ConnectionManagerCurl();
-	~ConnectionManagerCurl() override;
+	if (state == kFileExists) {
+		return DATA_PATH "/cacert.pem";
+	} else {
+		return "";
+	}
+#else
+	return "";
+#endif
+}
 
-	/**
-	 * All libcurl transfers are going through this ConnectionManager.
-	 * So, if you want to start any libcurl transfer, you must create
-	 * an easy handle and register it using this method.
-	 */
-	void registerEasyHandle(CURL *easy) const;
-
-	/** Return URL-encoded version of given string. */
-	Common::String urlEncode(const Common::String &s) const override;
-
-};
 
 } // End of namespace Networking
-
-#endif

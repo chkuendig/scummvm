@@ -34,18 +34,15 @@ namespace Networking {
 typedef Common::Array<Common::String> RequestHeaders;
 
 // Simple interface for platform-specific NetworkReadStream implementations
-class NetworkReadStreamImplementation : public Common::ReadStream {
+class NetworkReadStream : public Common::ReadStream {
 protected:
 	Common::MemoryReadWriteStream _backingStream;
 	bool _keepAlive;
 	long _keepAliveIdle, _keepAliveInterval;
 	bool _eos, _requestComplete;
-	char *_errorBuffer;
-	uint32 _errorCode;
 	const byte *_sendingContentsBuffer;
 	uint32 _sendingContentsSize;
 	uint32 _sendingContentsPos;
-	byte *_bufferCopy; // To use with old curl version where CURLOPT_COPYPOSTFIELDS is not available
 	Common::String _responseHeaders;
 	uint64 _progressDownloaded, _progressTotal;
 
@@ -75,30 +72,37 @@ protected:
 	 * @returns how many bytes were actually read
 	 */
 	uint32 addResponseHeaders(char *buffer, uint32 bufferSize);
-public:
+
 	/** Send <postFields>, using POST by default. */
-	NetworkReadStreamImplementation(const char *url, RequestHeaders *headersList, const Common::String &postFields, bool uploading, bool usingPatch, bool keepAlive, long keepAliveIdle, long keepAliveInterval)
+	NetworkReadStream(const char *url, RequestHeaders *headersList, const Common::String &postFields, bool uploading, bool usingPatch, bool keepAlive, long keepAliveIdle, long keepAliveInterval)
 		: _backingStream(DisposeAfterUse::YES), _keepAlive(keepAlive), _keepAliveIdle(keepAliveIdle), _keepAliveInterval(keepAliveInterval),
 		  _eos(false), _requestComplete(false), _sendingContentsBuffer(nullptr), _sendingContentsSize(0), _sendingContentsPos(0),
 		  _progressDownloaded(0), _progressTotal(0) {
 	}
 	/** Send <formFields>, <formFiles>, using POST multipart/form. */
-	NetworkReadStreamImplementation(const char *url, RequestHeaders *headersList, const Common::HashMap<Common::String, Common::String> &formFields, const Common::HashMap<Common::String, Common::Path> &formFiles, bool keepAlive, long keepAliveIdle, long keepAliveInterval)
+	NetworkReadStream(const char *url, RequestHeaders *headersList, const Common::HashMap<Common::String, Common::String> &formFields, const Common::HashMap<Common::String, Common::Path> &formFiles, bool keepAlive, long keepAliveIdle, long keepAliveInterval)
 		: _backingStream(DisposeAfterUse::YES), _keepAlive(keepAlive), _keepAliveIdle(keepAliveIdle), _keepAliveInterval(keepAliveInterval),
 		  _eos(false), _requestComplete(false), _sendingContentsBuffer(nullptr), _sendingContentsSize(0), _sendingContentsPos(0),
 		  _progressDownloaded(0), _progressTotal(0) {
 	}
 	/** Send <buffer>, using POST by default. */
-	NetworkReadStreamImplementation(const char *url, RequestHeaders *headersList, const byte *buffer, uint32 bufferSize, bool uploading, bool usingPatch, bool post, bool keepAlive, long keepAliveIdle, long keepAliveInterval)
+	NetworkReadStream(const char *url, RequestHeaders *headersList, const byte *buffer, uint32 bufferSize, bool uploading, bool usingPatch, bool post, bool keepAlive, long keepAliveIdle, long keepAliveInterval)
 		: _backingStream(DisposeAfterUse::YES), _keepAlive(keepAlive), _keepAliveIdle(keepAliveIdle), _keepAliveInterval(keepAliveInterval),
 		  _eos(false), _requestComplete(false), _sendingContentsBuffer(nullptr), _sendingContentsSize(0), _sendingContentsPos(0),
 		  _progressDownloaded(0), _progressTotal(0) {
 	}
 
-	~NetworkReadStreamImplementation() {
-		free(_bufferCopy);
-		free(_errorBuffer);
-	}
+public:
+	/* Implementation-defined Constructors */
+	static NetworkReadStream *make(const char *url, RequestHeaders *headersList, const Common::String &postFields,
+			bool uploading = false, bool usingPatch = false,
+			bool keepAlive = false, long keepAliveIdle = 120, long keepAliveInterval = 60);
+	static NetworkReadStream *make(const char *url, RequestHeaders *headersList,
+			const Common::HashMap<Common::String, Common::String> &formFields, const Common::HashMap<Common::String, Common::Path> &formFiles,
+			bool keepAlive = false, long keepAliveIdle = 120, long keepAliveInterval = 60);
+	static NetworkReadStream *make(const char *url, RequestHeaders *headersList, const byte *buffer, uint32 bufferSize,
+			bool uploading = false, bool usingPatch = false, bool post = true,
+			bool keepAlive = false, long keepAliveIdle = 120, long keepAliveInterval = 60);
 
 	/** Send <postFields>, using POST by default. */
 	virtual bool reuse(const char *url, RequestHeaders *headersList, const Common::String &postFields, bool uploading = false, bool usingPatch = false) = 0;
@@ -119,7 +123,7 @@ public:
 	 * with N bytes, reading exactly N bytes from the start should *not*
 	 * set eos; only reading *beyond* the available data should set it.
 	 */
-	bool eos() const { return _eos; }
+	bool eos() const override { return _eos; }
 
 	/**
 	 * Read data from the stream. Subclasses must implement this
@@ -133,7 +137,7 @@ public:
 	 * @param dataSize  number of bytes to be read
 	 * @return the number of bytes which were actually read.
 	 */
-	uint32 read(void *dataPtr, uint32 dataSize);
+	uint32 read(void *dataPtr, uint32 dataSize) override;
 
 	/**
 	 * Returns HTTP response code from inner CURL handle.
@@ -177,102 +181,7 @@ public:
 	bool keepAlive() const { return _keepAlive; }
 
 	virtual bool hasError() const = 0;
-	uint32 getErrorCode() const { return _errorCode; }
 	virtual const char *getError() const = 0;
-};
-
-// Forward declarations
-
-class NetworkReadStream : public Common::ReadStream {
-private:
-	// Use composition instead of platform-specific members
-	NetworkReadStreamImplementation *_impl;
-
-public:
-	/** Send <postFields>, using POST by default. */
-	NetworkReadStream(const char *url, RequestHeaders *headersList, const Common::String &postFields, bool uploading = false, bool usingPatch = false, bool keepAlive = false, long keepAliveIdle = 120, long keepAliveInterval = 60);
-	/** Send <formFields>, <formFiles>, using POST multipart/form. */
-	NetworkReadStream(
-		const char *url, RequestHeaders *headersList,
-		const Common::HashMap<Common::String, Common::String> &formFields,
-		const Common::HashMap<Common::String, Common::Path> &formFiles,
-		bool keepAlive = false, long keepAliveIdle = 120, long keepAliveInterval = 60);
-	/** Send <buffer>, using POST by default. */
-	NetworkReadStream(const char *url, RequestHeaders *headersList, const byte *buffer, uint32 bufferSize, bool uploading = false, bool usingPatch = false, bool post = true, bool keepAlive = false, long keepAliveIdle = 120, long keepAliveInterval = 60);
-	~NetworkReadStream() override;
-
-	/** Send <postFields>, using POST by default. */
-	bool reuse(const char *url, RequestHeaders *headersList, const Common::String &postFields, bool uploading = false, bool usingPatch = false) {
-		return _impl->reuse(url, headersList, postFields, uploading, usingPatch);
-	};
-	/** Send <formFields>, <formFiles>, using POST multipart/form. */
-	bool reuse(
-		const char *url, RequestHeaders *headersList,
-		const Common::HashMap<Common::String, Common::String> &formFields,
-		const Common::HashMap<Common::String, Common::Path> &formFiles) {
-		return _impl->reuse(url, headersList, formFields, formFiles);
-	}
-	/** Send <buffer>, using POST by default. */
-	bool reuse(const char *url, RequestHeaders *headersList, const byte *buffer, uint32 bufferSize, bool uploading = false, bool usingPatch = false, bool post = true) {
-		return _impl->reuse(url, headersList, buffer, bufferSize, uploading, usingPatch, post);
-	}
-
-	/**
-	 * Returns true if a read failed because the stream end has been reached.
-	 * This flag is cleared by clearErr().
-	 * For a SeekableReadStream, it is also cleared by a successful seek.
-	 *
-	 * @note The semantics of any implementation of this method are
-	 * supposed to match those of ISO C feof(). In particular, in a stream
-	 * with N bytes, reading exactly N bytes from the start should *not*
-	 * set eos; only reading *beyond* the available data should set it.
-	 */
-	bool eos() const override { return _impl->eos(); }
-
-	/**
-	 * Read data from the stream. Subclasses must implement this
-	 * method; all other read methods are implemented using it.
-	 *
-	 * @note The semantics of any implementation of this method are
-	 * supposed to match those of ISO C fread(), in particular where
-	 * it concerns setting error and end of file/stream flags.
-	 *
-	 * @param dataPtr   pointer to a buffer into which the data is read
-	 * @param dataSize  number of bytes to be read
-	 * @return the number of bytes which were actually read.
-	 */
-	uint32 read(void *dataPtr, uint32 dataSize) override { return _impl->read(dataPtr, dataSize); }
-
-	/**
-	 * Returns HTTP response code from inner CURL handle.
-	 * It returns -1 to indicate there is no inner handle.
-	 *
-	 * @note This method should be called when eos() == true.
-	 */
-	long httpResponseCode() const { return _impl->httpResponseCode(); };
-
-	/**
-	 * Return current location URL from inner CURL handle.
-	 * "" is returned to indicate there is no inner handle.
-	 *
-	 * @note This method should be called when eos() == true.
-	 */
-	Common::String currentLocation() const { return _impl->currentLocation(); };
-
-	/**
-	 * Return response headers as HashMap. All header names in
-	 * it are lowercase.
-	 *
-	 * @note This method should be called when eos() == true.
-	 */
-	Common::HashMap<Common::String, Common::String> responseHeadersMap() const { return _impl->responseHeadersMap(); };
-
-	/** Returns a number in range [0, 1], where 1 is "complete". */
-	double getProgress() const { return _impl->getProgress(); }
-
-	bool hasError() const { return _impl->hasError(); }
-	uint32 getErrorCode() const { return _impl->getErrorCode(); }
-	const char *getError() const { return _impl->getError(); }
 };
 
 } // End of namespace Networking

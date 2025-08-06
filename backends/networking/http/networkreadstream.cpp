@@ -22,47 +22,13 @@
 #include "networkreadstream.h"
 #include "common/tokenizer.h"
 
-#ifdef USE_LIBCURL
-#include "backends/networking/http/curl/networkreadstream-curl.h"
-#elif defined(EMSCRIPTEN)
-#include "backends/networking/http/emscripten/networkreadstream-emscripten.h"
-#endif
-
 namespace Networking {
 
-// Constructor implementations
-NetworkReadStream::NetworkReadStream(const char *url, RequestHeaders *headersList, const Common::String &postFields, bool uploading, bool usingPatch, bool keepAlive, long keepAliveIdle, long keepAliveInterval) {
-#ifdef USE_LIBCURL
-	_impl = new NetworkReadStreamCurl(url, headersList, postFields, uploading, usingPatch, keepAlive, keepAliveIdle, keepAliveInterval);
-#elif defined(EMSCRIPTEN)
-	_impl = new NetworkReadStreamEmscripten(url, headersList, postFields, uploading, usingPatch, keepAlive, keepAliveIdle, keepAliveInterval);
-#endif
-}
+/*
+ * The make static functions are defined in the implementation-specific subclass
+ */
 
-NetworkReadStream::NetworkReadStream(const char *url, RequestHeaders *headersList, const Common::HashMap<Common::String, Common::String> &formFields, const Common::HashMap<Common::String, Common::Path> &formFiles, bool keepAlive, long keepAliveIdle, long keepAliveInterval) {
-#ifdef USE_LIBCURL
-	_impl = new NetworkReadStreamCurl(url, headersList, formFields, formFiles, keepAlive, keepAliveIdle, keepAliveInterval);
-#elif defined(EMSCRIPTEN)
-	_impl = new NetworkReadStreamEmscripten(url, headersList, formFields, formFiles, keepAlive, keepAliveIdle, keepAliveInterval);
-
-#endif
-}
-
-NetworkReadStream::NetworkReadStream(const char *url, RequestHeaders *headersList, const byte *buffer, uint32 bufferSize, bool uploading, bool usingPatch, bool post, bool keepAlive, long keepAliveIdle, long keepAliveInterval) {
-#ifdef USE_LIBCURL
-	_impl = new NetworkReadStreamCurl(url, headersList, buffer, bufferSize, uploading, usingPatch, post, keepAlive, keepAliveIdle, keepAliveInterval);
-#elif defined(EMSCRIPTEN)
-	_impl = new NetworkReadStreamEmscripten(url, headersList, buffer, bufferSize, uploading, usingPatch, post, keepAlive, keepAliveIdle, keepAliveInterval);
-
-#endif
-}
-
-NetworkReadStream::~NetworkReadStream() {
-
-	delete _impl;
-}
-
-uint32 NetworkReadStreamImplementation::fillWithSendingContents(char *bufferToFill, uint32 maxSize) {
+uint32 NetworkReadStream::fillWithSendingContents(char *bufferToFill, uint32 maxSize) {
 	uint32 sendSize = _sendingContentsSize - _sendingContentsPos;
 	if (sendSize > maxSize)
 		sendSize = maxSize;
@@ -73,23 +39,23 @@ uint32 NetworkReadStreamImplementation::fillWithSendingContents(char *bufferToFi
 	return sendSize;
 }
 
-uint32 NetworkReadStreamImplementation::addResponseHeaders(char *buffer, uint32 bufferSize) {
+uint32 NetworkReadStream::addResponseHeaders(char *buffer, uint32 bufferSize) {
 	_responseHeaders += Common::String(buffer, bufferSize);
 	return bufferSize;
 }
 
-double NetworkReadStreamImplementation::getProgress() const {
+double NetworkReadStream::getProgress() const {
 	if (_progressTotal < 1)
 		return 0;
 	return (double)_progressDownloaded / (double)_progressTotal;
 }
 
-void NetworkReadStreamImplementation::setProgress(uint64 downloaded, uint64 total) {
+void NetworkReadStream::setProgress(uint64 downloaded, uint64 total) {
 	_progressDownloaded = downloaded;
 	_progressTotal = total;
 }
 
-uint32 NetworkReadStreamImplementation::read(void *dataPtr, uint32 dataSize) {
+uint32 NetworkReadStream::read(void *dataPtr, uint32 dataSize) {
 	uint32 actuallyRead = _backingStream.read(dataPtr, dataSize);
 
 	if (actuallyRead == 0) {

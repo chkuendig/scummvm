@@ -19,16 +19,20 @@
  *
  */
 
-#define FORBIDDEN_SYMBOL_ALLOW_ALL
-
 #include "backends/networking/http/curl/connectionmanager-curl.h"
 #include "backends/networking/http/curl/networkreadstream-curl.h"
 #include "common/debug.h"
-#include "common/fs.h"
 #include "common/system.h"
 #include "common/timer.h"
-#ifdef USE_LIBCURL
-#include <curl/curl.h>
+
+namespace Common {
+
+template<>
+Networking::ConnectionManager *Singleton<Networking::ConnectionManager>::makeInstance() {
+	return new Networking::ConnectionManagerCurl();
+}
+
+} // namespace Common
 
 namespace Networking {
 ConnectionManagerCurl::ConnectionManagerCurl() : ConnectionManager(), _multi(nullptr) {
@@ -63,34 +67,6 @@ Common::String ConnectionManagerCurl::urlEncode(const Common::String &s) const {
 	return "";
 }
 
-Common::String ConnectionManagerCurl::getCaCertPath() {
-#if defined(ANDROID_BACKEND)
-	// cacert path must exist on filesystem and be reachable by standard open syscall
-	// Lets use ScummVM internal directory
-	Common::String assetsPath = JNI::getScummVMAssetsPath();
-	return assetsPath + "/cacert.pem";
-#elif defined(DATA_PATH)
-	static enum {
-		kNotInitialized,
-		kFileNotFound,
-		kFileExists
-	} state = kNotInitialized;
-
-	if (state == kNotInitialized) {
-		Common::FSNode node(DATA_PATH "/cacert.pem");
-		state = node.exists() ? kFileExists : kFileNotFound;
-	}
-
-	if (state == kFileExists) {
-		return DATA_PATH "/cacert.pem";
-	} else {
-		return "";
-	}
-#else
-	return "";
-#endif
-}
-
 // private goes here:
 void ConnectionManagerCurl::processTransfers() {
 	if (!_multi)
@@ -120,5 +96,3 @@ void ConnectionManagerCurl::processTransfers() {
 }
 
 } // End of namespace Networking
-
-#endif // USE_LIBCURL

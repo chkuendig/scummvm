@@ -38,6 +38,15 @@
 #include "common/debug.h"
 #include <emscripten.h>
 
+namespace Common {
+
+template<>
+Networking::ConnectionManager *Singleton<Networking::ConnectionManager>::makeInstance() {
+	return new Networking::ConnectionManagerEmscripten();
+}
+
+} // namespace Common
+
 namespace Networking {
 
 Common::String ConnectionManagerEmscripten::urlEncode(const Common::String &s) const {
