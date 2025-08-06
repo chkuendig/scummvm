@@ -40,6 +40,8 @@
 
 namespace Common {
 
+DECLARE_SINGLETON(Networking::ConnectionManager);
+
 template<>
 Networking::ConnectionManager *Singleton<Networking::ConnectionManager>::makeInstance() {
 	return new Networking::ConnectionManagerEmscripten();

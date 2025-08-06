@@ -25,13 +25,9 @@
 #include "common/system.h"
 #include "common/timer.h"
 
-namespace Common {
-
-DECLARE_SINGLETON(Networking::ConnectionManager);
-
-/* The makeInstance function is defined in the platform specific source file */
-
-} // namespace Common
+/* The makeInstance function and the singleton attribute are
+ * defined in the platform specific source file
+ */
 
 namespace Networking {
 ConnectionManager::ConnectionManager() : _timerStarted(false), _frame(0) {}
