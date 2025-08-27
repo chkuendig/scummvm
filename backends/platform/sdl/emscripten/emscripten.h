@@ -29,12 +29,20 @@
 typedef Common::BaseCallback<const Common::String *> *CloudConnectionCallback;
 #endif
 
-extern "C" {
-void cloud_connection_json_callback(char *str);       // pass cloud storage activation data from JS to setup wizard
+extern "C" { // External JavaScript API functions implemented in libscummvm.js
+// Backend functions
+bool isFullscreen();
+void toggleFullscreen(bool enable);
+void downloadFile(const char *filenamePtr, char *dataPtr, int dataSize);
+// Cloud functions
+#ifdef USE_CLOUD
+void cloudConnectionWizardCallback(char *str); // pass cloud storage activation data from JS to setup wizard
+bool cloudConnectionWizardOAuthWindow(char const *url);
+#endif
 }
 class OSystem_Emscripten : public OSystem_POSIX {
 #ifdef USE_CLOUD
-	friend void ::cloud_connection_json_callback(char *str);
+	friend void ::cloudConnectionWizardCallback(char *str);
 #endif
 protected:
 #ifdef USE_CLOUD
