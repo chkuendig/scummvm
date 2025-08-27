@@ -36,41 +36,6 @@
 #include "backends/text-to-speech/emscripten/emscripten-text-to-speech.h"
 #endif
 
-// Inline JavaScript, see https://emscripten.org/docs/api_reference/emscripten.h.html#inline-assembly-javascript for details
-EM_JS(bool, isFullscreen, (), {
-	return !!document.fullscreenElement;
-});
-
-EM_JS(void, toggleFullscreen, (bool enable), {
-	let canvas = document.getElementById('canvas');
-	if (enable && !document.fullscreenElement) {
-		canvas.requestFullscreen();
-	}
-	if (!enable && document.fullscreenElement) {
-		document.exitFullscreen();
-	}
-});
-
-EM_JS(void, downloadFile, (const char *filenamePtr, char *dataPtr, int dataSize), {
-	const view = new Uint8Array(HEAPU8.buffer, dataPtr, dataSize);
-	const blob = new Blob([view], {
-			type:
-				'octet/stream'
-		});
-	const filename = UTF8ToString(filenamePtr);
-	setTimeout(() => {
-		const a = document.createElement('a');
-		a.style = 'display:none';
-		document.body.appendChild(a);
-		const url = window.URL.createObjectURL(blob);
-		a.href = url;
-		a.download = filename;
-		a.click();
-		window.URL.revokeObjectURL(url);
-		document.body.removeChild(a);
-	}, 0);
-});
-
 extern "C" {
 #ifdef USE_CLOUD
 void EMSCRIPTEN_KEEPALIVE OSystem_Emscripten_cloudConnectionWizardCallback(char *str) {
@@ -130,7 +95,7 @@ bool OSystem_Emscripten::hasFeature(Feature f) {
 
 bool OSystem_Emscripten::getFeatureState(Feature f) {
 	if (f == kFeatureFullscreenMode) {
-		return isFullscreen();
+		return OSystem_Emscripten_isFullscreen();
 	} else {
 		return OSystem_POSIX::getFeatureState(f);
 	}
@@ -138,7 +103,7 @@ bool OSystem_Emscripten::getFeatureState(Feature f) {
 
 void OSystem_Emscripten::setFeatureState(Feature f, bool enable) {
 	if (f == kFeatureFullscreenMode) {
-		toggleFullscreen(enable);
+		OSystem_Emscripten_toggleFullscreen(enable);
 	} else {
 		OSystem_POSIX::setFeatureState(f, enable);
 	}
@@ -187,7 +152,7 @@ void OSystem_Emscripten::exportFile(const Common::Path &filename) {
 	char *bytes = new char[size + 1];
 	file.read(bytes, size);
 	file.close();
-	downloadFile(exportName.c_str(), bytes, size);
+	OSystem_Emscripten_downloadFile(exportName.c_str(), bytes, size);
 	delete[] bytes;
 }
 
