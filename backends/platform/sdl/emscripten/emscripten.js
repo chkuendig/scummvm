@@ -25,7 +25,53 @@
  */
 
 mergeInto(LibraryManager.library, {
-  
+    /**
+     * Check if the browser is currently in fullscreen mode
+     * @returns {boolean} true if in fullscreen mode, false otherwise
+     */
+    OSystem_Emscripten_isFullscreen: function () {
+        return !!document.fullscreenElement;
+    },
+
+    /**
+     * Toggle fullscreen mode for the canvas element
+     * @param {boolean} enable - true to enter fullscreen, false to exit
+     */
+    OSystem_Emscripten_toggleFullscreen: function (enable) {
+        let canvas = document.getElementById('canvas');
+        if (enable && !document.fullscreenElement) {
+            canvas.requestFullscreen();
+        }
+        if (!enable && document.fullscreenElement) {
+            document.exitFullscreen();
+        }
+    },
+
+    /**
+     * Download a file by creating a blob and triggering a download
+     * @param {number} filenamePtr - pointer to filename string in WASM memory
+     * @param {number} dataPtr - pointer to file data in WASM memory
+     * @param {number} dataSize - size of the file data in bytes
+     */
+    OSystem_Emscripten_downloadFile: function (filenamePtr, dataPtr, dataSize) {
+        const view = new Uint8Array(HEAPU8.buffer, dataPtr, dataSize);
+        const blob = new Blob([view], {
+            type: 'octet/stream'
+        });
+        const filename = UTF8ToString(filenamePtr);
+        setTimeout(() => {
+            const a = document.createElement('a');
+            a.style = 'display:none';
+            document.body.appendChild(a);
+            const url = window.URL.createObjectURL(blob);
+            a.href = url;
+            a.download = filename;
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+        }, 0);
+    },
+
     /**
      * Open OAuth window for cloud connection and listen for response
      * @param {number} urlPtr - pointer to URL string in WASM memory
