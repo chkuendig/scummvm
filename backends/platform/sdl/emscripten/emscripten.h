@@ -29,7 +29,11 @@
 typedef Common::BaseCallback<const Common::String *> *CloudConnectionCallback;
 #endif
 
-extern "C" {
+extern "C" { // External JavaScript API functions implemented in libscummvm.js
+// Backend functions
+bool OSystem_Emscripten_isFullscreen();
+void OSystem_Emscripten_toggleFullscreen(bool enable);
+void OSystem_Emscripten_downloadFile(const char *filenamePtr, char *dataPtr, int dataSize);
 // Cloud functions
 #ifdef USE_CLOUD
 void OSystem_Emscripten_cloudConnectionWizardCallback(char *str); // pass cloud storage activation data from JS to setup wizard
