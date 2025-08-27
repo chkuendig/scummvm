@@ -30,11 +30,16 @@ typedef Common::BaseCallback<const Common::String *> *CloudConnectionCallback;
 #endif
 
 extern "C" {
-void cloud_connection_json_callback(char *str);       // pass cloud storage activation data from JS to setup wizard
+// Cloud functions
+#ifdef USE_CLOUD
+void OSystem_Emscripten_cloudConnectionWizardCallback(char *str); // pass cloud storage activation data from JS to setup wizard
+bool OSystem_Emscripten_openCloudOAuthWindow(char const *url);
+#endif
 }
+
 class OSystem_Emscripten : public OSystem_POSIX {
 #ifdef USE_CLOUD
-	friend void ::cloud_connection_json_callback(char *str);
+	friend void ::OSystem_Emscripten_cloudConnectionWizardCallback(char *str);
 #endif
 protected:
 #ifdef USE_CLOUD

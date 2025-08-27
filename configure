@@ -3381,6 +3381,7 @@ EOF
 
 		append_var LDFLAGS "-s EXPORTED_FUNCTIONS=[_main,_malloc,_free,_raise]"
 		append_var LDFLAGS "-s EXPORTED_RUNTIME_METHODS=[ccall,lengthBytesUTF8,setValue,writeArrayToMemory]"
+        append_var LDFLAGS "--js-library backends/platform/sdl/emscripten/emscripten.js"
 		append_var LDFLAGS "--js-library backends/networking/http/emscripten/networkreadstream-emscripten.js"
 
 		append_var LDFLAGS "-O2"
