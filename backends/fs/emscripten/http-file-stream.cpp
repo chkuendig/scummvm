@@ -1,0 +1,105 @@
+/* ScummVM - Graphic Adventure Engine
+ *
+ * ScummVM is the legal property of its developers, whose names
+ * are too numerous to list here. Please refer to the COPYRIGHT
+ * file distributed with this source distribution.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
+
+#ifdef EMSCRIPTEN
+
+#include "backends/fs/emscripten/http-file-stream.h"
+#include "backends/networking/http/connectionmanager.h"
+#include "backends/networking/http/sessionrequest.h"
+#include "backends/platform/sdl/emscripten/emscripten.h"
+#include "common/debug.h"
+#include "common/system.h"
+
+HttpFileStream::HttpFileStream(const Common::String &url, const Common::String &displayName,
+							   const Common::String &cachePath, uint64 fileSize)
+	: NetworkFileStream(displayName, cachePath, fileSize), _url(url) {
+}
+
+HttpFileStream::~HttpFileStream() {
+	// Nothing special to clean up
+}
+void HttpFileStream::downloadFileCallback(const Networking::DataResponse &response) {
+	debug(5, "HttpFileStream::downloadFileCallback called - processing download progress");
+	// SessionRequest handles the file writing automatically
+	// No need to track completion here
+}
+
+void HttpFileStream::errorCallbackDownloadFile(const Networking::ErrorResponse &errorResponse) {
+	error("HttpFileStream::errorCallbackDownloadFile called - %s", errorResponse.response.c_str());
+	// Error is handled by SessionRequest
+}
+
+void HttpFileStream::downloadChunk(uint32 chunkIndex) {
+	assert(chunkIndex < _numChunks);
+
+	Common::String chunkPath = getChunkPath(chunkIndex);
+
+	POSIXFilesystemNode *chunkFile = new POSIXFilesystemNode(chunkPath);
+	// Calculate chunk range
+	uint64 chunkStart = chunkIndex * CHUNK_SIZE;
+	uint64 chunkLength = CHUNK_SIZE;
+	if (chunkStart + chunkLength > _fileSize) {
+		chunkLength = _fileSize - chunkStart; // Last chunk may be smaller
+	}
+
+	debug(5, "HttpFileStream: Downloading chunk %u: bytes %llu-%llu",
+		  chunkIndex + 1, chunkStart, chunkStart + chunkLength - 1);
+
+	// Create callbacks following the ScummVMCloud::startDownloadAsync pattern
+	Networking::DataCallback callback = new Common::Callback<HttpFileStream, const Networking::DataResponse &>((HttpFileStream *)this, &HttpFileStream::downloadFileCallback);
+	Networking::ErrorCallback errorCallback = new Common::Callback<HttpFileStream, const Networking::ErrorResponse &>((HttpFileStream *)this, &HttpFileStream::errorCallbackDownloadFile);
+
+	// Create and start the download request using SessionRequest
+	Networking::SessionRequest *request = new Networking::SessionRequest(_url, Common::Path(chunkPath), callback, errorCallback);
+
+	// Add Range header for chunk download
+	Common::String rangeHeaderLine = Common::String::format("Range: bytes=%llu-%llu", chunkStart, chunkStart + chunkLength - 1);
+	request->addHeader(rangeHeaderLine);
+
+	// Start the download - this sets state to PROCESSING
+	request->start();
+	// Show progress bar with chunk info
+	Common::String progressText = _displayName.c_str();
+	if (_numChunks > 1)
+		progressText = Common::String::format("%s - part %u/%u", _displayName.c_str(), chunkIndex + 1, _numChunks);
+	httpShowProgressBar(progressText.c_str());
+
+	// Wait for completion by checking both request state AND file existence/size
+	// This matches the original HTTPFilesystemNode pattern
+	while (!chunkFile->exists()) {
+		httpUpdateProgressBar(request->getProgress() * chunkLength, chunkLength);
+		g_system->delayMillis(10);
+	}
+	httpHideProgressBar();
+	debug(5, "HTTPFilesystemNode::createReadStream() download completed for %s", chunkPath.c_str());
+
+	if (request->success()) {
+		// Mark chunk as downloaded
+		_downloadedChunks[chunkIndex] = true;
+		debug(5, "HttpFileStream: Chunk %u completed successfully", chunkIndex + 1);
+	} else {
+		error("HttpFileStream: Failed to download chunk %u", chunkIndex + 1);
+	}
+
+	httpHideProgressBar();
+}
+
+#endif // EMSCRIPTEN

@@ -18,20 +18,51 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
-// Disable symbol overrides so that we can use system headers.
-#define FORBIDDEN_SYMBOL_EXCEPTION_FILE
-#define FORBIDDEN_SYMBOL_EXCEPTION_getenv
-
 #ifdef EMSCRIPTEN
 
 #include "backends/fs/emscripten/http-fs.h"
-#include "backends/cloud/downloadrequest.h"
+#include "backends/fs/emscripten/http-file-stream.h"
 #include "backends/fs/fs-factory.h"
-#include "backends/fs/posix/posix-fs.h"
-#include "backends/fs/posix/posix-iostream.h"
+#include "backends/networking/http/httpjsonrequest.h"
 #include "common/debug.h"
 #include "common/formats/json.h"
-#include <emscripten.h>
+#include "common/system.h"
+
+// Static member definition
+Common::HashMap<Common::String, AbstractFSList> HTTPFilesystemNode::_httpFolders = Common::HashMap<Common::String, AbstractFSList>();
+
+// Instance callback methods for HTTP requests
+void HTTPFilesystemNode::jsonCallbackGetChildren(const Networking::JsonResponse &response) {
+	debug(5, "HTTPFilesystemNode::jsonCallbackGetChildren called - processing response k %s", _path.c_str());
+	const Common::JSONValue *json = response.value;
+
+	Common::JSONObject jsonObj = json->asObject();
+	AbstractFSList *dirList = new AbstractFSList();
+
+	for (typename Common::HashMap<Common::String, Common::JSONValue *>::iterator i = jsonObj.begin(); i != jsonObj.end(); ++i) {
+		Common::String name = i->_key;
+		bool isDir = false;
+		int size = -1;
+		Common::String baseUrl = _url + "/" + name;
+
+		if (i->_value->isObject()) {
+			isDir = true;
+			if (i->_value->asObject().contains("baseUrl")) {
+				debug(5, "HTTPFilesystemNode::directoryListedCallback - Directory with baseUrl %s", name.c_str());
+				baseUrl = i->_value->asObject()["baseUrl"]->asString();
+			}
+		} else if (i->_value->isIntegerNumber()) {
+			size = i->_value->asIntegerNumber();
+		}
+		HTTPFilesystemNode *file_node = new HTTPFilesystemNode(_path + "/" + name, name, baseUrl, true, isDir, size);
+		dirList->push_back(file_node);
+	}
+	_httpFolders[_path] = *dirList;
+}
+
+void HTTPFilesystemNode::errorCallbackGetChildren(const Networking::ErrorResponse &errorResponse) {
+	error("HTTPFilesystemNode::errorCallbackGetChildren called - %s", errorResponse.response.c_str());
+}
 
 HTTPFilesystemNode::HTTPFilesystemNode(const Common::String &path, const Common::String &displayName, const Common::String &baseUrl, bool isValid, bool isDirectory, int size) : _path(path), _displayName(displayName), _url(baseUrl), _isValid(isValid), _isDirectory(isDirectory), _size(size) {
 	debug(5, "HTTPFilesystemNode::HTTPFilesystemNode(%s, %s)", path.c_str(), baseUrl.c_str());
@@ -88,90 +119,29 @@ AbstractFSNode *HTTPFilesystemNode::getChild(const Common::String &n) const {
 	return makeNode(newPath);
 }
 
-EM_ASYNC_JS(char *, _httpFsFetchIndex, (const char *url), {
-	globalThis['httpFsIndexCache'] = globalThis['httpFsIndexCache'] || {};
-	returnString = "";
-	url = UTF8ToString(url);
-	console.debug("Downloading %s", url);
-	if (globalThis['httpFsIndexCache'][url]) {
-		console.debug("Cache hit for %s", url);
-		returnString = globalThis['httpFsIndexCache'][url];
-	} else {
-		try {
-			const response = await fetch(url);
-			if (response.ok) {
-				returnString = await response.text();
-				globalThis['httpFsIndexCache'][url] = returnString;
-			}
-		} catch (error) {
-			console.error(error);
-		}
-	}
-	var size = lengthBytesUTF8(returnString) + 1;
-	var ret = Module._malloc(size);
-	stringToUTF8Array(returnString, HEAP8, ret, size);
-	return ret;
-});
-
-EM_ASYNC_JS(bool, _httpFsFetchFile, (const char *url, byte *dataPtr, int dataSize), {
-	returnBytes = new Uint8Array();
-	url = UTF8ToString(url);
-	console.debug("Downloading %s", url);
-	try {
-		const response = await fetch(url);
-		if (response.ok) {
-			returnBytes = await response.bytes();
-			if (returnBytes.length == dataSize) {
-				Module.writeArrayToMemory(returnBytes, dataPtr);
-				return true;
-			}
-		} else {
-			console.error("HTTPFilesystemNode::_httpFsFetchFile: %s", response.statusText);
-		}
-	} catch (error) {
-		console.error(error);
-	}
-
-	return false;
-});
-
 bool HTTPFilesystemNode::getChildren(AbstractFSList &myList, ListMode mode, bool hidden) const {
 	if (!_isValid) {
 		return false;
 	}
 	assert(_isDirectory);
-	if (_children->size() == 0) {
+	if (!_httpFolders.contains(_path)) {
 		// if we don't have a children list yet, we need to fetch it from the server
 		debug(5, "HTTPFilesystemNode::getChildren Fetching Children: %s at %s", _path.c_str(), _url.c_str());
 		Common::String url = _url + "/index.json";
-		char *response = _httpFsFetchIndex(url.c_str());
-		if (strcmp(response, "") == 0) {
-			return false;
+		debug(5, "HTTPFilesystemNode::getChildren - Starting HTTP request to %s", url.c_str());
+		Networking::JsonCallback callback = new Common::Callback<HTTPFilesystemNode, const Networking::JsonResponse &>((HTTPFilesystemNode *)this, &HTTPFilesystemNode::jsonCallbackGetChildren);
+		Networking::ErrorCallback failureCallback = new Common::Callback<HTTPFilesystemNode, const Networking::ErrorResponse &>((HTTPFilesystemNode *)this, &HTTPFilesystemNode::errorCallbackGetChildren);
+		Networking::HttpJsonRequest *request = new Networking::HttpJsonRequest(
+			callback, failureCallback, url);
+		request->execute();
+		while (!_httpFolders.contains(_path)) {
+			g_system->delayMillis(10);
 		}
 
-		Common::JSONObject jsonObj = Common::JSON::parse(response)->asObject();
-		// add dummy element so we know that we fetched the list
-		_children->push_back(new HTTPFilesystemNode(_path, ".", _url, false, false, 0));
-		for (typename Common::HashMap<Common::String, Common::JSONValue *>::iterator i = jsonObj.begin(); i != jsonObj.end(); ++i) {
-			Common::String name = i->_key;
-			bool isDir = false;
-			int size = -1;
-			Common::String baseUrl = _url + "/" + name;
-
-			if (i->_value->isObject()) {
-				isDir = true;
-				if (i->_value->asObject().contains("baseUrl")) {
-					debug(5, "HTTPFilesystemNode::directoryListedCallback - Directory with baseUrl %s", name.c_str());
-					baseUrl = i->_value->asObject()["baseUrl"]->asString();
-				}
-			} else if (i->_value->isIntegerNumber()) {
-				size = i->_value->asIntegerNumber();
-			}
-			HTTPFilesystemNode *file_node = new HTTPFilesystemNode(_path + "/" + name, name, baseUrl, true, isDir, size);
-			_children->push_back(file_node);
-		}
+		debug(5, "HTTPFilesystemNode::getChildren %s size %u", _path.c_str(), _httpFolders[_path].size());
 	}
-	for (AbstractFSList::iterator i = (*_children).begin(); i != (*_children).end(); ++i) {
+
+	for (AbstractFSList::iterator i = _httpFolders[_path].begin(); i != _httpFolders[_path].end(); ++i) {
 		HTTPFilesystemNode *node = (HTTPFilesystemNode *)*i;
 
 		if (node->_isValid && (mode == Common::FSNode::kListAll ||
@@ -214,40 +184,10 @@ AbstractFSNode *HTTPFilesystemNode::getParent() const {
 
 Common::SeekableReadStream *HTTPFilesystemNode::createReadStream() {
 	debug(5, "*HTTPFilesystemNode::createReadStream() %s (size %d) ", _path.c_str(), _size);
-	Common::String fsCachePath = Common::normalizePath("/.cache/" + _path, '/');
-	POSIXFilesystemNode *cacheFile = new POSIXFilesystemNode(fsCachePath);
-	// todo: this should not be cached on the filesystem, but in memory
-	// and support range requests
-	// port https://github.com/emscripten-core/emscripten/blob/main/src/lib/libwasmfs_fetch.js over
-	if (!cacheFile->exists() && _size > 0) {
-		byte *buffer = new byte[_size];
-		bool success = _httpFsFetchFile(_url.c_str(), buffer, _size);
-		if (success) {
-			Common::DumpFile *_localFile = new Common::DumpFile();
-			if (!_localFile->open(Common::Path(fsCachePath), true)) {
-				error("Storage: unable to open file to download into");
-				return 0;
-			}
-			debug(5, "HTTPFilesystemNode::createReadStream() file downloaded %s", _path.c_str());
-			_localFile->write(buffer, _size);
-			_localFile->close();
-			free(buffer);
-		} else {
-			warning("Storage: unable to download file %s", _url.c_str());
-			free(buffer);
-			return 0;
-		}
-	} else if (_size == 0) {
-		debug(5, "HTTPFilesystemNode::createReadStream() file empty %s", _path.c_str());
-		Common::DumpFile *_localFile = new Common::DumpFile();
-		if (!_localFile->open(Common::Path(fsCachePath), true)) {
-			warning("Storage: unable to open file to download into");
-			return 0;
-		}
-		_localFile->close();
-	}
-
-	return PosixIoStream::makeFromPath(fsCachePath, StdioStream::WriteMode_Read);
+	// Create cache path for this file
+	Common::String baseCachePath = Common::normalizePath("/.cache/" + _path, '/');
+	// Create and return the HttpFileStream for chunked downloading
+	return new HttpFileStream(_url, _displayName, baseCachePath, _size);
 }
 
 Common::SeekableWriteStream *HTTPFilesystemNode::createWriteStream(bool atomic) {

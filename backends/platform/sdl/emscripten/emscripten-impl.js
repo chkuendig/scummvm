@@ -91,6 +91,67 @@ mergeInto(LibraryManager.library, {
         return true;
     },
 
+    // Filesystem functions
 
+    /**
+     * Initialize filesystem settings
+     * @param {number} pathPtr - pointer to path string in WASM memory
+     */
+    fsInitSettingsFile__async: true,
+    fsInitSettingsFile: (pathPtr) => Asyncify.handleSleep(async (wakeUp) => {
+        console.debug("fsInitSettingsFile")
+        try {
+            const settingsPath = UTF8ToString(pathPtr);
+            const path = settingsPath.substring(0, settingsPath.lastIndexOf("/"));
 
+            // Mount the filesystem
+            FS.mount(IDBFS, { autoPersist: true }, path);
+            
+            // Sync the filesystem
+            await new Promise((resolve, reject) => {
+                FS.syncfs(true, (err) => err ? reject(err) : resolve());
+            });
+            
+            // Check if settings file exists and download if needed
+            if (!FS.analyzePath(settingsPath).exists) {
+                const response = await fetch("scummvm.ini");
+                if (response.ok) {
+                    const text = await response.text();
+                    FS.writeFile(settingsPath, text);
+                }
+            }
+            console.debug("Filesystem initialized at %s", path);
+        } catch (err) {
+            console.error("Error initializing files:", err);
+            alert("Error initializing files: " + err);
+            throw err;
+        }
+        wakeUp();
+    }),
+
+    /**
+     * Update the progress bar with current and total values
+     * @param {number} current - current bytes downloaded
+     * @param {number} total - total bytes to download
+     */
+    httpUpdateProgressBar: function(current, total) {
+        globalThis.httpUpdateProgressBar(current, total);
+    },
+    
+    /**
+     * Show progress bar with a filename
+     * @param {number} filenamePtr - pointer to filename string in WASM memory
+     */
+    httpShowProgressBar__deps: ['$stringToNewUTF8'],
+    httpShowProgressBar: function(filenamePtr) {
+        const filename = UTF8ToString(filenamePtr);
+        globalThis.httpShowProgressBar(filename);
+    },
+    
+    /**
+     * Hide the progress bar
+     */
+    httpHideProgressBar: function() {
+        globalThis.httpHideProgressBar();
+    }
 });

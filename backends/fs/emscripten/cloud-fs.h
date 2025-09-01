@@ -47,6 +47,7 @@ protected:
 	Common::String _displayName;
 	Common::String _path;
 	Common::String _storageFileId;
+	uint32 _size, _timestamp;
 	bool _isDirectory;
 	bool _isValid;
 
@@ -64,9 +65,6 @@ protected:
 	 */
 	void directoryListedCallback(const Cloud::Storage::ListDirectoryResponse &response);
 	void directoryListedErrorCallback(const Networking::ErrorResponse &error);
-	void fileDownloadedCallback(const Cloud::Storage::BoolResponse &response);
-	void fileDownloadedErrorCallback(const Networking::ErrorResponse &error);
-
 public:
 	/**
 	 * Creates a CloudFilesystemNode for a given path.
