@@ -103,16 +103,16 @@ ifdef EMSCRIPTEN
 MODULE_OBJS += \
 	fs/emscripten/emscripten-fs-factory.o \
 	fs/emscripten/emscripten-posix-fs.o \
+	fs/emscripten/http-file-stream.o \
 	fs/emscripten/http-fs.o \
-	midi/webmidi.o 
+	fs/emscripten/network-file-stream.o \
+	midi/webmidi.o \
+	networking/http/emscripten/connectionmanager-emscripten.o \
+	networking/http/emscripten/networkreadstream-emscripten.o 
 ifdef USE_CLOUD
 MODULE_OBJS += \
-	fs/emscripten/cloud-fs.o
-endif
-ifdef USE_HTTP
-MODULE_OBJS += \
-	networking/http/emscripten/connectionmanager-emscripten.o \
-	networking/http/emscripten/networkreadstream-emscripten.o
+	fs/emscripten/cloud-fs.o \
+	fs/emscripten/cloud-file-stream.o
 endif
 ifdef USE_TTS
 MODULE_OBJS += \

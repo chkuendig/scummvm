@@ -34,6 +34,11 @@ extern "C" { // External JavaScript API functions implemented in libscummvm.js
 bool isFullscreen();
 void toggleFullscreen(bool enable);
 void downloadFile(const char *filenamePtr, char *dataPtr, int dataSize);
+// Filesystem functions
+void fsInitSettingsFile(const char *pathPtr);
+void httpUpdateProgressBar(int current, int total);
+void httpShowProgressBar(const char *filename);
+void httpHideProgressBar();
 // Cloud functions
 #ifdef USE_CLOUD
 void cloudConnectionWizardCallback(char *str); // pass cloud storage activation data from JS to setup wizard

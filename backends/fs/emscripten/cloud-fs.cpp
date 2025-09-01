@@ -22,13 +22,10 @@
 #ifdef EMSCRIPTEN
 
 #include "backends/fs/emscripten/cloud-fs.h"
-#include "backends/cloud/downloadrequest.h"
+#include "backends/cloud/storage.h"
+#include "backends/fs/emscripten/cloud-file-stream.h"
 #include "backends/fs/fs-factory.h"
-#include "backends/fs/posix/posix-fs.h"
-#include "backends/fs/posix/posix-iostream.h"
-
 #include "common/system.h"
-
 Common::HashMap<Common::String, AbstractFSList> CloudFilesystemNode::_cloudFolders = Common::HashMap<Common::String, AbstractFSList>();
 
 CloudFilesystemNode::CloudFilesystemNode(const Common::String &p) : _isDirectory(false), _isValid(false), _path(p), _storageFileId(nullptr) {
@@ -43,6 +40,9 @@ CloudFilesystemNode::CloudFilesystemNode(const Common::String &p) : _isDirectory
 		_isDirectory = true;
 		_isValid = true;
 		return;
+	} else if (!_cloudFolders.contains(_path)) {
+		_isDirectory = true;
+		_isValid = true;
 	} else { // we need to peek in the parent folder to see if file exists and if it's a directory
 		AbstractFSNode *parent = getParent();
 		AbstractFSList tmp = AbstractFSList();
@@ -90,29 +90,24 @@ void CloudFilesystemNode::directoryListedCallback(const Cloud::Storage::ListDire
 		file_node->_path = _path + "/" + storageFile.name();
 		file_node->_isValid = true;
 		file_node->_displayName = "" + storageFile.name();
-		file_node->_storageFileId = storageFile.id();
+		file_node->_size = storageFile.size();
+		if (!file_node->_isDirectory) {
+			file_node->_storageFileId = storageFile.id();
+		}
 		dirList->push_back(file_node);
 	}
 	_cloudFolders[_path] = *dirList;
 }
 
 void CloudFilesystemNode::directoryListedErrorCallback(const Networking::ErrorResponse &_error) {
-	// _workingRequest = nullptr; // TODO: HANDLE THIS SOMEWHERE
-	error("Response %ld: %s", _error.httpResponseCode, _error.response.c_str());
-}
-
-void CloudFilesystemNode::fileDownloadedCallback(const Cloud::Storage::BoolResponse &response) {
-	// _workingRequest = nullptr; // TODO: HANDLE THIS SOMEWHERE
-	debug(5, "CloudFilesystemNode::fileDownloadedCallback %s", _path.c_str());
-}
-
-void CloudFilesystemNode::fileDownloadedErrorCallback(const Networking::ErrorResponse &_error) {
-	// _workingRequest = nullptr; // TODO: HANDLE THIS SOMEWHERE
 	error("Response %ld: %s", _error.httpResponseCode, _error.response.c_str());
 }
 
 bool CloudFilesystemNode::getChildren(AbstractFSList &myList, ListMode mode, bool hidden) const {
-	assert(_isDirectory);
+	if (!_isDirectory) {
+		warning("CloudFilesystemNode::getChildren: %s is not a directory", _path.c_str());
+		return false;
+	}
 
 	if (!_cloudFolders.contains(_path)) {
 		debug(5, "CloudFilesystemNode::getChildren Fetching Children: %s", _path.c_str());
@@ -166,21 +161,19 @@ AbstractFSNode *CloudFilesystemNode::getParent() const {
 
 Common::SeekableReadStream *CloudFilesystemNode::createReadStream() {
 	debug(5, "CloudFilesystemNode::createReadStream() %s", _path.c_str());
-	Common::String fsCachePath = Common::normalizePath("/.cache/" + _path, '/');
-	POSIXFilesystemNode *cacheFile = new POSIXFilesystemNode(fsCachePath);
-	if (!cacheFile->exists()) {
-		Cloud::Storage *_storage = CloudMan.getCurrentStorage();
-		Networking::Request *_workingRequest = _storage->downloadById(
-			_storageFileId,
-			Common::Path(fsCachePath),
-			new Common::Callback<CloudFilesystemNode, const Cloud::Storage::BoolResponse &>(this, &CloudFilesystemNode::fileDownloadedCallback),
-			new Common::Callback<CloudFilesystemNode, const Networking::ErrorResponse &>(this, &CloudFilesystemNode::fileDownloadedErrorCallback));
-		while (_workingRequest->state() != Networking::RequestState::FINISHED) {
-			g_system->delayMillis(10);
-		}
-		debug(5, "CloudFilesystemNode::createReadStream() file written %s", fsCachePath.c_str());
+
+	// Create cache path for this file
+	Common::String baseCachePath = Common::normalizePath("/.cache/" + _path, '/');
+
+	// Get current storage
+	Cloud::Storage *storage = CloudMan.getCurrentStorage();
+	if (!storage) {
+		warning("CloudFilesystemNode::createReadStream: No storage available");
+		return nullptr;
 	}
-	return PosixIoStream::makeFromPath(fsCachePath, StdioStream::WriteMode_Read);
+
+	// Create and return the CloudFileStream
+	return new CloudFileStream(storage, _storageFileId, _displayName, baseCachePath, _size);
 }
 
 Common::SeekableWriteStream *CloudFilesystemNode::createWriteStream(bool atomic) {

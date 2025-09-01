@@ -24,9 +24,11 @@
 
 #include "backends/fs/abstract-fs.h"
 #include "backends/fs/posix/posix-fs.h"
+#include "backends/networking/http/httpjsonrequest.h"
+#include "backends/networking/http/sessionrequest.h"
 
 /**
- * Implementation of the ScummVM file system API based on POSIX.
+ * Implementation of the ScummVM file system API based on HTTP.
  *
  * Parts of this class are documented in the base interface class, AbstractFSNode.
  */
@@ -50,6 +52,8 @@ protected:
 		return new HTTPFilesystemNode(path);
 	}
 
+	void jsonCallbackGetChildren(const Networking::JsonResponse &response);
+	void errorCallbackGetChildren(const Networking::ErrorResponse &error);
 public:
 	/**
 	 * Creates a HTTPFilesystemNode for a given path.
