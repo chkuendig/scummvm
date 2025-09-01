@@ -3311,6 +3311,7 @@ EOF
 		append_var LDFLAGS "-s FORCE_FILESYSTEM -lidbfs.js"
 		append_var LDFLAGS "-s ASYNCIFY=1 -s ASYNCIFY_STACK_SIZE=1048576"
 		append_var LDFLAGS "--js-library backends/platform/sdl/emscripten/emscripten-impl.js"
+		append_var LDFLAGS "--js-library backends/networking/http/emscripten/networkreadstream-emscripten.js"
 		if test "$_tts" != "no" ; then
 			append_var LDFLAGS "--js-library backends/text-to-speech/emscripten/emscripten-text-to-speech.js"
 		fi
@@ -6007,7 +6008,6 @@ define_in_config_if_yes "$_libcurl" "USE_LIBCURL"
 
 echocheck "HTTP client"
 if test "$_host_os" = "emscripten" &&  test "$_cloud" = "yes"; then
-	append_var LDFLAGS "-sFETCH"
 	_http=yes
 	echo "Emscripten"
 elif test "$_libcurl" = "yes"; then
