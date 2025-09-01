@@ -115,7 +115,7 @@ Networking::Request *Storage::download(const Common::String &remotePath, const C
 	return downloadById(remotePath, localPath, callback, errorCallback);
 }
 
-Networking::Request *Storage::downloadById(const Common::String &remoteId, const Common::Path &localPath, BoolCallback callback, Networking::ErrorCallback errorCallback) {
+Networking::Request *Storage::downloadById(const Common::String &remoteId, const Common::Path &localPath, BoolCallback callback, Networking::ErrorCallback errorCallback, uint64 startPos, uint64 length) {
 	if (!errorCallback) errorCallback = getErrorPrintingCallback();
 
 	Common::DumpFile *f = new Common::DumpFile();
@@ -128,7 +128,7 @@ Networking::Request *Storage::downloadById(const Common::String &remoteId, const
 		return nullptr;
 	}
 
-	return addRequest(new DownloadRequest(this, callback, errorCallback, remoteId, f));
+	return addRequest(new DownloadRequest(this, callback, errorCallback, remoteId, f, startPos, length));
 }
 
 Networking::Request *Storage::downloadFolder(const Common::String &remotePath, const Common::Path &localPath, FileArrayCallback callback, Networking::ErrorCallback errorCallback, bool recursive) {
