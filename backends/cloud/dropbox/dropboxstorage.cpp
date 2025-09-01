@@ -75,7 +75,7 @@ Networking::Request *DropboxStorage::upload(const Common::String &path, Common::
 	return addRequest(new DropboxUploadRequest(this, path, contents, callback, errorCallback));
 }
 
-Networking::Request *DropboxStorage::streamFileById(const Common::String &path, Networking::NetworkReadStreamCallback callback, Networking::ErrorCallback errorCallback) {
+Networking::Request *DropboxStorage::streamFileById(const Common::String &path, Networking::NetworkReadStreamCallback callback, Networking::ErrorCallback errorCallback, uint64 startPos, uint64 length) {
 	Common::JSONObject jsonRequestParameters;
 	jsonRequestParameters.setVal("path", new Common::JSONValue(path));
 	Common::JSONValue value(jsonRequestParameters);
@@ -84,6 +84,14 @@ Networking::Request *DropboxStorage::streamFileById(const Common::String &path, 
 	request->addHeader("Authorization: Bearer " + _token);
 	request->addHeader("Dropbox-API-Arg: " + Common::JSON::stringify(&value));
 	request->addHeader("Content-Type: "); //required to be empty (as we do POST, it's usually app/form-url-encoded)
+	
+	// Add Range header if needed
+	if (startPos > 0 || length > 0) {
+		Common::String rangeHeader = Common::String::format("Range: bytes=%llu-%s", 
+			startPos, 
+			length > 0 ? Common::String::format("%llu", startPos + length - 1).c_str() : "");
+		request->addHeader(rangeHeader);
+	}
 
 	Networking::NetworkReadStreamResponse response = request->execute();
 	if (callback)

@@ -40,6 +40,8 @@ class DownloadRequest: public Networking::Request {
 	Request *_workingRequest;
 	bool _ignoreCallback;
 	byte *_buffer;
+	uint64 _startPos;
+	uint64 _length;
 
 	void start();
 	void streamCallback(const Networking::NetworkReadStreamResponse &response);
@@ -48,7 +50,7 @@ class DownloadRequest: public Networking::Request {
 	void finishError(const Networking::ErrorResponse &error, Networking::RequestState state = Networking::FINISHED) override;
 
 public:
-	DownloadRequest(Storage *storage, Storage::BoolCallback callback, Networking::ErrorCallback ecb, const Common::String &remoteFileId, Common::DumpFile *dumpFile);
+	DownloadRequest(Storage *storage, Storage::BoolCallback callback, Networking::ErrorCallback ecb, const Common::String &remoteFileId, Common::DumpFile *dumpFile, uint64 startPos = 0, uint64 length = 0);
 	~DownloadRequest() override;
 
 	void handle() override;

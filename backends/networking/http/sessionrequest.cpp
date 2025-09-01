@@ -155,7 +155,7 @@ void SessionRequest::handle() {
 	if (!_stream) _stream = makeStream();
 
 	if (_stream) {
-		if (_stream->httpResponseCode() != 200 && _stream->httpResponseCode() != 0) {
+		if (_stream->httpResponseCode() != 200 && _stream->httpResponseCode() != 0 && _stream->httpResponseCode() != 206) {
 			warning("SessionRequest: HTTP response code is not 200 OK (it's %ld)", _stream->httpResponseCode());
 			ErrorResponse error(this, false, true, "HTTP response code is not 200 OK", _stream->httpResponseCode());
 			finishError(error);
@@ -255,6 +255,12 @@ Common::JSONValue *SessionRequest::json() {
 	if (_localFile)
 		error("SessionRequest::json() is called for localFile stream");
 	return Common::JSON::parse(text());
+}
+
+double SessionRequest::getProgress() const {
+	if (_stream)
+		return _stream->getProgress();
+	return 0;
 }
 
 } // End of namespace Networking

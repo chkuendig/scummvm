@@ -25,9 +25,10 @@
 
 namespace Cloud {
 
-DownloadRequest::DownloadRequest(Storage *storage, Storage::BoolCallback callback, Networking::ErrorCallback ecb, const Common::String &remoteFileId, Common::DumpFile *dumpFile):
+DownloadRequest::DownloadRequest(Storage *storage, Storage::BoolCallback callback, Networking::ErrorCallback ecb, const Common::String &remoteFileId, Common::DumpFile *dumpFile, uint64 startPos, uint64 length):
 	Request(nullptr, ecb), _boolCallback(callback), _localFile(dumpFile), _remoteFileId(remoteFileId), _storage(storage),
-	_remoteFileStream(nullptr), _workingRequest(nullptr), _ignoreCallback(false), _buffer(new byte[DOWNLOAD_REQUEST_BUFFER_SIZE]) {
+	_remoteFileStream(nullptr), _workingRequest(nullptr), _ignoreCallback(false), _buffer(new byte[DOWNLOAD_REQUEST_BUFFER_SIZE]),
+	_startPos(startPos), _length(length) {
 	start();
 }
 
@@ -51,7 +52,9 @@ void DownloadRequest::start() {
 	_workingRequest = _storage->streamFileById(
 		_remoteFileId,
 		new Common::Callback<DownloadRequest, const Networking::NetworkReadStreamResponse &>(this, &DownloadRequest::streamCallback),
-		new Common::Callback<DownloadRequest, const Networking::ErrorResponse &>(this, &DownloadRequest::streamErrorCallback)
+		new Common::Callback<DownloadRequest, const Networking::ErrorResponse &>(this, &DownloadRequest::streamErrorCallback),
+		_startPos,
+		_length
 	);
 }
 
@@ -88,7 +91,6 @@ void DownloadRequest::handle() {
 	}
 
 	uint32 readBytes = _remoteFileStream->read(_buffer, DOWNLOAD_REQUEST_BUFFER_SIZE);
-
 	if (readBytes != 0)
 		if (_localFile->write(_buffer, readBytes) != readBytes) {
 			warning("DownloadRequest: unable to write all received bytes into output file");
@@ -97,14 +99,14 @@ void DownloadRequest::handle() {
 		}
 
 	if (_remoteFileStream->eos()) {
-		if (_remoteFileStream->httpResponseCode() != 200) {
+		if (_remoteFileStream->httpResponseCode() != 200 && _remoteFileStream->httpResponseCode() != 206) {
 			warning("DownloadRequest: HTTP response code is not 200 OK (it's %ld)", _remoteFileStream->httpResponseCode());
 			//TODO: do something about it actually
 			// the problem is file's already downloaded, stream is over
 			// so we can't return error message anymore
 		}
 
-		finishDownload(_remoteFileStream->httpResponseCode() == 200);
+		finishDownload(_remoteFileStream->httpResponseCode() == 200 || _remoteFileStream->httpResponseCode() == 206);
 
 		_localFile->close(); //yes, I know it's closed automatically in ~DumpFile()
 	}
@@ -123,6 +125,7 @@ void DownloadRequest::finishDownload(bool success) {
 }
 
 void DownloadRequest::finishError(const Networking::ErrorResponse &error, Networking::RequestState state) {
+	warning("DownloadRequest: finished with error: %s", error.response.c_str());
 	if (_localFile)
 		_localFile->close();
 	Request::finishError(error);
