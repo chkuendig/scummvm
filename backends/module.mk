@@ -116,7 +116,8 @@ MODULE_OBJS += \
 	timer/emscripten/emscripten-timer.o
 ifdef USE_CLOUD
 MODULE_OBJS += \
-	fs/emscripten/cloud-fs.o
+	fs/emscripten/cloud-fs.o \
+	fs/emscripten/cloud-readstream.o
 endif
 ifdef USE_TTS
 MODULE_OBJS += \
