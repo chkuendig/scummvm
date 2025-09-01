@@ -117,6 +117,25 @@ private:
 	// Temporary storage for range parameters used in streamFileById
 	uint64 _pendingRangeStartPos;
 	uint64 _pendingRangeLength;
+	Common::String _pendingFilePath; // Store file path for caching download URL
+	
+	// Download URL cache to avoid repeated metadata requests
+	struct CachedDownloadUrl {
+		Common::String url;
+		uint32 timestamp;
+		
+		CachedDownloadUrl() : timestamp(0) {}
+		CachedDownloadUrl(const Common::String &downloadUrl, uint32 time) : url(downloadUrl), timestamp(time) {}
+	};
+	
+	Common::HashMap<Common::String, CachedDownloadUrl> _downloadUrlCache;
+	static const uint32 URL_CACHE_TIMEOUT = 120; // 2 minutes in seconds (very conservative for OneDrive)
+	
+	// Helper methods for URL caching
+	bool isUrlCacheValid(const Common::String &fileId) const;
+	Common::String getCachedDownloadUrl(const Common::String &fileId) const;
+	void cacheDownloadUrl(const Common::String &fileId, const Common::String &downloadUrl);
+	void invalidateUrlCache(const Common::String &fileId); // Invalidate cache when URL fails
 };
 
 } // End of namespace OneDrive
