@@ -29,7 +29,6 @@
 #include "backends/fs/emscripten/emscripten-fs-factory.h"
 #include "backends/mixer/emscriptensdl/emscriptensdl-mixer.h"
 #include "backends/mutex/null/null-mutex.h"
-#include "backends/fs/emscripten/emscripten-fs-factory.h"
 #include "backends/platform/sdl/emscripten/emscripten.h"
 #include "backends/timer/emscripten/emscripten-timer.h"
 #include "common/file.h"
