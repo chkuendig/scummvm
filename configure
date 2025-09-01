@@ -3382,6 +3382,7 @@ EOF
 		append_var LDFLAGS "-s EXPORTED_FUNCTIONS=[_main,_malloc,_free,_raise]"
 		append_var LDFLAGS "-s EXPORTED_RUNTIME_METHODS=[ccall,lengthBytesUTF8,setValue,writeArrayToMemory]"
         append_var LDFLAGS "--js-library backends/platform/sdl/emscripten/emscripten.js"
+		append_var LDFLAGS "--js-library backends/fs/emscripten/emscripten-fs-factory.js"
 		append_var LDFLAGS "--js-library backends/networking/http/emscripten/networkreadstream-emscripten.js"
 
 		append_var LDFLAGS "-O2"
@@ -3765,7 +3766,7 @@ if test -n "$_host"; then
 			_backend="emscripten"
 			_enet=no    # Disable ENet (no sockets in the browser)
 			_sdlnet=no  # Disable SDL_Net (no sockets in the browser)
-			_libcurl=no # Emscripten backend uses emscripten_fetch not libcurl
+			_libcurl=no # Emscripten backend uses Fetch API not libcurl
 			if test "$_cloud" != yes; then
 				_cloud=no
 			fi
@@ -6230,11 +6231,10 @@ echo "$_libcurl"
 define_in_config_if_yes "$_libcurl" "USE_LIBCURL"
 
 echocheck "Network client"
-if test "$_backend" = "emscripten" && test "$_cloud" = "yes"; then
-	append_var LDFLAGS "-sFETCH"
+if test "$_backend" = "emscripten"; then
 	_basicnet=no
 	_http=yes
-	echo "Emscripten (HTTP only)"
+	echo "Fetch API (HTTP only)"
 elif test "$_backend" = "android"; then
 	_basicnet=yes
 	_http=yes
