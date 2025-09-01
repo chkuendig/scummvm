@@ -1,0 +1,314 @@
+/* ScummVM - Graphic Adventure Engine
+ *
+ * ScummVM is the legal property of its developers, whose names
+ * are too numerous to list here. Please refer to the COPYRIGHT
+ * file distributed with this source distribution.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
+
+mergeInto(LibraryManager.library, {
+
+    httpFetchInit: function() {
+        // Global storage for all fetch operations
+        if (!window.scummvmFetches) {
+            window.scummvmFetches = {};
+            window.scummvmNextFetchId = 1;
+        }
+        
+    },
+
+    httpFetchStart: function(methodPtr, urlPtr, requestDataPtr, requestDataSize, headersPtr) {
+        const method = UTF8ToString(methodPtr);
+        const url = UTF8ToString(urlPtr);
+        const fetchId = window.scummvmNextFetchId++;
+        console.log("Starting fetch #" + fetchId + " for URL: " + url + " with method: " + method);
+        
+        // Initialize fetch object
+        const fetch = {
+            id: fetchId,
+            readyState: 0,
+            status: 0,
+            statusText: 0, // Will allocate when response arrives
+            url: urlPtr,
+            numBytes: 0,
+            totalBytes: 0,
+            responseHeaders: 0, // Will allocate when headers arrive
+            active: true,
+            completed: false,
+            success: false,
+            reader: null, // JS-only field to store the ReadableStream reader
+            buffer: null,
+            bufferSize: 0
+        };
+        
+        // Store in global registry
+        window.scummvmFetches[fetchId] = fetch;
+        
+        // Create headers object from the headers array
+        let headers = {};
+        if (headersPtr) {
+            const headersObj = new Headers();
+            let i = 0;
+            while (HEAP32[(headersPtr >> 2) + (i*2)]) {
+                const keyPtr = HEAP32[(headersPtr >> 2) + (i*2)];
+                const valuePtr = HEAP32[(headersPtr >> 2) + (i*2+1)];
+                const key = UTF8ToString(keyPtr);
+                const value = UTF8ToString(valuePtr);
+                console.log(`Adding header: ${key} = ${value}`);
+                headersObj.append(key, value);
+                i++;
+            }
+            headers = headersObj;
+            console.log("Request headers:", JSON.stringify(headers));
+        }
+        
+        const options = {
+            method: method,
+            headers: headers
+        };
+        
+        // Add body if needed
+        if (requestDataPtr && requestDataSize > 0) {
+            const bodyData = new Uint8Array(HEAPU8.buffer, requestDataPtr, requestDataSize);
+            options.body = bodyData;
+            console.log("Added request body, size:", requestDataSize);
+        }
+        
+        // Start the fetch
+        window.fetch(url, options)
+        .then(response => {
+            fetch.readyState = 2; // HEADERS_RECEIVED
+            fetch.status = response.status;
+            
+            // Store status text
+            if (fetch.statusText) _free(fetch.statusText);
+            const statusTextJS = response.statusText;
+            const statusTextLen = lengthBytesUTF8(statusTextJS) + 1;
+            fetch.statusText = _malloc(statusTextLen);
+            stringToUTF8(statusTextJS, fetch.statusText, statusTextLen);
+            
+            // Store headers array for efficient access
+            let responseHeadersArray = 0;
+            if (response.headers) {
+                const headerPairs = [];
+                response.headers.forEach((value, key) => {
+                    headerPairs.push(key, value);
+                });
+                
+                // Allocate memory for the array of string pointers (pairs + null terminator)
+                const arraySize = (headerPairs.length + 1) * 4; // 4 bytes per pointer
+                const arrayPtr = _malloc(arraySize);
+                
+                // Fill the array with pointers to the header strings
+                for (let i = 0; i < headerPairs.length; i++) {
+                    const str = headerPairs[i];
+                    const strLen = lengthBytesUTF8(str) + 1;
+                    const strPtr = _malloc(strLen);
+                    stringToUTF8(str, strPtr, strLen);
+                    HEAP32[(arrayPtr >> 2) + i] = strPtr;
+                }
+                
+                // Null terminate the array
+                HEAP32[(arrayPtr >> 2) + headerPairs.length] = 0;
+                
+                responseHeadersArray = arrayPtr;
+            }
+            fetch.responseHeadersArray = responseHeadersArray;
+            
+            // Get total size if available
+            const contentLength = response.headers.get('Content-Length');
+            if (contentLength) {
+                fetch.totalBytes = parseInt(contentLength, 10);
+                fetch.bufferSize = fetch.totalBytes;
+            } else {
+                fetch.bufferSize = 1024 * 1024; // 1MB
+            }
+            // Update fetch object
+            fetch.buffer =  _malloc(fetch.bufferSize);
+
+            // Check for error status codes (4xx, 5xx)
+            if (!response.ok) {
+                console.log(`Fetch #${fetchId} received error status: ${response.status} ${response.statusText}`);
+                // For error responses, we still want to read the body for potential error details
+                // but mark the request as not successful
+                fetch.success = false;
+            } else {
+                fetch.success = true;
+            }
+            
+            fetch.readyState = 3; // LOADING
+            console.debug("Fetch #" + fetchId + " headers received, status: " + response.status);
+
+            // Start reading the data
+            const reader = response.body.getReader();
+            fetch.reader = reader; // Store reader for possible cancellation
+
+            // Function to read all chunks (async)
+            const readAllChunks = async () => {
+                try {
+                    while (true) {
+                        const {done, value} = await reader.read();
+                        if(value)
+                            console.debug(`Fetch #${fetchId} read ${value.length} bytes`);
+                        if (done) {
+                            // Finished reading
+                            fetch.completed = true;
+                            fetch.active = false;
+                            fetch.readyState = 4; // DONE
+                            console.debug(`Fetch #${fetchId} complete: Read ${fetch.numBytes} bytes total`);
+                            break;
+                        }
+                        
+                        // Ensure we have enough buffer space
+                        if (fetch.numBytes + value.length > fetch.bufferSize &&
+                            fetch.totalBytes === 0) { // totalBytes is based on content-length header
+                            fetch.bufferSize = fetch.bufferSize * 2;
+                            const newBuffer = _malloc(fetch.bufferSize);
+                            if (fetch.numBytes > 0) {
+                                // Copy existing data if needed
+                                HEAPU8.set(HEAPU8.subarray(fetch.buffer, fetch.buffer + fetch.numBytes), newBuffer);
+                            }
+                            _free(fetch.buffer);
+                            fetch.buffer = newBuffer;
+                        } 
+                        
+                        // Copy data to the buffer
+                        HEAPU8.set(value, fetch.buffer + fetch.numBytes);
+                        fetch.numBytes += value.length;
+                    }
+                } catch (error) {
+                    console.error(`Error reading from fetch #${fetchId}:`, error);
+                    fetch.completed = true;
+                    fetch.active = false;
+                    fetch.success = false;
+                }
+            };
+            
+            // Start reading all chunks
+            readAllChunks();
+        })
+        .catch(error => {
+            console.error("Fetch #" + fetchId + " failed:", error);
+            fetch.completed = true;
+            fetch.active = false;
+            fetch.success = false;
+            
+            if (fetch.statusText) _free(fetch.statusText);
+            const errorMsg = "Network error: " + error.message;
+            const errorLen = lengthBytesUTF8(errorMsg) + 1;
+            fetch.statusText = _malloc(errorLen);
+            stringToUTF8(errorMsg, fetch.statusText, errorLen);
+        });
+        
+        return fetchId;
+    },
+
+    httpFetchClose: function(fetchId) {
+        const fetch = window.scummvmFetches[fetchId];
+        if (!fetch) return;
+        
+        console.log("Closing fetch #" + fetchId);
+        
+        // Cancel reader if active
+        if (fetch.reader) {
+            try {
+                fetch.reader.cancel();
+            } catch (e) {}
+        }
+        
+        // Free allocated memory
+        if (fetch.statusText) _free(fetch.statusText);
+        if (fetch.responseHeadersArray) {
+            // Free the header strings in the array first
+            let i = 0;
+            while (HEAP32[(fetch.responseHeadersArray >> 2) + i] !== 0) {
+                _free(HEAP32[(fetch.responseHeadersArray >> 2) + i]);
+                i++;
+            }
+            // Free the array itself
+            _free(fetch.responseHeadersArray);
+        }
+        if (fetch.buffer) _free(fetch.buffer);
+        
+        // Remove from registry
+        delete window.scummvmFetches[fetchId];
+    },
+
+    // Getter functions properties
+    
+    httpFetchGetStatus: function(fetchId) {
+        const fetch = window.scummvmFetches[fetchId];
+        if (!fetch) return 0;
+        return fetch.status;
+    },
+    
+
+    
+    httpFetchGetNumBytes: function(fetchId) {
+        const fetch = window.scummvmFetches[fetchId];
+        if (!fetch) return 0;
+        return fetch.numBytes;
+    },
+    
+    httpFetchGetTotalBytes: function(fetchId) {
+        const fetch = window.scummvmFetches[fetchId];
+        if (!fetch) return 0;
+        return fetch.totalBytes;
+    },
+    
+    httpFetchGetResponseHeadersArray: function(fetchId) {
+        const fetch = window.scummvmFetches[fetchId];
+        if (!fetch) return 0;
+        return fetch.responseHeadersArray;
+    },
+    
+    httpFetchGetDataPointer: function(fetchId) {
+        const fetch = window.scummvmFetches[fetchId];
+        //console.log("Fetch #" + fetchId + " data pointer requested:", fetch ? fetch.buffer : "not found");
+        if (!fetch) return 0;
+        return fetch.buffer;
+    },
+    
+    httpFetchIsCompleted: function(fetchId) {
+        const fetch = window.scummvmFetches[fetchId];
+        if (!fetch) return true;
+        return fetch.completed;
+    },
+    
+    httpFetchIsSuccessful: function(fetchId) {
+        const fetch = window.scummvmFetches[fetchId];
+        if (!fetch) return false;
+        return fetch.success;
+    },
+    
+    httpFetchGetErrorMessage: function(fetchId) {
+        const fetch = window.scummvmFetches[fetchId];
+        if (!fetch) return 0; // Return null pointer
+        
+        if (fetch.statusText) {
+            // Return the statusText if available
+            const ptr = _malloc(lengthBytesUTF8(fetch.statusText) + 1);
+            stringToUTF8(fetch.statusText, ptr, lengthBytesUTF8(fetch.statusText) + 1);
+            return ptr;
+        }
+        
+        // Return a generic error if no specific message is available
+        const errorMsg = "Unknown error";
+        const ptr = _malloc(lengthBytesUTF8(errorMsg) + 1);
+        stringToUTF8(errorMsg, ptr, lengthBytesUTF8(errorMsg) + 1);
+        return ptr;
+    }
+});
