@@ -66,59 +66,83 @@
       }
     }
 
-    #progress {
-      top: 0px;
-      left: 0px;
-      height: 10px;
-      width: 100%;
+
+    #download-modal {
+      background-color: #F9F2D2;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+      display: none;
+      font-family: Arial, sans-serif;
+      left: 50%;
+      max-width: 90%;
       overflow: hidden;
-      display: block;
       position: absolute;
-      z-index: 2;
-      border: 0px;
-      background: #c60
+      bottom: 10%;
+      transform: translate(-50%, 0);
+      width: 400px;
+      z-index: 10;
     }
 
-    progress::-moz-progress-bar {
-      background: #f6e08a;
+    #download-modal-title {
+      background-color: #E9CC7A;
+      border-bottom: 1px solid #DFB661;
+      margin: 0;
+      padding: 8px 16px;
+      text-align: center;
     }
 
-    progress::-webkit-progress-value {
-      background: #f6e08a;
+    #download-modal-content {
+      padding: 16px;
     }
 
-    progress {
-      color: #f6e08a;
+    #download-modal h3 {
+      color: #333;
+      font-size: 13px;
+      font-weight: bold;
+      margin: 0 0 0px 0;
     }
 
-    #status {
-      position: absolute;
-      bottom: 5em;
-      right: 0px;
-      padding: 5px;
-      text-align: right;
-      border-top-left-radius: 1em;
-      border-bottom-left-radius: 1em;
-      padding-left: 1em;
-      padding-right: 1em;
-      z-index: 3;
-      border: 3px solid black;
-      border-right: none;
-      background: #f6e08a;
-      font: bold large/1.4 "Trebuchet MS", Verdana, Tahoma, Sans-Serif;
+    #download-modal p {
+      color: #333;
+      font-size: 12px;
+      font-weight: bold;
+      margin: 8px 0;
     }
 
-    #status.error {
-      background: red
+    #download-modal-progress {
+      background-color: #F4E5AD;
+      border-radius: 4px;
+      border-top: 1px solid #686557;
+      height: 20px;
+      margin: 12px 0;
+      overflow: hidden;
+      position: relative;
+      width: 100%;
+    }
+
+    #download-modal-progress-fill {
+      background-color: #821D06;
+      border-radius: 3px;
+      height: 100%;
+      width: 0%;
     }
   </style>
 </head>
 
 <body>
-  <div class=emscripten>
-    <progress hidden id=progress max=100 value=0></progress>
+  <div id="download-modal">
+    <div id="download-modal-title">
+      <h3></h3>
+    </div>
+    <div id="download-modal-content">
+      <div id="download-modal-progress">
+        <div id="download-modal-progress-fill"></div>
+      </div>
+
+      <p id="download-modal-progress-text">Downloaded 0 KB / 0 MB</p>
+      <p id="download-modal-speed-text">Download speed: 0 MB/s</p>
+    </div>
   </div>
-  <div class="emscripten" id="status">Downloading ScummVM...</div>
 
   <div class=emscripten_border>
     <canvas class=emscripten id=canvas oncontextmenu=event.preventDefault() tabindex=-1></canvas>
@@ -128,14 +152,6 @@
   <textarea class="emscripten" id="output" rows="8"></textarea>
 
   <script type='text/javascript'>
-
-    var statusElement = document.getElementById('status');
-    var progressElement = document.getElementById('progress');
-
-    function loadingDoneMessage() {
-      document.getElementById("progress").style.zIndex = 0;
-      return "All downloads complete."
-    }
 
 
     var Module = {
@@ -173,46 +189,31 @@
         return canvas;
       })(),
       setStatus: function (text) {
-        if (!Module.setStatus.last) Module.setStatus.last = { time: Date.now(), text: '' };
-        if (text === Module.setStatus.last.text) return;
-        var m = text.match(/([^(]+)\((\d+(\.\d+)?)\/(\d+)\)/);
-        var now = Date.now();
-        if (m && now - Module.setStatus.last.time < 30) return; // if this is a progress update, skip it if too soon
-        Module.setStatus.last.time = now;
-        Module.setStatus.last.text = text;
-        if (m) {
-          text = m[1];
-          progressElement.value = parseInt(m[2]) * 100;
-          progressElement.max = parseInt(m[4]) * 100;
-          progressElement.hidden = false;
-
-        } else {
-          progressElement.value = null;
-          progressElement.max = null;
-          progressElement.hidden = true;
+        if (!Module.setStatus.last) {
+          Module.setStatus.last = '';
+          document.getElementById('download-modal-progress-fill').style.transition = 'width 0.5s ease';
         }
+        document.getElementById('download-modal').style.display = 'block';
+        if (text === Module.setStatus.last) { return; }
+        Module.setStatus.last = text;
         if (text && text.length > 0) {
-          console.log((new Date()).toLocaleTimeString() + " " + text)
-          text += "⚡️"
-          statusElement.style.display = "block";
+          document.getElementById('download-modal-title').firstChild.innerHTML = text;
         } else {
-          statusElement.style.display = "none";
+          document.getElementById('download-modal').style.display = 'none';
+          // Remove transition for instant reset
+          document.getElementById('download-modal-progress-fill').style.transition = 'none';
+          document.getElementById('download-modal-progress-fill').style.width = '0%';
         }
-        statusElement.innerHTML = text;
       },
       totalDependencies: 0,
       monitorRunDependencies: function (left) {
         this.totalDependencies = Math.max(this.totalDependencies, left);
-        Module.setStatus(left ? 'Preparing... (' + (this.totalDependencies - left) + '/' + this.totalDependencies + ')' : loadingDoneMessage());
+        Module.setStatus(left ? 'Preparing... (' + (this.totalDependencies - left) + '/' + this.totalDependencies + ')' : 'All downloads complete.');
       }
     };
-    Module.setStatus('Downloading ScummVM...');
-    window.onerror = function () {
-      statusElement.classList.add("error")
-      Module.setStatus('Exception thrown, see JavaScript console');
-      Module.setStatus = function (text) {
-        if (text) Module.printErr('[post-exception status] ' + text);
-      };
+    window.onerror = function (event) {
+      alert('Exception thrown, see JavaScript console');
+      console.log(event);
     };
 
   </script>
