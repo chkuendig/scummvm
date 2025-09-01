@@ -22,7 +22,9 @@
 #ifndef CLOUD_FILESYSTEM_H
 #define CLOUD_FILESYSTEM_H
 
-#include "backends/fs/abstract-fs.h"
+#ifdef EMSCRIPTEN
+
+#include "backends/fs/emscripten/virtual-fs.h"
 
 #ifdef USE_CLOUD
 #include "backends/cloud/cloudmanager.h"
@@ -33,39 +35,42 @@
 #include "backends/networking/http/request.h"
 #endif
 
-#include "backends/fs/posix/posix-fs.h"
+#define CLOUD_FS_PATH "/cloud"
 
 /**
- * Implementation of the ScummVM file system API based on POSIX.
+ * Implementation of the ScummVM file system API based on Cloud storage.
  *
  * Parts of this class are documented in the base interface class, AbstractFSNode.
  */
-class CloudFilesystemNode : public AbstractFSNode {
-#define CLOUD_FS_PATH "/cloud"
-protected:
-	static Common::HashMap<Common::String, AbstractFSList> _cloudFolders;
-	Common::String _displayName;
-	Common::String _path;
+class CloudFilesystemNode : public VirtualFileSystemNode {
+private:
 	Common::String _storageFileId;
-	bool _isDirectory;
-	bool _isValid;
+	Common::String _storageDirectoryPath;
+	static Common::String *_lastAccessToken;
 
 	/**
-	 * Plain constructor, for internal use only (hence protected).
-	 */
-	CloudFilesystemNode() : _isDirectory(false), _isValid(false), _storageFileId(nullptr) {}
-
-	virtual AbstractFSNode *makeNode(const Common::String &path) const {
-		return new CloudFilesystemNode(path);
-	}
-
-	/**
-	 * Callbacks for network calls (file download and directory listing)
+	 * Callbacks for network calls
 	 */
 	void directoryListedCallback(const Cloud::Storage::ListDirectoryResponse &response);
 	void directoryListedErrorCallback(const Networking::ErrorResponse &error);
-	void fileDownloadedCallback(const Cloud::Storage::BoolResponse &response);
-	void fileDownloadedErrorCallback(const Networking::ErrorResponse &error);
+
+protected:
+	/**
+	 * Constructor for creating nodes with known properties (for internal use only).
+	 */
+	CloudFilesystemNode(const Common::String &path, const Common::String &displayName,
+						bool isDirectory, bool isValid, uint32 size,
+						const Common::String &storageFileId, const Common::String &storageDirectoryPath);
+
+	virtual AbstractFSNode *makeNode(const Common::String &path) const override {
+		return new CloudFilesystemNode(path);
+	}
+
+	virtual void fetchDirectoryContents() const override;
+
+	virtual VirtualFileSystemNode *copy() const override {
+		return new CloudFilesystemNode(*this);
+	}
 
 public:
 	/**
@@ -75,21 +80,16 @@ public:
 	 */
 	CloudFilesystemNode(const Common::String &path);
 
-	bool exists() const override;
-	Common::U32String getDisplayName() const override { return _displayName; }
-	Common::String getName() const override { return _displayName; }
-	Common::String getPath() const override { return _path; }
-	bool isDirectory() const override { return _isDirectory; }
-	bool isReadable() const override;
-	bool isWritable() const override;
+	virtual Common::SeekableReadStream *createReadStream() override;
 
-	AbstractFSNode *getChild(const Common::String &n) const override;
-	bool getChildren(AbstractFSList &list, ListMode mode, bool hidden) const override;
-	AbstractFSNode *getParent() const override;
-
-	Common::SeekableReadStream *createReadStream() override;
-	Common::SeekableWriteStream *createWriteStream(bool atomic) override;
-	bool createDirectory() override;
+	/**
+	 * Invalidate the cache for all cloud folders if the access token has changed,
+	 * to make sure we don't show outdated folder contents after a user switches
+	 * cloud accounts.
+	 */
+	static void invalidateFoldersCache();
 };
+
+#endif // EMSCRIPTEN
 
 #endif

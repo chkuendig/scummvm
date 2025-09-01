@@ -22,32 +22,41 @@
 #ifndef HTTP_FILESYSTEM_H
 #define HTTP_FILESYSTEM_H
 
-#include "backends/fs/abstract-fs.h"
-#include "backends/fs/posix/posix-fs.h"
+#ifdef EMSCRIPTEN
+
+#include "backends/fs/emscripten/virtual-fs.h"
+#include "backends/networking/http/httpjsonrequest.h"
+#include "backends/networking/http/sessionrequest.h"
+
+#define DATA_PATH "/data"
 
 /**
- * Implementation of the ScummVM file system API based on POSIX.
+ * Implementation of the ScummVM file system API based on HTTP.
  *
  * Parts of this class are documented in the base interface class, AbstractFSNode.
  */
-class HTTPFilesystemNode : public AbstractFSNode {
-protected:
-	static Common::HashMap<Common::String, AbstractFSList> _httpFolders;
-	Common::String _displayName;
-	Common::String _path;
+class HTTPFilesystemNode : public VirtualFileSystemNode {
+private:
 	Common::String _url;
-	AbstractFSList *_children;
-	bool _isDirectory;
-	bool _isValid;
-	int _size;
 
+	// Callback methods for HTTP requests
+	void jsonCallbackGetChildren(const Networking::JsonResponse &response);
+	void errorCallbackGetChildren(const Networking::ErrorResponse &error);
+
+protected:
 	/**
 	 * Full constructor, for internal use only (hence protected).
 	 */
-	HTTPFilesystemNode(const Common::String &path, const Common::String &displayName, const Common::String &baseUrl, bool isValid, bool isDirectory, int size);
+	HTTPFilesystemNode(const Common::String &path, const Common::String &displayName, const Common::String &baseUrl, bool isValid, bool isDirectory, uint32 size);
 
-	virtual AbstractFSNode *makeNode(const Common::String &path) const {
+	virtual AbstractFSNode *makeNode(const Common::String &path) const override {
 		return new HTTPFilesystemNode(path);
+	}
+
+	virtual void fetchDirectoryContents() const override;
+
+	virtual VirtualFileSystemNode *copy() const override {
+		return new HTTPFilesystemNode(*this);
 	}
 
 public:
@@ -57,22 +66,10 @@ public:
 	 * @param path the path the new node should point to.
 	 */
 	HTTPFilesystemNode(const Common::String &path);
-	~HTTPFilesystemNode() {}
-	bool exists() const override;
-	Common::U32String getDisplayName() const override { return _displayName; }
-	Common::String getName() const override { return _displayName; }
-	Common::String getPath() const override { return _path; }
-	bool isDirectory() const override { return _isDirectory; }
-	bool isReadable() const override;
-	bool isWritable() const override;
 
-	AbstractFSNode *getChild(const Common::String &n) const override;
-	bool getChildren(AbstractFSList &list, ListMode mode, bool hidden) const override;
-	AbstractFSNode *getParent() const override;
-
-	Common::SeekableReadStream *createReadStream() override;
-	Common::SeekableWriteStream *createWriteStream(bool atomic) override;
-	bool createDirectory() override;
+	virtual Common::SeekableReadStream *createReadStream() override;
 };
+
+#endif // EMSCRIPTEN
 
 #endif
