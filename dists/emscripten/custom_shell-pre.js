@@ -9,5 +9,10 @@ if (window.location.hash.length > 0) {
     })
 }
 
+// Reload page when fragment identifier (and launch parameters) changes
+window.addEventListener("hashchange", function () {
+	location.reload(); 
+});
+
 		});
 }
