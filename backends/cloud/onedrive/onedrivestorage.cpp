@@ -148,10 +148,21 @@ void OneDriveStorage::fileInfoCallback(Networking::NetworkReadStreamCallback out
 	}
 
 	const char *url = result.getVal("@microsoft.graph.downloadUrl")->asString().c_str();
+	
+	// Create Range header if needed
+	Networking::RequestHeaders *headers = nullptr;
+	if (_pendingRangeStartPos > 0 || _pendingRangeLength > 0) {
+		headers = new Networking::RequestHeaders();
+		Common::String rangeHeader = Common::String::format("Range: bytes=%llu-%s", 
+			_pendingRangeStartPos, 
+			_pendingRangeLength > 0 ? Common::String::format("%llu", _pendingRangeStartPos + _pendingRangeLength - 1).c_str() : "");
+		headers->push_back(rangeHeader);
+	}
+	
 	if (outerCallback)
 		(*outerCallback)(Networking::NetworkReadStreamResponse(
 			response.request,
-			Networking::NetworkReadStream::make(url, nullptr, "")
+			Networking::NetworkReadStream::make(url, headers, "")
 		));
 
 	delete json;
@@ -168,12 +179,18 @@ Networking::Request *OneDriveStorage::upload(const Common::String &path, Common:
 	return addRequest(new OneDriveUploadRequest(this, path, contents, callback, errorCallback));
 }
 
-Networking::Request *OneDriveStorage::streamFileById(const Common::String &path, Networking::NetworkReadStreamCallback outerCallback, Networking::ErrorCallback errorCallback) {
+Networking::Request *OneDriveStorage::streamFileById(const Common::String &path, Networking::NetworkReadStreamCallback outerCallback, Networking::ErrorCallback errorCallback, uint64 startPos, uint64 length) {
 	debug(9, "OneDrive: `download \"%s\"`", path.c_str());
 	Common::String url = ONEDRIVE_API_SPECIAL_APPROOT_ID + Common::percentEncodeString(path);
+	
+	// Store range parameters for use in fileInfoCallback
+	_pendingRangeStartPos = startPos;
+	_pendingRangeLength = length;
+	
 	Networking::JsonCallback innerCallback = new Common::CallbackBridge<OneDriveStorage, const Networking::NetworkReadStreamResponse &, const Networking::JsonResponse &>(this, &OneDriveStorage::fileInfoCallback, outerCallback);
 	Networking::HttpJsonRequest *request = new OneDriveTokenRefresher(this, innerCallback, errorCallback, url.c_str());
 	request->addHeader("Authorization: bearer " + _token);
+	
 	return addRequest(request);
 }
 
