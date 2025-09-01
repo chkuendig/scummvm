@@ -89,7 +89,7 @@ public:
 	Networking::Request *upload(const Common::String &path, Common::SeekableReadStream *contents, UploadCallback callback, Networking::ErrorCallback errorCallback) override;
 
 	/** Returns pointer to Networking::NetworkReadStream. */
-	Networking::Request *streamFileById(const Common::String &path, Networking::NetworkReadStreamCallback callback, Networking::ErrorCallback errorCallback) override;
+	Networking::Request *streamFileById(const Common::String &path, Networking::NetworkReadStreamCallback callback, Networking::ErrorCallback errorCallback, uint64 startPos = 0, uint64 length = 0) override;
 
 	/** Calls the callback when finished. */
 	Networking::Request *createDirectory(const Common::String &path, BoolCallback callback, Networking::ErrorCallback errorCallback) override;
@@ -112,6 +112,11 @@ public:
 	static void removeFromConfig(const Common::String &keyPrefix);
 
 	Common::String accessToken() const { return _token; }
+
+private:
+	// Temporary storage for range parameters used in streamFileById
+	uint64 _pendingRangeStartPos;
+	uint64 _pendingRangeLength;
 };
 
 } // End of namespace OneDrive
