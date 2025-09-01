@@ -32,7 +32,7 @@ TASKS=()
 CONFIGURE_ARGS=()
 _bundle_games=()
 _verbose=false
-EMSDK_VERSION="${EMSDK_VERSION:-4.0.10}"
+EMSDK_VERSION="${EMSDK_VERSION:-4.0.15}"
 EMSCRIPTEN_VERSION="$EMSDK_VERSION"
 
 usage="\
@@ -135,11 +135,7 @@ for i in "$@"; do
   esac
 done
 
-TASKS="${TASKS:1}"
-if [[ -z "$TASKS" ]]; then
-  echo "$usage"
-  exit
-fi
+
 
 # print commands
 if [[ "$_verbose" = true ]]; then
@@ -172,6 +168,12 @@ if [[ $ret != 0 ]]; then
 
   cd "$DIST_FOLDER/emsdk-${EMSDK_VERSION}"
   ./emsdk activate ${EMSCRIPTEN_VERSION}
+fi
+
+TASKS="${TASKS:1}"
+if [[ -z "$TASKS" ]]; then
+  echo "$usage"
+  exit
 fi
 
 source "$DIST_FOLDER/emsdk-$EMSDK_VERSION/emsdk_env.sh"
