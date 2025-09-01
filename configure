@@ -3333,6 +3333,8 @@ EOF
 		else
 			embuilder build sdl3
 		fi
+		define_in_config_if_yes yes 'USE_IMGUI_SDLRENDERER3'
+
 		_pkg_config=yes
 		PKG_CONFIG_LIBDIR="$EMSDK/upstream/emscripten/cache/sysroot/local/lib/pkgconfig:$EMSDK/upstream/emscripten/cache/sysroot/lib/pkgconfig"
 		_sdlconfig="pkg-config sdl3"
