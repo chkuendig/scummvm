@@ -38,8 +38,6 @@ public:
 	AbstractFSNode *makeCurrentDirectoryFileNode() const override;
 	AbstractFSNode *makeFileNodePath(const Common::String &path) const override;
 
-private:
-	Common::HashMap<Common::String, HTTPFilesystemNode *> *_httpNodes;
 };
 
 #endif /*EMSCRIPTEN_FILESYSTEM_FACTORY_H*/

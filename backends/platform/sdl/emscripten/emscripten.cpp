@@ -28,12 +28,14 @@
 #include "backends/events/emscriptensdl/emscriptensdl-events.h"
 #include "backends/fs/emscripten/emscripten-fs-factory.h"
 #include "backends/mutex/null/null-mutex.h"
-#include "backends/fs/emscripten/emscripten-fs-factory.h"
 #include "backends/platform/sdl/emscripten/emscripten.h"
 #include "backends/timer/default/default-timer.h"
 #include "common/file.h"
 #ifdef USE_TTS
 #include "backends/text-to-speech/emscripten/emscripten-text-to-speech.h"
+#endif
+#ifdef USE_CLOUD
+#include "backends/cloud/cloudmanager.h"
 #endif
 
 extern "C" {
@@ -58,10 +60,6 @@ void OSystem_Emscripten::initBackend() {
 	_textToSpeechManager = new EmscriptenTextToSpeechManager();
 #endif
 
-	// SDL Timers don't work in Emscripten unless threads are enabled or Asyncify is disabled.
-	// We can do neither, so we use the DefaultTimerManager instead.
-	_timerManager = new DefaultTimerManager();
-
 	// Event source
 	_eventSource = new EmscriptenSdlEventSource();
 
@@ -70,6 +68,13 @@ void OSystem_Emscripten::initBackend() {
 }
 
 void OSystem_Emscripten::init() {
+
+	// SDL Timers don't work in Emscripten unless threads are enabled or Asyncify is disabled.
+	// We can do neither, so we use the DefaultTimerManager instead.
+	// This has to be done before the filesystem is initialized so it's available for folders
+	// being loaded over HTTP. 
+	_timerManager = new DefaultTimerManager();
+
 	// Initialze File System Factory
 	EmscriptenFilesystemFactory *fsFactory = new EmscriptenFilesystemFactory();
 	_fsFactory = fsFactory;

@@ -6007,9 +6007,9 @@ echo "$_libcurl"
 define_in_config_if_yes "$_libcurl" "USE_LIBCURL"
 
 echocheck "HTTP client"
-if test "$_host_os" = "emscripten" &&  test "$_cloud" = "yes"; then
+if test "$_host_os" = "emscripten"; then
 	_http=yes
-	echo "Emscripten"
+	echo "Fetch API"
 elif test "$_libcurl" = "yes"; then
 	_http=yes
 	echo "libcurl"

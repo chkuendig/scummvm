@@ -3698,7 +3698,11 @@ void GlobalOptionsDialog::setupCloudTab() {
 		_storageSyncSavesButton->setEnabled(enabled);
 	}
 
+#ifndef EMSCRIPTEN
 	bool showDownloadButton = (showingCurrentStorage && _selectedStorageIndex != Cloud::kStorageGoogleDriveId); // cannot download via Google Drive
+#else
+	bool showDownloadButton = false; // Emscripten can access files directly and doesn't download them
+#endif
 	if (_storageDownloadHint) _storageDownloadHint->setVisible(showDownloadButton);
 	if (_storageDownloadButton) {
 		_storageDownloadButton->setVisible(showDownloadButton);

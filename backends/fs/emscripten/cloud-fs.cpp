@@ -22,60 +22,41 @@
 #ifdef EMSCRIPTEN
 
 #include "backends/fs/emscripten/cloud-fs.h"
-#include "backends/cloud/downloadrequest.h"
-#include "backends/fs/fs-factory.h"
-#include "backends/fs/posix/posix-fs.h"
-#include "backends/fs/posix/posix-iostream.h"
-
+#include "backends/cloud/basestorage.h"
+#include "backends/cloud/cloudmanager.h"
+#include "backends/cloud/storage.h"
+#include "backends/fs/emscripten/cloud-readstream.h"
 #include "common/system.h"
 
-Common::HashMap<Common::String, AbstractFSList> CloudFilesystemNode::_cloudFolders = Common::HashMap<Common::String, AbstractFSList>();
+Common::String *CloudFilesystemNode::_lastAccessToken = nullptr;
 
-CloudFilesystemNode::CloudFilesystemNode(const Common::String &p) : _isDirectory(false), _isValid(false), _path(p), _storageFileId(nullptr) {
-	debug(5, "CloudFilesystemNode::CloudFilesystemNode(Common::String %s)", p.c_str());
-	assert(p.size() > 0);
+CloudFilesystemNode::CloudFilesystemNode(const Common::String &path, const Common::String &displayName,
+										 bool isDirectory, bool isValid, uint32 size,
+										 const Common::String &storageFileId, const Common::String &storageDirectoryPath)
+	: VirtualFileSystemNode(path, displayName, isValid, isDirectory, size, path == CLOUD_FS_PATH),
+	  _storageFileId(storageFileId), _storageDirectoryPath(storageDirectoryPath) {
+}
 
-	// Normalize the path (that is, remove unneeded slashes etc.)
-	_path = Common::normalizePath(_path, '/');
-	_displayName = Common::lastPathComponent(_path, '/');
-	if (_path == CLOUD_FS_PATH) { // need special case for handling the root of the cloud-filesystem
-		_displayName = "[" + Common::lastPathComponent(_path, '/') + "]";
-		_isDirectory = true;
-		_isValid = true;
-		return;
-	} else { // we need to peek in the parent folder to see if file exists and if it's a directory
+CloudFilesystemNode::CloudFilesystemNode(const Common::String &path)
+	: VirtualFileSystemNode(path, path == CLOUD_FS_PATH) {
+	if (_isRoot) {
+		_storageDirectoryPath = "";
+	} else {
 		AbstractFSNode *parent = getParent();
-		AbstractFSList tmp = AbstractFSList();
-		parent->getChildren(tmp, Common::FSNode::kListAll, true);
-		for (AbstractFSList::iterator i = tmp.begin(); i != tmp.end(); ++i) {
-			CloudFilesystemNode *child = (CloudFilesystemNode *)*i;
-			if (child->getPath() == _path) {
-				_isDirectory = child->isDirectory();
-				_isValid = true;
-				_storageFileId = child->_storageFileId;
+		if (!parent) {
+			_isValid = false;
+			return;
+		}
+		for (AbstractFSList::iterator i = virtualFolders()[parent->getPath()].begin();
+			 i != virtualFolders()[parent->getPath()].end(); ++i) {
+			CloudFilesystemNode *node = (CloudFilesystemNode *)*i;
+			if (node->getPath() == _path) {
+				_storageFileId = node->_storageFileId;
+				_storageDirectoryPath = node->_storageDirectoryPath;
 				break;
 			}
 		}
-
-		return;
 	}
-}
-
-AbstractFSNode *CloudFilesystemNode::getChild(const Common::String &n) const {
-	assert(!_path.empty());
-	assert(_isDirectory);
-
-	// Make sure the string contains no slashes
-	assert(!n.contains('/'));
-
-	// We assume here that _path is already normalized (hence don't bother to call
-	//  Common::normalizePath on the final path).
-	Common::String newPath(_path);
-	if (_path.lastChar() != '/')
-		newPath += '/';
-	newPath += n;
-
-	return makeNode(newPath);
 }
 
 void CloudFilesystemNode::directoryListedCallback(const Cloud::Storage::ListDirectoryResponse &response) {
@@ -85,121 +66,77 @@ void CloudFilesystemNode::directoryListedCallback(const Cloud::Storage::ListDire
 
 	for (Common::Array<Cloud::StorageFile>::iterator i = storageFiles.begin(); i != storageFiles.end(); ++i) {
 		Cloud::StorageFile storageFile = *i;
-		CloudFilesystemNode *file_node = new CloudFilesystemNode();
-		file_node->_isDirectory = storageFile.isDirectory();
-		file_node->_path = _path + "/" + storageFile.name();
-		file_node->_isValid = true;
-		file_node->_displayName = "" + storageFile.name();
-		file_node->_storageFileId = storageFile.id();
+		CloudFilesystemNode *file_node = new CloudFilesystemNode(
+			_path + "/" + storageFile.name(),
+			storageFile.name(),
+			storageFile.isDirectory(),
+			true,
+			storageFile.size(),
+			storageFile.isDirectory() ? "" : storageFile.id(),
+			storageFile.isDirectory() ? storageFile.path() : "");
 		dirList->push_back(file_node);
 	}
-	_cloudFolders[_path] = *dirList;
+	virtualFolders()[_path] = *dirList;
 }
 
-void CloudFilesystemNode::directoryListedErrorCallback(const Networking::ErrorResponse &_error) {
-	// _workingRequest = nullptr; // TODO: HANDLE THIS SOMEWHERE
-	error("Response %ld: %s", _error.httpResponseCode, _error.response.c_str());
+void CloudFilesystemNode::directoryListedErrorCallback(const Networking::ErrorResponse &error) {
+	warning("CloudFilesystemNode::directoryListedErrorCallback - Response %ld: %s",
+			error.httpResponseCode, error.response.c_str());
+	_isValid = false;
 }
 
-void CloudFilesystemNode::fileDownloadedCallback(const Cloud::Storage::BoolResponse &response) {
-	// _workingRequest = nullptr; // TODO: HANDLE THIS SOMEWHERE
-	debug(5, "CloudFilesystemNode::fileDownloadedCallback %s", _path.c_str());
-}
-
-void CloudFilesystemNode::fileDownloadedErrorCallback(const Networking::ErrorResponse &_error) {
-	// _workingRequest = nullptr; // TODO: HANDLE THIS SOMEWHERE
-	error("Response %ld: %s", _error.httpResponseCode, _error.response.c_str());
-}
-
-bool CloudFilesystemNode::getChildren(AbstractFSList &myList, ListMode mode, bool hidden) const {
-	assert(_isDirectory);
-
-	if (!_cloudFolders.contains(_path)) {
-		debug(5, "CloudFilesystemNode::getChildren Fetching Children: %s", _path.c_str());
-		Common::String _cloud_path = _path.substr(sizeof(CLOUD_FS_PATH), _path.size() - sizeof(CLOUD_FS_PATH));
-
-		CloudMan.listDirectory(
-			_cloud_path,
-			new Common::Callback<CloudFilesystemNode, const Cloud::Storage::ListDirectoryResponse &>((CloudFilesystemNode *)this, &CloudFilesystemNode::directoryListedCallback),
-			new Common::Callback<CloudFilesystemNode, const Networking::ErrorResponse &>((CloudFilesystemNode *)this, &CloudFilesystemNode::directoryListedErrorCallback),
-			false);
-
-		while (!_cloudFolders.contains(_path)) {
-			g_system->delayMillis(10);
-		}
-		debug(5, "CloudFilesystemNode::getChildren %s size %u", _path.c_str(), _cloudFolders[_path].size());
-	}
-
-	for (AbstractFSList::iterator i = _cloudFolders[_path].begin(); i != _cloudFolders[_path].end(); ++i) {
-		// TODO: Respect mode and hidden getChildren parameters
-		CloudFilesystemNode *node = (CloudFilesystemNode *)*i;
-		// we need to copy node here as FSNode will take ownership of the pointer and destroy it after use
-		myList.push_back(new CloudFilesystemNode(*node));
-	}
-	return true;
-}
-
-AbstractFSNode *CloudFilesystemNode::getParent() const {
-	if (_path == "/")
-		return 0; // The filesystem root has no parent
-
-	const char *start = _path.c_str();
-	const char *end = start + _path.size();
-
-	// Strip of the last component. We make use of the fact that at this
-	// point, _path is guaranteed to be normalized
-	while (end > start && *(end - 1) != '/')
-		end--;
-
-	if (end == start) {
-		// This only happens if we were called with a relative path, for which
-		// there simply is no parent.
-		// TODO: We could also resolve this by assuming that the parent is the
-		//       current working directory, and returning a node referring to that.
-		return 0;
-	}
-
-	Common::String _parent_path = Common::normalizePath(Common::String(start, end), '/');
-	FilesystemFactory *factory = g_system->getFilesystemFactory();
-	return factory->makeFileNodePath(_parent_path);
+void CloudFilesystemNode::fetchDirectoryContents() const {
+	debug(5, "CloudFilesystemNode::fetchDirectoryContents - Fetching children for %s", _path.c_str());
+	CloudMan.listDirectory(
+		_storageDirectoryPath,
+		new Common::Callback<CloudFilesystemNode, const Cloud::Storage::ListDirectoryResponse &>(
+			const_cast<CloudFilesystemNode *>(this), &CloudFilesystemNode::directoryListedCallback),
+		new Common::Callback<CloudFilesystemNode, const Networking::ErrorResponse &>(
+			const_cast<CloudFilesystemNode *>(this), &CloudFilesystemNode::directoryListedErrorCallback),
+		false);
 }
 
 Common::SeekableReadStream *CloudFilesystemNode::createReadStream() {
 	debug(5, "CloudFilesystemNode::createReadStream() %s", _path.c_str());
-	Common::String fsCachePath = Common::normalizePath("/.cache/" + _path, '/');
-	POSIXFilesystemNode *cacheFile = new POSIXFilesystemNode(fsCachePath);
-	if (!cacheFile->exists()) {
-		Cloud::Storage *_storage = CloudMan.getCurrentStorage();
-		Networking::Request *_workingRequest = _storage->downloadById(
-			_storageFileId,
-			Common::Path(fsCachePath),
-			new Common::Callback<CloudFilesystemNode, const Cloud::Storage::BoolResponse &>(this, &CloudFilesystemNode::fileDownloadedCallback),
-			new Common::Callback<CloudFilesystemNode, const Networking::ErrorResponse &>(this, &CloudFilesystemNode::fileDownloadedErrorCallback));
-		while (_workingRequest->state() != Networking::RequestState::FINISHED) {
-			g_system->delayMillis(10);
-		}
-		debug(5, "CloudFilesystemNode::createReadStream() file written %s", fsCachePath.c_str());
+
+	// Create cache path for this file
+	Common::String baseCachePath = Common::normalizePath("/.cache/" + _path, '/');
+
+	// Get current storage
+	Cloud::Storage *storage = CloudMan.getCurrentStorage();
+	if (!storage) {
+		warning("CloudFilesystemNode::createReadStream: No storage available");
+		return nullptr;
 	}
-	return PosixIoStream::makeFromPath(fsCachePath, StdioStream::WriteMode_Read);
+
+	// Create and return the CloudReadStream
+	return new CloudReadStream(storage, _storageFileId, _displayName, baseCachePath, _size);
 }
 
-Common::SeekableWriteStream *CloudFilesystemNode::createWriteStream(bool atomic) {
-	return 0;
+void CloudFilesystemNode::invalidateFoldersCache() {
+	if (!_lastAccessToken) {
+		_lastAccessToken = new Common::String();
+	}
+	Cloud::BaseStorage *baseStorage = dynamic_cast<Cloud::BaseStorage *>(CloudMan.getCurrentStorage());
+
+	Common::String newToken = baseStorage->accessToken();
+	if (newToken != *_lastAccessToken) {
+		// Collect keys to erase first, then erase them
+		Common::Array<Common::String> keysToErase;
+		for (Common::HashMap<Common::String, AbstractFSList>::iterator it = virtualFolders().begin();
+			 it != virtualFolders().end(); ++it) {
+			if (it->_key.hasPrefix(CLOUD_FS_PATH)) {
+				keysToErase.push_back(it->_key);
+			}
+		}
+
+		// Now erase the collected keys
+		for (uint i = 0; i < keysToErase.size(); ++i) {
+			virtualFolders().erase(keysToErase[i]);
+		}
+
+		*_lastAccessToken = newToken;
+	}
 }
 
-bool CloudFilesystemNode::createDirectory() {
-	return false;
-}
-bool CloudFilesystemNode::exists() const {
-	return _isValid;
-}
-
-bool CloudFilesystemNode::isReadable() const {
-	return exists();
-}
-
-bool CloudFilesystemNode::isWritable() const {
-	return false;
-}
-
-#endif // #if defined(EMSCRIPTEN)
+#endif // EMSCRIPTEN

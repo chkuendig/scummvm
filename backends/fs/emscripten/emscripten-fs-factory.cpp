@@ -21,49 +21,17 @@
 
 #ifdef EMSCRIPTEN
 
-#define FORBIDDEN_SYMBOL_EXCEPTION_getenv
-#define FORBIDDEN_SYMBOL_EXCEPTION_FILE
 #include "backends/fs/emscripten/emscripten-fs-factory.h"
 #include "backends/fs/emscripten/emscripten-posix-fs.h"
 #include "backends/fs/emscripten/http-fs.h"
+#include "backends/platform/sdl/emscripten/emscripten.h"
 #include "common/debug.h"
 #ifdef USE_CLOUD
 #include "backends/fs/emscripten/cloud-fs.h"
 #endif
 
-#include <emscripten.h>
-
-EM_ASYNC_JS(void, _initSettings, (const char *pathPtr), {
-	try {
-		const path = UTF8ToString(pathPtr);
-		const settingsPath = path + "/scummvm.ini";
-		
-		// Mount the filesystem
-		FS.mount(IDBFS, { autoPersist: true }, path);
-		
-		// Sync the filesystem
-		await new Promise((resolve, reject) => {
-			FS.syncfs(true, (err) => err ? reject(err) : resolve());
-		});
-		
-		// Check if settings file exists and download if needed
-		if (!FS.analyzePath(settingsPath).exists) {
-			const response = await fetch("scummvm.ini");
-			if (response.ok) {
-				const text = await response.text();
-				FS.writeFile(settingsPath, text);
-			}
-		}
-	} catch (err) {
-		console.error("Error initializing files:", err);
-		alert("Error initializing files: " + err);
-		throw err;
-	}
-});
-
 EmscriptenFilesystemFactory::EmscriptenFilesystemFactory() {
-	_initSettings(getenv("HOME"));
-	_httpNodes = new Common::HashMap<Common::String, HTTPFilesystemNode *>();
+	fsInitSettingsFile(g_system->getDefaultConfigFileName().toString().c_str());
 }
 
 AbstractFSNode *EmscriptenFilesystemFactory::makeCurrentDirectoryFileNode() const {
@@ -76,16 +44,12 @@ AbstractFSNode *EmscriptenFilesystemFactory::makeRootFileNode() const {
 }
 
 AbstractFSNode *EmscriptenFilesystemFactory::makeFileNodePath(const Common::String &path) const {
-	debug(5, "EmscriptenFilesystemFactory::makeFileNodePath(%s)", path.c_str());
 	assert(!path.empty());
 	if (path.hasPrefix(DATA_PATH)) {
-		if (!_httpNodes->contains(path)) {
-			// finding a node by path requires a http request to the server, so we cache the nodes
-			_httpNodes->setVal(path, new HTTPFilesystemNode(path));
-		}
-		return new HTTPFilesystemNode(*(_httpNodes->getVal(path)));
+		return new HTTPFilesystemNode(path);
 #ifdef USE_CLOUD
 	} else if (path.hasPrefix(CLOUD_FS_PATH) && CloudMan.isStorageEnabled()) {
+		CloudFilesystemNode::invalidateFoldersCache();
 		return new CloudFilesystemNode(path);
 #endif
 	} else {

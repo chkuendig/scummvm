@@ -23,6 +23,7 @@
 #define PLATFORM_SDL_EMSCRIPTEN_H
 
 #include "backends/platform/sdl/posix/posix.h"
+#include "backends/cloud/cloudicon.h"
 #ifdef USE_CLOUD
 #include "backends/networking/http/request.h"
 #include "common/ustr.h"
@@ -34,6 +35,9 @@ extern "C" { // External JavaScript API functions implemented in libscummvm.js
 bool isFullscreen();
 void toggleFullscreen(bool enable);
 void downloadFile(const char *filenamePtr, char *dataPtr, int dataSize);
+// Filesystem functions
+void fsInitSettingsFile(const char *pathPtr);
+
 // Cloud functions
 #ifdef USE_CLOUD
 void cloudConnectionWizardCallback(char *str); // pass cloud storage activation data from JS to setup wizard
@@ -65,11 +69,6 @@ public:
 	void delayMillis(uint msecs) override;
 	void init() override;
 	void addSysArchivesToSearchSet(Common::SearchSet &s, int priority) override;
-
-#ifdef USE_CLOUD
-	void setCloudConnectionCallback(CloudConnectionCallback cb) { _cloudConnectionCallback = cb; }
-	bool openUrl(const Common::String &url) override;
-#endif // USE_CLOUD
     
 protected:
 	Common::Path getDefaultConfigFileName() override;
