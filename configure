@@ -3310,15 +3310,15 @@ EOF
 		append_var LDFLAGS "-s INITIAL_MEMORY=128MB -s STACK_SIZE=32MB -s ALLOW_MEMORY_GROWTH=1"
 		append_var LDFLAGS "-s FORCE_FILESYSTEM -lidbfs.js"
 		append_var LDFLAGS "-s ASYNCIFY=1 -s ASYNCIFY_STACK_SIZE=1048576"
-
-		append_var LDFLAGS "-s EXPORTED_FUNCTIONS=[_main,_malloc,_free,_raise]"
-		append_var LDFLAGS "-s EXPORTED_RUNTIME_METHODS=[ccall,lengthBytesUTF8,setValue,writeArrayToMemory]"
 		append_var LDFLAGS "--js-library backends/platform/sdl/emscripten/emscripten-impl.js"
 		if test "$_tts" != "no" ; then
 			append_var LDFLAGS "--js-library backends/text-to-speech/emscripten/emscripten-text-to-speech.js"
 		fi
 		if test "$_midi" != "no" ; then
 			append_var LDFLAGS "--js-library backends/midi/webmidi.js"
+		fi
+		if test "$_dynamic_modules" != "yes" ; then
+			append_var LDFLAGS "-s EXPORTED_FUNCTIONS=[_main,_raise]" # custom_shell-post.js needs raise to send a signal
 		fi
 
 		append_var LDFLAGS "-O2"
