@@ -385,7 +385,7 @@ const CdFile SwordEngine::_pcCdFileList[] = {
 	, { "speech1.clv", FLAG_SPEECH1 },
 	{ "speech2.clv", FLAG_SPEECH2 }
 #endif
-#ifdef USE_MAD
+#ifdef USE_MP3
 	, { "speech1.cl3", FLAG_SPEECH1 },
 	{ "speech2.cl3", FLAG_SPEECH2 }
 #endif
@@ -417,7 +417,7 @@ const CdFile SwordEngine::_macCdFileList[] = {
 	,{ "speech1.clv", FLAG_SPEECH1 },
 	{ "speech2.clv", FLAG_SPEECH2 }
 #endif
-#ifdef USE_MAD
+#ifdef USE_MP3
 	,{ "speech1.cl3", FLAG_SPEECH1 },
 	{ "speech2.cl3", FLAG_SPEECH2 }
 #endif

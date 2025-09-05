@@ -227,7 +227,7 @@ bool FPSfx::loadVoiceFromVDB(Common::File &vdbFP) {
 		}
 		break;
 	case FPCODEC_MP3 : {
-#ifdef USE_MAD
+#ifdef USE_MP3
 		uint32 size = vdbFP.readUint32LE();
 		_rewindableStream = Audio::makeMP3Stream(vdbFP.readStream(size), DisposeAfterUse::YES);
 #else
@@ -305,7 +305,7 @@ bool FPSfx::loadFile(const char *fileName) {
 		}
 		break;
 	case FPCODEC_MP3:
-#ifdef USE_MAD
+#ifdef USE_MP3
 		buffer = file.readStream(file.size());
 		_rewindableStream = Audio::makeMP3Stream(buffer, DisposeAfterUse::YES);
 #endif
@@ -583,7 +583,7 @@ bool FPStream::loadFile(const Common::String &fileName, int bufSize) {
 		_rewindableStream = Audio::makeADPCMStream(&_file, DisposeAfterUse::NO, 0, Audio::kADPCMDVI, 44100, 2);
 		break;
 	case FPCODEC_MP3:
-#ifdef USE_MAD
+#ifdef USE_MP3
 		_rewindableStream = Audio::makeMP3Stream(&_file, DisposeAfterUse::NO);
 #endif
 		break;

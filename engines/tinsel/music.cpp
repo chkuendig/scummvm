@@ -1022,7 +1022,7 @@ struct MusicSegmentNoir {
 };
 
 void PCMMusicPlayer::loadMP3MusicFromSegment(int segmentNum) {
-#ifdef USE_MAD
+#ifdef USE_MP3
 	MusicSegmentNoir *musicSegments = (MusicSegmentNoir *)_vm->_handle->LockMem(_hSegment);
 
 	Common::SeekableReadStream *sampleStream = readSampleData(_filename, _file, musicSegments[segmentNum].sampleOffset,

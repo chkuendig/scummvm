@@ -58,7 +58,7 @@ static const StreamFileFormat STREAM_FILEFORMATS[] = {
 #ifdef USE_VORBIS
 	{ "Ogg Vorbis",   ".ogg",  makeVorbisStream },
 #endif
-#ifdef USE_MAD
+#ifdef USE_MP3
 	{ "MPEG Layer 3", ".mp3",  makeMP3Stream },
 #endif
 	{ "MPEG-4 Audio", ".m4a",  makeQuickTimeStream },

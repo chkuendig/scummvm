@@ -110,7 +110,7 @@ protected:
 	void playSoundData(Common::File *f, uint32 size, Audio::SoundHandle *soundHandle) override;
 };
 
-#ifdef USE_MAD
+#ifdef USE_MP3
 class MP3Sound : public PCSound {
 public:
 	MP3Sound(Audio::Mixer *mixer, QueenEngine *vm) : PCSound(mixer, vm) {}
@@ -162,7 +162,7 @@ Sound *Sound::makeSoundInstance(Audio::Mixer *mixer, QueenEngine *vm, uint8 comp
 	case COMPRESSION_NONE:
 		return new SBSound(mixer, vm);
 	case COMPRESSION_MP3:
-#ifndef USE_MAD
+#ifndef USE_MP3
 		warning("Using MP3 compressed datafile, but MP3 support not compiled in");
 		return new SilentSound(mixer, vm);
 #else

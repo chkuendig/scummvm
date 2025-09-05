@@ -193,7 +193,7 @@ bool HEMixer::audioOverrideExists(int soundId, bool justGetInfo, int *duration, 
 #ifdef USE_VORBIS
 		"ogg",
 #endif
-#ifdef USE_MAD
+#ifdef USE_MP3
 		"mp3",
 #endif
 	};
@@ -206,7 +206,7 @@ bool HEMixer::audioOverrideExists(int soundId, bool justGetInfo, int *duration, 
 #ifdef USE_VORBIS
 		Audio::makeVorbisStream,
 #endif
-#ifdef USE_MAD
+#ifdef USE_MP3
 		Audio::makeMP3Stream,
 #endif
 	};

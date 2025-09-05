@@ -163,7 +163,7 @@ private:
 #endif
 	};
 
-#ifdef USE_MAD
+#ifdef USE_MP3
 	// An MPEG audio track
 	class MPEGAudioTrack : public AudioTrack, public MPEGStream {
 	public:

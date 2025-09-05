@@ -337,7 +337,7 @@ int SoundManager::makeSoundAudioStream(int f, Audio::AudioStream *&audiostream, 
 		stream = Audio::makeVorbisStream(readStream->readStream(length), DisposeAfterUse::NO);
 #endif
 
-#ifdef USE_MAD
+#ifdef USE_MP3
 	// TODO: Detect this correctly
 	if (!stream)
 		stream = Audio::makeMP3Stream(readStream->readStream(length), DisposeAfterUse::NO);

@@ -119,7 +119,7 @@ bool SoundManager::load_sys(Sound sound, const Common::Path &filename) {
 	if (baseName.hasSuffixIgnoreCase(".ogg"))
 		audioStream = Audio::makeVorbisStream(f.readStream(f.size()), DisposeAfterUse::YES);
 #endif
-#ifdef USE_MAD
+#ifdef USE_MP3
 	if (baseName.hasSuffixIgnoreCase(".mp3"))
 		audioStream = Audio::makeMP3Stream(f.readStream(f.size()), DisposeAfterUse::YES);
 #endif

@@ -187,7 +187,7 @@ static SoundArchive* openAnyPossibleDubbing() {
 	zip->openArchive("dub-ogg.zzz", "ogg", OGG);
 	if (zip->isOpen() && zip->size()) return zip;
 #endif
-#ifdef USE_MAD
+#ifdef USE_MP3
 	zip->openArchive("dub-mp3.zzz", "mp3", MP3);
 	if (zip->isOpen() && zip->size()) return zip;
 #endif

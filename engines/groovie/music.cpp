@@ -825,7 +825,7 @@ bool MusicPlayerTlc::load(uint32 fileref, bool loop) {
 	if (_file->isOpen()) {
 		if (filename.hasSuffix(".m4a"))
 			seekStream = Audio::makeQuickTimeStream(_file, DisposeAfterUse::NO);
-#ifdef USE_MAD
+#ifdef USE_MP3
 		else
 			seekStream = Audio::makeMP3Stream(_file, DisposeAfterUse::NO);
 #endif

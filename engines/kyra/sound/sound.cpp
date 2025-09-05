@@ -346,10 +346,10 @@ const Sound::SpeechCodecs Sound::_supportedCodecs[] = {
 	{ ".VOC", makeVOCStream },
 	{ "", makeVOCStream },
 
-#ifdef USE_MAD
+#ifdef USE_MP3
 	{ ".VO3", Audio::makeMP3Stream },
 	{ ".MP3", Audio::makeMP3Stream },
-#endif // USE_MAD
+#endif // USE_MP3
 
 #ifdef USE_VORBIS
 	{ ".VOG", Audio::makeVorbisStream },

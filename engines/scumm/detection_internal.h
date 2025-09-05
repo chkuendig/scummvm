@@ -190,7 +190,7 @@ static bool detectSpeech(const Common::FSList &fslist, const GameSettings *gs) {
 #ifdef USE_VORBIS
 		 "sog",
 #endif
-#ifdef USE_MAD
+#ifdef USE_MP3
 		 "so3",
 #endif
 		 0 };

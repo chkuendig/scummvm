@@ -333,7 +333,7 @@ uint Sound::playSoundBuffer(Audio::SoundHandle *handle, const SoundSample &buffe
 	case RAW80:
 		reader = Audio::makeRawStream(stream, buffer._frequency, Audio::FLAG_UNSIGNED, DisposeAfterUse::YES);
 		break;
-#ifdef USE_MAD
+#ifdef USE_MP3
 	case MP3:
 		reader = Audio::makeMP3Stream(stream, DisposeAfterUse::YES);
 		break;

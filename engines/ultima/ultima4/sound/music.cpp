@@ -125,7 +125,7 @@ bool Music::startMusic(const Common::String &filename) {
 		// No such file exists
 		return false;
 
-#ifdef USE_MAD
+#ifdef USE_MP3
 	if (filename.hasSuffixIgnoreCase(".mp3")) {
 		Audio::SeekableAudioStream *audioStream = Audio::makeMP3Stream(
 			musicFile.readStream(musicFile.size()), DisposeAfterUse::YES);

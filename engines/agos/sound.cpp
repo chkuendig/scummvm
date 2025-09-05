@@ -260,7 +260,7 @@ void RawSound::playSound(uint sound, uint loopSound, Audio::Mixer::SoundType typ
 ///////////////////////////////////////////////////////////////////////////////
 #pragma mark -
 
-#ifdef USE_MAD
+#ifdef USE_MP3
 class MP3Sound : public BaseSound {
 public:
 	MP3Sound(Audio::Mixer *mixer, const Common::Path &filename, uint32 base = 0) : BaseSound(mixer, filename, base, false) {}
@@ -320,7 +320,7 @@ static BaseSound *makeSound(Audio::Mixer *mixer, const Common::Path &basename) {
 	if (Common::File::exists(tmp))
 		return new VorbisSound(mixer, tmp);
 #endif
-#ifdef USE_MAD
+#ifdef USE_MP3
 	tmp = basename.append(".mp3");
 	if (Common::File::exists(tmp))
 		return new MP3Sound(mixer, tmp);

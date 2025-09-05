@@ -152,6 +152,7 @@ _enet=yes
 _tremor=auto
 _flac=auto
 _mad=auto
+_mpg123=auto
 _opl2lpt=no
 _retrowave=auto
 _alsa=auto
@@ -312,6 +313,7 @@ add_feature freetype2 "FreeType2" "_freetype2"
 add_feature highres "high resolution" "_highres"
 add_feature jpeg "JPEG" "_jpeg"
 add_feature mad "MAD" "_mad"
+add_feature mp3 "MP3" "_mp123 _mad"
 add_feature opengl_game_classic "OpenGL (classic)" "_opengl_game_classic"
 add_feature opengl_game_shaders "OpenGL with shaders" "_opengl_game_shaders"
 add_feature png "PNG" "_png"
@@ -349,7 +351,7 @@ add_component vgmtrans_audio "VGMTrans Soundfont audio" "_vgmtrans_audio" "USE_V
 # fribidi: used by the GUI
 # freetype2: used by the GUI
 # highres: not a real feature
-# mad: used by DefaultAudioCDManager
+# mp3: used by DefaultAudioCDManager
 # png: used by the GUI
 # vorbis: used by DefaultAudioCDManager
 # zlib: used by the GUI
@@ -1059,6 +1061,8 @@ Optional Libraries:
 
   --with-mad-prefix=DIR    prefix where libmad is installed (optional)
   --disable-mad            disable libmad (MP3) support [autodetect]
+  --with-mpg123-prefix=DIR prefix where libmpg123 is installed (optional)
+  --disable-mpg123         disable libmpg123 (MP3) support [autodetect]
 
   --with-fribidi-prefix=DIR    prefix where libfribidi is installed
   --disable-fribidi            disable libfribidi support [autodetect]
@@ -1263,6 +1267,8 @@ for ac_option in $@; do
 	--disable-flac)               _flac=no               ;;
 	--enable-mad)                 _mad=yes               ;;
 	--disable-mad)                _mad=no                ;;
+	--enable-mpg123)              _mpg123=yes            ;;
+	--disable-mpg123)             _mpg123=no             ;;
 	--enable-fribidi)             _fribidi=yes           ;;
 	--disable-fribidi)            _fribidi=no            ;;
 	--enable-test-c++11)          _test_cxx11=yes        ;;
@@ -1448,6 +1454,11 @@ for ac_option in $@; do
 		FLAC_CFLAGS="-I$arg/include"
 		FLAC_LIBS="-L$arg/lib -lFLAC"
 		FLAC_PREFIX="$arg"
+		;;
+	--with-mpg123-prefix=*)
+		arg=`echo $ac_option | cut -d '=' -f 2`
+		MPG123_CFLAGS="-I$arg/include"
+		MPG123_LIBS="-L$arg/lib"
 		;;
 	--with-mad-prefix=*)
 		arg=`echo $ac_option | cut -d '=' -f 2`
@@ -3305,6 +3316,11 @@ EOF
 			FREETYPE2_CFLAGS="-I$_freetypepath"
 		else
 			_freetype2=no
+		fi
+		if test "$_mpg123" = yes; then
+			append_var LDFLAGS "-s USE_MPG123=1"
+		else
+			_mpg123=no
 		fi
 		if test "$_gif" = yes; then
 		 	append_var LDFLAGS "-s USE_GIFLIB=1"
@@ -5453,6 +5469,32 @@ if test "$_mad" = yes ; then
 fi
 define_in_config_if_yes "$_mad" 'USE_MAD'
 echo "$_mad"
+
+#
+# Check for mpg123 (MP3 library)
+#
+echocheck "mpeg123"
+if test "$_mpg123" != no && test "$_mad" = no; then
+	
+	_mpg123=no
+	cat > $TMPC << EOF
+#include <mpg123.h>
+int main(void) { return 0; }
+EOF
+	cc_check $MPG123_CFLAGS $MPG123_LIBS -lmpg123 && _mpg123=yes
+fi
+if test "$_mpg123" = yes ; then
+	append_var LIBS "$MPG123_LIBS -lmpg123"
+	append_var INCLUDES "$MPG123_CFLAGS"
+fi
+define_in_config_if_yes "$_mpg123" 'USE_MPG123'
+
+else
+
+	# Skip mikmod detection if openmpt is detected
+	_mpg123="no (MAD/mpg123 support is mutually exclusive)"
+fi
+echo "$_mpg123"
 
 #
 # Check for ALSA

@@ -670,7 +670,7 @@ Audio::SeekableAudioStream *SoundSE::createSoundStream(Common::SeekableSubReadSt
 		return new HeaderlessWMAStream(stream, entry, disposeAfterUse);
 #endif
 	case kFSBCodecMP3:
-#ifdef USE_MAD
+#ifdef USE_MP3
 		return Audio::makeMP3Stream(
 			stream,
 			disposeAfterUse

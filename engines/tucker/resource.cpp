@@ -54,7 +54,7 @@ static const CompressedSoundFile compressedSoundFilesTable[] = {
 #ifdef USE_VORBIS
 	{ "TUCKER.SOG", Audio::makeVorbisStream },
 #endif
-#ifdef USE_MAD
+#ifdef USE_MP3
 	{ "TUCKER.SO3", Audio::makeMP3Stream },
 #endif
 	{ nullptr,      nullptr }

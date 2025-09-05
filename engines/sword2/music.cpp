@@ -69,7 +69,7 @@ static Audio::AudioStream *getAudioStream(SoundFileHandle *fh, const char *base,
 #ifdef USE_VORBIS
 			{ "clg", kVorbisMode },
 #endif
-#ifdef USE_MAD
+#ifdef USE_MP3
 			{ "cl3", kMP3Mode },
 #endif
 			{ "clu", kCLUMode }
@@ -158,7 +158,7 @@ static Audio::AudioStream *getAudioStream(SoundFileHandle *fh, const char *base,
 			return makePSXCLUStream(&fh->file, enc_len);
 		else
 			return makeCLUStream(&fh->file, enc_len);
-#ifdef USE_MAD
+#ifdef USE_MP3
 	case kMP3Mode: {
 		Common::SafeSeekableSubReadStream *tmp = new Common::SafeSeekableSubReadStream(&fh->file, pos, pos + enc_len);
 		return Audio::makeMP3Stream(tmp, DisposeAfterUse::YES);
