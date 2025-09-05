@@ -38,20 +38,32 @@ protected:
 	uint64 _fileSize;
 	uint64 _currentPos;
 	bool _eos;  // True when a read operation has hit EOF
-	static const uint64 CHUNK_SIZE = 5 * 1024 * 1024; // 5MB chunks
+	static const uint64 CHUNK_SIZE = 10 * 1024 * 1024; // 10MB chunks
+	/*
+	 * Note on CHUNK_SIZE: 10MB is probably too big, but avoids the following issue
+	 * 
+	 * When hosting on GitHub Pages, this needs to be high enough to not trigger any chunked downloads
+	 * for files hosted there, as their servers don't work properly with range requests
+	 * https://stackoverflow.com/questions/55914486/issue-making-range-requests-in-some-browsers
+	 * https://github.com/bdon/ghpages-firefox-range-bug?tab=readme-ov-file
+	 * NOTE: This breaks for all browser when proxying through Cloudflare, as they also can't handle
+	 * 		 the responses (0 bytes for range requests from GH Pages)
+	 */
 
 	// Cache management
 	Common::Array<bool> _downloadedChunks;
 	uint32 _numChunks;
+	bool _singleFullFile;  // True if we have the entire file in one download
 
 	// Helper methods (implemented in base class)
 	uint32 getChunkIndex(uint64 pos) const;
 	Common::String getChunkPath(uint32 chunkIndex) const;
 	bool isChunkDownloaded(uint32 chunkIndex) const;
+	bool isFullFileDownloaded() const;
 	void ensureChunkDownloaded(uint32 chunkIndex);
 
 	// Abstract method to be implemented by subclasses
-	virtual void downloadChunk(uint32 chunkIndex) = 0;
+	virtual void downloadChunk(uint32 chunkIndex, uint64 chunkStart, uint64 chunkLength) = 0;
 
 public:
 	NetworkFileStream(const Common::String &displayName, const Common::String &cachePath, uint64 fileSize);

@@ -39,7 +39,7 @@ private:
 	void errorCallbackDownloadFile(const Networking::ErrorResponse &error);
 
 protected:
-	virtual void downloadChunk(uint32 chunkIndex) override;
+	virtual void downloadChunk(uint32 chunkIndex, uint64 chunkStart, uint64 chunkLength) override;
 
 public:
 	HttpFileStream(const Common::String &url, const Common::String &displayName, 

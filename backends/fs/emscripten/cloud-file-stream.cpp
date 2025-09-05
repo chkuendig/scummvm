@@ -45,19 +45,13 @@ void CloudFileStream::fileDownloadedErrorCallback(const Networking::ErrorRespons
 	error("CloudFileStream::fileDownloadedErrorCallback ErrorResponse %ld: %s", _error.httpResponseCode, _error.response.c_str());
 }
 
-void CloudFileStream::downloadChunk(uint32 chunkIndex) {
+void CloudFileStream::downloadChunk(uint32 chunkIndex, uint64 chunkStart, uint64 chunkLength) {
 	if (chunkIndex >= _numChunks)
 		return;
 
 	Common::String chunkPath = getChunkPath(chunkIndex);
 
 	POSIXFilesystemNode *chunkFile = new POSIXFilesystemNode(chunkPath);
-	// Calculate chunk range
-	uint64 chunkStart = chunkIndex * CHUNK_SIZE;
-	uint64 chunkLength = CHUNK_SIZE;
-	if (chunkStart + chunkLength > _fileSize) {
-		chunkLength = _fileSize - chunkStart; // Last chunk may be smaller
-	}
 
 	debug(5, "CloudFileStream: Downloading chunk %u: bytes %llu-%llu",
 		  chunkIndex + 1, chunkStart, chunkStart + chunkLength - 1);
@@ -83,9 +77,9 @@ void CloudFileStream::downloadChunk(uint32 chunkIndex) {
 		g_system->delayMillis(10);
 	}
 
-	// Mark chunk as downloaded
-	_downloadedChunks[chunkIndex] = true;
-	debug(5, "CloudFileStream: Chunk %u completed", chunkIndex + 1);
+	if (!chunkFile->exists()) {
+		error("CloudFileStream: Failed to download chunk %u", chunkIndex + 1);
+	}
 
 	httpHideProgressBar();
 }

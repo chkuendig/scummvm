@@ -47,18 +47,12 @@ void HttpFileStream::errorCallbackDownloadFile(const Networking::ErrorResponse &
 	// Error is handled by SessionRequest
 }
 
-void HttpFileStream::downloadChunk(uint32 chunkIndex) {
+void HttpFileStream::downloadChunk(uint32 chunkIndex,uint64 chunkStart, uint64 chunkLength) {
 	assert(chunkIndex < _numChunks);
 
 	Common::String chunkPath = getChunkPath(chunkIndex);
 
 	POSIXFilesystemNode *chunkFile = new POSIXFilesystemNode(chunkPath);
-	// Calculate chunk range
-	uint64 chunkStart = chunkIndex * CHUNK_SIZE;
-	uint64 chunkLength = CHUNK_SIZE;
-	if (chunkStart + chunkLength > _fileSize) {
-		chunkLength = _fileSize - chunkStart; // Last chunk may be smaller
-	}
 
 	debug(5, "HttpFileStream: Downloading chunk %u: bytes %llu-%llu",
 		  chunkIndex + 1, chunkStart, chunkStart + chunkLength - 1);
@@ -88,17 +82,12 @@ void HttpFileStream::downloadChunk(uint32 chunkIndex) {
 		httpUpdateProgressBar(request->getProgress() * chunkLength, chunkLength);
 		g_system->delayMillis(10);
 	}
-	httpHideProgressBar();
 	debug(5, "HTTPFilesystemNode::createReadStream() download completed for %s", chunkPath.c_str());
-
-	if (request->success()) {
-		// Mark chunk as downloaded
-		_downloadedChunks[chunkIndex] = true;
-		debug(5, "HttpFileStream: Chunk %u completed successfully", chunkIndex + 1);
-	} else {
+	if (!request->success()) {
 		error("HttpFileStream: Failed to download chunk %u", chunkIndex + 1);
 	}
 
+	request->close();
 	httpHideProgressBar();
 }
 
