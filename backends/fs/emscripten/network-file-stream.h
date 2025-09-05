@@ -43,15 +43,17 @@ protected:
 	// Cache management
 	Common::Array<bool> _downloadedChunks;
 	uint32 _numChunks;
+	bool _singleFullFile;  // True if we have the entire file in one download
 
 	// Helper methods (implemented in base class)
 	uint32 getChunkIndex(uint64 pos) const;
 	Common::String getChunkPath(uint32 chunkIndex) const;
 	bool isChunkDownloaded(uint32 chunkIndex) const;
+	bool isFullFileDownloaded() const;
 	void ensureChunkDownloaded(uint32 chunkIndex);
 
 	// Abstract method to be implemented by subclasses
-	virtual void downloadChunk(uint32 chunkIndex) = 0;
+	virtual void downloadChunk(uint32 chunkIndex, uint64 chunkStart, uint64 chunkLength) = 0;
 
 public:
 	NetworkFileStream(const Common::String &displayName, const Common::String &cachePath, uint64 fileSize);

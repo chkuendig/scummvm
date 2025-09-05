@@ -40,7 +40,7 @@ private:
 	void fileDownloadedErrorCallback(const Networking::ErrorResponse &error);
 
 protected:
-	virtual void downloadChunk(uint32 chunkIndex) override;
+	virtual void downloadChunk(uint32 chunkIndex, uint64 chunkStart, uint64 chunkLength) override;
 
 public:
 	CloudFileStream(Cloud::Storage *storage, const Common::String &fileId, 
