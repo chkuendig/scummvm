@@ -1152,7 +1152,7 @@ void SmushPlayer::tryCmpFile(const char *filename) {
 	if (i == NULL) {
 		error("invalid filename : %s", filename);
 	}
-#if defined(USE_MAD) || defined(USE_VORBIS)
+#if defined(USE_MP3) || defined(USE_VORBIS)
 	char fname[260];
 #endif
 	Common::File *file = new Common::File();
@@ -1168,7 +1168,7 @@ void SmushPlayer::tryCmpFile(const char *filename) {
 		return;
 	}
 #endif
-#ifdef USE_MAD
+#ifdef USE_MP3
 	memcpy(fname, filename, MIN<int>(i - filename, sizeof(fname)));
 	Common::strlcpy(fname + (i - filename), ".mp3", sizeof(fname) - (i - filename));
 	if (file->open(fname)) {

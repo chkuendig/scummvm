@@ -688,7 +688,7 @@ void Sound::startTalkSound(uint32 offset, uint32 length, int mode, Audio::SoundH
 				num = result->num_tags;
 			}
 			offset = result->new_offset;
-#if defined(USE_FLAC) || defined(USE_VORBIS) || defined(USE_MAD)
+#if defined(USE_FLAC) || defined(USE_VORBIS) || defined(USE_MP3)
 			size = result->compressed_size;
 #endif
 		} else {
@@ -743,7 +743,7 @@ void Sound::startTalkSound(uint32 offset, uint32 length, int mode, Audio::SoundH
 
 		switch (_soundMode) {
 		case kMP3Mode:
-#ifdef USE_MAD
+#ifdef USE_MP3
 			{
 			assert(size > 0);
 			input = Audio::makeMP3Stream(new Common::SeekableSubReadStream(file.release(), offset, offset + size, DisposeAfterUse::YES), DisposeAfterUse::YES);
@@ -1108,7 +1108,7 @@ void Sound::setupSfxFile() {
 #ifdef USE_VORBIS
 		{ "sog", kVorbisMode },
 #endif
-#ifdef USE_MAD
+#ifdef USE_MP3
 		{ "so3", kMP3Mode },
 #endif
 		{ nullptr, kVOCMode }

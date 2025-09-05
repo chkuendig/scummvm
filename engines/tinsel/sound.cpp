@@ -135,7 +135,7 @@ bool SoundManager::playSample(int id, Audio::Mixer::SoundType type, Audio::Sound
 		// play it
 		switch (_soundMode) {
 		case kMP3Mode:
-#ifdef USE_MAD
+#ifdef USE_MP3
 			{
 			Common::MemoryReadStream *compressedStream =
 				new Common::MemoryReadStream(sampleBuf, sampleLen, DisposeAfterUse::YES);
@@ -318,7 +318,7 @@ bool SoundManager::playSample(int id, int sub, bool bLooped, int x, int y, int p
 
 	switch (_soundMode) {
 	case kMP3Mode:
-#ifdef USE_MAD
+#ifdef USE_MP3
 		sampleStream = Audio::makeMP3Stream(compressedStream, DisposeAfterUse::YES);
 #endif
 		break;

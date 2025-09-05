@@ -503,7 +503,7 @@ Audio::RewindableAudioStream *SoundChannel::makeAudioStream(const Common::String
 		error("Unable to open sound file '%s'", filename.toString().c_str());
 
 	if (isMP3) {
-#ifdef USE_MAD
+#ifdef USE_MP3
 		return Audio::makeMP3Stream(s, DisposeAfterUse::YES);
 #else
 		warning("Unable to play sound '%s', MP3 support is not compiled in.", filename.toString().c_str());

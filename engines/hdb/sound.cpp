@@ -1412,7 +1412,7 @@ Sound::Sound() {
 }
 
 void Sound::test() {
-	#ifdef USE_MAD
+	#ifdef USE_MP3
 		Common::SeekableReadStream *soundStream = g_hdb->_fileMan->findFirstData("M00_AIRLOCK_01_MP3", TYPE_BINARY);
 		Audio::SeekableAudioStream *audioStream = Audio::makeMP3Stream(soundStream, DisposeAfterUse::YES);
 		Audio::SoundHandle *handle = new Audio::SoundHandle();
@@ -1504,9 +1504,9 @@ void Sound::playSound(int index) {
 	Common::MemoryReadStream *stream = new Common::MemoryReadStream(_soundCache[index].data, _soundCache[index].size, DisposeAfterUse::NO);
 
 	if (_soundCache[index].ext == SNDTYPE_MP3) {
-#ifdef USE_MAD
+#ifdef USE_MP3
 		audioStream = Audio::makeMP3Stream(stream, DisposeAfterUse::YES);
-#endif // USE_MAD
+#endif // USE_MP3
 	} else if (_soundCache[index].ext == SNDTYPE_OGG) {
 #ifdef USE_VORBIS
 		audioStream = Audio::makeVorbisStream(stream, DisposeAfterUse::YES);
@@ -1565,9 +1565,9 @@ void Sound::playSoundEx(int index, int channel, bool loop) {
 	Common::MemoryReadStream *stream = new Common::MemoryReadStream(_soundCache[index].data, _soundCache[index].size, DisposeAfterUse::NO);
 
 	if (_soundCache[index].ext == SNDTYPE_MP3) {
-#ifdef USE_MAD
+#ifdef USE_MP3
 		audioStream = Audio::makeMP3Stream(stream, DisposeAfterUse::YES);
-#endif // USE_MAD
+#endif // USE_MP3
 	} else if (_soundCache[index].ext == SNDTYPE_OGG) {
 #ifdef USE_VORBIS
 		audioStream = Audio::makeVorbisStream(stream, DisposeAfterUse::YES);
@@ -1650,7 +1650,7 @@ void Sound::playVoice(int index, int actor) {
 		);
 #endif
 	} else {
-#ifdef USE_MAD
+#ifdef USE_MP3
 		Audio::AudioStream *audioStream = Audio::makeMP3Stream(stream, DisposeAfterUse::YES);
 		if (audioStream == nullptr) {
 			return;
@@ -1829,7 +1829,7 @@ Audio::AudioStream* Song::createStream(const Common::Path &fileName) {
 		return nullptr;
 
 	if (g_hdb->getPlatform() != Common::kPlatformLinux) {
-#ifdef USE_MAD
+#ifdef USE_MP3
 		Audio::SeekableAudioStream* audioStream = Audio::makeMP3Stream(stream, DisposeAfterUse::YES);
 		return new Audio::LoopingAudioStream(audioStream, 0, DisposeAfterUse::YES);
 #else

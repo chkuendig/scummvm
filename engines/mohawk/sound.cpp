@@ -242,7 +242,7 @@ Audio::RewindableAudioStream *makeMohawkWaveStream(Common::SeekableReadStream *s
 		uint32 blockAlign = dataChunk.channels * dataChunk.bitsPerSample / 8;
 		return Audio::makeADPCMStream(dataChunk.audioData, DisposeAfterUse::YES, dataSize, Audio::kADPCMDVI, dataChunk.sampleRate, dataChunk.channels, blockAlign);
 	} else if (dataChunk.encoding == kCodecMPEG2) {
-#ifdef USE_MAD
+#ifdef USE_MP3
 		return Audio::makeMP3Stream(dataChunk.audioData, DisposeAfterUse::YES);
 #else
 		warning ("MAD library not included - unable to play MP2 audio");

@@ -1201,7 +1201,7 @@ void AVIDecoder::AVIAudioTrack::createAudioStream() {
 		_packetStream = Audio::makePacketizedADPCMStream(Audio::kADPCMDK3, _wvInfo.samplesPerSec, _wvInfo.channels, _wvInfo.blockAlign);
 		break;
 	case Audio::kWaveFormatMP3:
-#ifdef USE_MAD
+#ifdef USE_MP3
 		_packetStream = Audio::makePacketizedMP3Stream(_wvInfo.channels, _wvInfo.samplesPerSec);
 #else
 		warning("AVI MP3 stream found, but no libmad support compiled in");

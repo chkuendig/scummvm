@@ -394,7 +394,7 @@ bool Music::playDigital(uint32 resourceId, MusicFlags flags) {
 					byte identifier = musicFile->readByte();
 
 					if (identifier == 0) {		// MP3
-#ifdef USE_MAD
+#ifdef USE_MP3
 						audioStream = Audio::makeMP3Stream(musicStream, DisposeAfterUse::YES);
 #endif
 					} else if (identifier == 1) {	// OGG

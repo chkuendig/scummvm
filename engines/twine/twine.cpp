@@ -187,7 +187,7 @@ TwinEEngine::TwinEEngine(OSystem *system, Common::Language language, uint32 flag
 		SearchMan.addSubDirectoryMatching(gameDataDir, "resources/lba_files/vox/en_voice");
 		SearchMan.addSubDirectoryMatching(gameDataDir, "resources/lba_files/vox/fr_voice");
 		SearchMan.addSubDirectoryMatching(gameDataDir, "resources");
-#ifdef USE_MAD
+#ifdef USE_MP3
 		SearchMan.addSubDirectoryMatching(gameDataDir, "resources/lba_files/music");
 		SearchMan.addSubDirectoryMatching(gameDataDir, "resources/lba_files/midi_mp3");
 #endif

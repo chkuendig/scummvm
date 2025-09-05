@@ -584,7 +584,7 @@ bool Sound::expandSpeech(byte *src, byte *dst, uint32 dstSize, bool *endiannessC
 			stream = Audio::makeVorbisStream(new Common::MemoryReadStream(src, dstSize), DisposeAfterUse::YES);
 		}
 #endif
-#ifdef USE_MAD
+#ifdef USE_MP3
 		if (_cowMode == CowMP3) {
 			stream = Audio::makeMP3Stream(new Common::MemoryReadStream(src, dstSize), DisposeAfterUse::YES);
 		}
@@ -732,7 +732,7 @@ void Sound::initCowSystem() {
 		}
 	}
 #endif
-#ifdef USE_MAD
+#ifdef USE_MP3
 	if (!_cowFile.isOpen()) {
 		Common::sprintf_s(cowName, "SPEECH%d.CL3", SwordEngine::_systemVars.currentCD);
 		_cowFile.open(cowName);
@@ -1006,7 +1006,7 @@ bool Sound::prepareMusicStreaming(const Common::Path &filename, int newHandleId,
 		sampleRate = _compressedMusicStream[newHandleId]->getRate();
 	}
 #endif
-#ifdef USE_MAD
+#ifdef USE_MP3
 	else if (assignedMode == MusMP3) {
 		_compressedMusicStream[newHandleId] = Audio::makeMP3Stream(&_musicFile[newHandleId], DisposeAfterUse::NO);
 		sampleRate = _compressedMusicStream[newHandleId]->getRate();
@@ -1457,7 +1457,7 @@ int32 Sound::getSpeechSize(byte *compData, uint32 compSize) {
 			stream = Audio::makeVorbisStream(&memStream, DisposeAfterUse::YES);
 		}
 #endif
-#ifdef USE_MAD
+#ifdef USE_MP3
 		else if (_cowMode == CowMP3) {
 			stream = Audio::makeMP3Stream(&memStream, DisposeAfterUse::YES);
 		}

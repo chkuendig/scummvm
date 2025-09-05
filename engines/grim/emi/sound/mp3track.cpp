@@ -166,7 +166,7 @@ bool MP3Track::openSound(const Common::String &filename, const Common::String &s
 		return false;
 	}
 	_soundName = soundName;
-#ifndef USE_MAD
+#ifndef USE_MP3
 	warning("Cannot open %s, MP3 support not enabled", soundName.c_str());
 	return true;
 #else

@@ -98,7 +98,7 @@ Common::Error VCruiseEngine::run() {
 	}
 #endif
 
-#if !defined(USE_MAD)
+#if !defined(USE_MP3)
 	if (_gameDescription->desc.flags & VCRUISE_GF_WANT_MP3) {
 		GUI::MessageDialog dialog(
 			_("Music for this game requires MP3 support, which was not compiled in.\n"

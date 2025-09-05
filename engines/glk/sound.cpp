@@ -99,7 +99,7 @@ uint SoundChannel::play(uint soundNum, uint repeats, uint notify) {
 	Common::Path nameSnd(Common::String::format("sound%u.snd", soundNum));
 	Common::Path nameWav(Common::String::format("sound%u.wav", soundNum));
 	Common::Path nameAiff(Common::String::format("sound%u.aiff", soundNum));
-#ifdef USE_MAD
+#ifdef USE_MP3
 	Common::Path nameMp3(Common::String::format("sound%u.mp3", soundNum));
 #endif
 
@@ -117,7 +117,7 @@ uint SoundChannel::play(uint soundNum, uint repeats, uint notify) {
 		Common::SeekableReadStream *s = f.readStream(size);
 		stream = Audio::makeRawStream(s, freq, Audio::FLAG_UNSIGNED);
 
-#ifdef USE_MAD
+#ifdef USE_MP3
 	} else if (f.exists(nameMp3) && f.open(nameMp3)) {
 		Common::SeekableReadStream *s = f.readStream(f.size());
 		stream = Audio::makeMP3Stream(s, DisposeAfterUse::YES);

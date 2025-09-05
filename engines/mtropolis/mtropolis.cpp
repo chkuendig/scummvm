@@ -115,7 +115,7 @@ Common::Error MTropolisEngine::run() {
 		dialog.runModal();
 	}
 #endif
-#if !defined(USE_MAD)
+#if !defined(USE_MP3)
 	if (_gameDescription->desc.flags & MTGF_WANT_MPEG_AUDIO) {
 		GUI::MessageDialog dialog(
 			_("This game requires MPEG audio support for some\n"

@@ -73,7 +73,7 @@ bool DefaultAudioCDManager::existExtractedCDAudioFiles(uint track) {
 #ifdef USE_FLAC
 		"fla", "flac",
 #endif
-#ifdef USE_MAD
+#ifdef USE_MP3
 		"mp3",
 #endif
 		"m4a",

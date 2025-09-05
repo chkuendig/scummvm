@@ -21,7 +21,7 @@
 
 #include "audio/decoders/mp3.h"
 
-#ifdef USE_MAD
+#ifdef USE_MP3
 
 #include "common/debug.h"
 #include "common/mutex.h"
@@ -34,18 +34,45 @@
 
 #include "audio/audiostream.h"
 
+#ifdef USE_MAD
 #include <mad.h>
+#elif defined(USE_MPG123)
+#include <mpg123.h>
+#endif
 
 #if defined(__PSP__)
 	#include "backends/platform/psp/mp3.h"
 #endif
 namespace Audio {
 
+#ifdef USE_MPG123
+// Global mpg123 initialization
+static bool g_mpg123Initialized = false;
+static int g_mpg123RefCount = 0;
+
+static void initMpg123() {
+	if (!g_mpg123Initialized) {
+		if (mpg123_init() == MPG123_OK) {
+			g_mpg123Initialized = true;
+		} else {
+			error("Failed to initialize mpg123");
+		}
+	}
+	g_mpg123RefCount++;
+}
+
+static void deinitMpg123() {
+	g_mpg123RefCount--;
+	if (g_mpg123RefCount == 0 && g_mpg123Initialized) {
+		mpg123_exit();
+		g_mpg123Initialized = false;
+	}
+}
+#endif
 
 #pragma mark -
-#pragma mark --- MP3 (MAD) stream ---
+#pragma mark --- MP3 stream ---
 #pragma mark -
-
 
 class BaseMP3Stream : public virtual AudioStream {
 public:
@@ -57,23 +84,32 @@ public:
 	int getRate() const override { return _rate; }
 
 protected:
+#ifdef USE_MAD
 	void decodeMP3Data(Common::ReadStream &stream);
 	void readMP3Data(Common::ReadStream &stream);
 
 	void initStream(Common::ReadStream &stream);
 	void readHeader(Common::ReadStream &stream);
-	void deinitStream();
 
 	int fillBuffer(Common::ReadStream &stream, int16 *buffer, const int numSamples);
+#elif defined(USE_MPG123)
+	void initStream();
+	
+	int fillBuffer(int16 *buffer, const int numSamples);
+	bool feedData(const byte *data, size_t size);
+	void drainDecoder();
 
+#endif
+	void deinitStream();
 	enum State {
 		MP3_STATE_INIT,	// Need to init the decoder
 		MP3_STATE_READY,	// ready for processing data
 		MP3_STATE_EOS		// end of data reached (may need to loop)
 	};
 
-	uint _posInFrame;
 	State _state;
+#ifdef USE_MAD
+	uint _posInFrame;
 
 	mad_timer_t _curTime;
 
@@ -90,12 +126,26 @@ protected:
 
 	// This buffer contains a slab of input data
 	byte _buf[BUFFER_SIZE + MAD_BUFFER_GUARD];
+#elif defined(USE_MPG123)
+	mpg123_handle *_handle;
+	
+	int _channels;
+	long _rate;
+	int _encoding;
+
+	// Buffer for decoded audio
+	static const size_t BUFFER_SIZE = 8192;
+	unsigned char _decodeBuffer[BUFFER_SIZE];
+	size_t _decodeBufferPos;
+	size_t _decodeBufferUsed;
+#endif
 };
 
 class MP3Stream : private BaseMP3Stream, public SeekableAudioStream {
 public:
 	MP3Stream(Common::SeekableReadStream *inStream,
 	               DisposeAfterUse::Flag dispose);
+
 
 	int readBuffer(int16 *buffer, const int numSamples) override;
 	bool seek(const Timestamp &where) override;
@@ -105,7 +155,9 @@ protected:
 	Common::ScopedPtr<Common::SeekableReadStream> _inStream;
 
 	Timestamp _length;
-
+#ifdef USE_MPG123
+	off_t _totalSamples;
+#endif
 private:
 	static Common::SeekableReadStream *skipID3(Common::SeekableReadStream *stream, DisposeAfterUse::Flag dispose);
 };
@@ -133,20 +185,36 @@ private:
 
 
 BaseMP3Stream::BaseMP3Stream() :
+#ifdef USE_MAD
 	_posInFrame(0),
-	_state(MP3_STATE_INIT),
-	_curTime(mad_timer_zero) {
-
+	_curTime(mad_timer_zero) ,
+#elif defined(USE_MPG123)
+	_handle(nullptr),
+	_channels(0),
+	_rate(0),
+	_encoding(0),
+	_decodeBufferPos(0),
+	_decodeBufferUsed(0),
+#endif
+	_state(MP3_STATE_INIT) {
+#ifdef USE_MAD
 	// The MAD_BUFFER_GUARD must always contain zeros (the reason
 	// for this is that the Layer III Huffman decoder of libMAD
 	// may read a few bytes beyond the end of the input buffer).
 	memset(_buf + BUFFER_SIZE, 0, MAD_BUFFER_GUARD);
+#elif defined(USE_MPG123)
+	initMpg123();
+#endif
 }
 
 BaseMP3Stream::~BaseMP3Stream() {
 	deinitStream();
+#ifdef USE_MPG123
+	deinitMpg123();
+#endif
 }
 
+#ifdef USE_MAD
 void BaseMP3Stream::decodeMP3Data(Common::ReadStream &stream) {
 	do {
 		if (_state == MP3_STATE_INIT)
@@ -193,13 +261,11 @@ void BaseMP3Stream::decodeMP3Data(Common::ReadStream &stream) {
 
 void BaseMP3Stream::readMP3Data(Common::ReadStream &stream) {
 	uint32 remaining = 0;
-
 	// Give up immediately if we already used up all data in the stream
 	if (stream.eos()) {
 		_state = MP3_STATE_EOS;
 		return;
 	}
-
 	if (_stream.next_frame) {
 		// If there is still data in the MAD stream, we need to preserve it.
 		// Note that we use memmove, as we are reusing the same buffer,
@@ -208,19 +274,16 @@ void BaseMP3Stream::readMP3Data(Common::ReadStream &stream) {
 		assert(remaining < BUFFER_SIZE);	// Paranoia check
 		memmove(_buf, _stream.next_frame, remaining);
 	}
-
 	// Try to read the next block
 	uint32 size = stream.read(_buf + remaining, BUFFER_SIZE - remaining);
 	if (size <= 0) {
 		_state = MP3_STATE_EOS;
 		return;
 	}
-
 	// Feed the data we just read into the stream decoder
 	_stream.error = MAD_ERROR_NONE;
 	mad_stream_buffer(&_stream, _buf, size + remaining);
 }
-
 void BaseMP3Stream::initStream(Common::ReadStream &stream) {
 	if (_state != MP3_STATE_INIT)
 		deinitStream();
@@ -233,18 +296,14 @@ void BaseMP3Stream::initStream(Common::ReadStream &stream) {
 	// Reset the stream data
 	_curTime = mad_timer_zero;
 	_posInFrame = 0;
-
 	// Update state
 	_state = MP3_STATE_READY;
-
 	// Read the first few sample bytes
 	readMP3Data(stream);
 }
-
 void BaseMP3Stream::readHeader(Common::ReadStream &stream) {
 	if (_state != MP3_STATE_READY)
 		return;
-
 	// If necessary, load more data into the stream decoder
 	if (_stream.error == MAD_ERROR_BUFLEN)
 		readMP3Data(stream);
@@ -324,7 +383,6 @@ int BaseMP3Stream::fillBuffer(Common::ReadStream &stream, int16 *buffer, const i
 	}
 	return samples;
 }
-
 MP3Stream::MP3Stream(Common::SeekableReadStream *inStream, DisposeAfterUse::Flag dispose) :
 		BaseMP3Stream(),
 		_inStream(skipID3(inStream, dispose)),
@@ -362,6 +420,171 @@ MP3Stream::MP3Stream(Common::SeekableReadStream *inStream, DisposeAfterUse::Flag
 int MP3Stream::readBuffer(int16 *buffer, const int numSamples) {
 	return fillBuffer(*_inStream, buffer, numSamples);
 }
+#elif defined(USE_MPG123)
+
+void BaseMP3Stream::initStream() {
+	if (_state != MP3_STATE_INIT)
+		deinitStream();
+
+	// Create new mpg123 handle
+	int err;
+	_handle = mpg123_new(nullptr, &err);
+	if (!_handle) {
+		error("Failed to create mpg123 handle: %s", mpg123_plain_strerror(err));
+		return;
+	}
+
+	// Set format to 16-bit signed
+	mpg123_format_none(_handle);
+	mpg123_format(_handle, 44100, MPG123_MONO | MPG123_STEREO, MPG123_ENC_SIGNED_16);
+
+	// Open feeder (for feeding data manually)
+	if (mpg123_open_feed(_handle) != MPG123_OK) {
+		error("Failed to open mpg123 feeder: %s", mpg123_strerror(_handle));
+		mpg123_delete(_handle);
+		_handle = nullptr;
+		return;
+	}
+
+	_state = MP3_STATE_READY;
+	_decodeBufferPos = 0;
+	_decodeBufferUsed = 0;
+}
+
+void BaseMP3Stream::deinitStream() {
+	if (_handle) {
+		mpg123_close(_handle);
+		mpg123_delete(_handle);
+		_handle = nullptr;
+	}
+	_state = MP3_STATE_INIT;
+}
+
+bool BaseMP3Stream::feedData(const byte *data, size_t size) {
+	if (!_handle || _state != MP3_STATE_READY)
+		return false;
+
+	int ret = mpg123_feed(_handle, data, size);
+	return (ret == MPG123_OK);
+}
+
+void BaseMP3Stream::drainDecoder() {
+	if (!_handle)
+		return;
+
+	while (_state == MP3_STATE_READY) {
+		size_t done;
+		int ret = mpg123_read(_handle, _decodeBuffer, BUFFER_SIZE, &done);
+		
+		if (ret == MPG123_NEW_FORMAT) {
+			// Get format information
+			int encoding;
+			if (mpg123_getformat(_handle, &_rate, &_channels, &encoding) == MPG123_OK) {
+				_encoding = encoding;
+			}
+			continue;
+		}
+		
+		if (ret == MPG123_OK) {
+			_decodeBufferUsed = done;
+			_decodeBufferPos = 0;
+			break;
+		} else if (ret == MPG123_NEED_MORE) {
+			break;
+		} else if (ret == MPG123_DONE) {
+			_state = MP3_STATE_EOS;
+			break;
+		} else {
+			warning("mpg123_read error: %s", mpg123_strerror(_handle));
+			_state = MP3_STATE_EOS;
+			break;
+		}
+	}
+}
+
+int BaseMP3Stream::fillBuffer(int16 *buffer, const int numSamples) {
+	int samples = 0;
+
+	while (samples < numSamples && _state != MP3_STATE_EOS) {
+		// If we have data in the decode buffer, use it first
+		if (_decodeBufferPos < _decodeBufferUsed) {
+			int16 *srcBuffer = (int16 *)(_decodeBuffer + _decodeBufferPos);
+			int availSamples = (_decodeBufferUsed - _decodeBufferPos) / 2; // 16-bit samples
+			int copySamples = MIN(numSamples - samples, availSamples);
+			
+			memcpy(buffer + samples, srcBuffer, copySamples * 2);
+			samples += copySamples;
+			_decodeBufferPos += copySamples * 2;
+		} else {
+			// Need to decode more data
+			drainDecoder();
+			
+			// If we still don't have data after decoding, we're done
+			if (_decodeBufferPos >= _decodeBufferUsed && _state != MP3_STATE_EOS) {
+				break;
+			}
+		}
+	}
+
+	return samples;
+}
+
+MP3Stream::MP3Stream(Common::SeekableReadStream *inStream, DisposeAfterUse::Flag dispose) :
+		BaseMP3Stream(),
+		_inStream(skipID3(inStream, dispose)),
+		_length(0, 1000),
+		_totalSamples(0) {
+
+	// Initialize the decoder
+	initStream();
+
+	// Feed some data to get format information
+	byte buffer[4096];
+	int size = _inStream->read(buffer, sizeof(buffer));
+	if (size > 0) {
+		feedData(buffer, size);
+		drainDecoder();
+	}
+
+	// Calculate the length of the stream by seeking to the end and back
+	if (_rate > 0) {
+		off_t currentPos = _inStream->pos();
+		_inStream->seek(0, SEEK_END);
+		off_t fileSize = _inStream->pos();
+		_inStream->seek(currentPos);
+
+		// Estimate total samples (this is approximate)
+		// Typical bitrate estimation: fileSize * 8 / (bitrate in bps)
+		// For now, use a rough estimate
+		_totalSamples = (fileSize * 8 * _rate) / (128000); // Assume 128kbps
+		_length = Timestamp(_totalSamples, _rate);
+	}
+}
+
+int MP3Stream::readBuffer(int16 *buffer, const int numSamples) {
+	// Read from stream and feed to decoder as needed
+	byte inputBuffer[4096];
+	int samples = 0;
+	
+	while (samples < numSamples && _state != MP3_STATE_EOS) {
+		// Try to fill buffer with already decoded data
+		int decodedSamples = fillBuffer(buffer + samples, numSamples - samples);
+		samples += decodedSamples;
+		
+		// If we didn't get enough samples and we're not at EOS, read more data
+		if (samples < numSamples && _state != MP3_STATE_EOS) {
+			int readBytes = _inStream->read(inputBuffer, sizeof(inputBuffer));
+			if (readBytes > 0) {
+				feedData(inputBuffer, readBytes);
+			} else {
+				_state = MP3_STATE_EOS;
+			}
+		}
+	}
+	
+	return samples;
+}
+#endif
 
 bool MP3Stream::seek(const Timestamp &where) {
 	if (where == _length) {
@@ -370,7 +593,7 @@ bool MP3Stream::seek(const Timestamp &where) {
 	} else if (where > _length) {
 		return false;
 	}
-
+#ifdef USE_MAD
 	const uint32 time = where.msecs();
 
 	mad_timer_t destination;
@@ -380,11 +603,34 @@ bool MP3Stream::seek(const Timestamp &where) {
 		_inStream->seek(0);
 		initStream(*_inStream);
 	}
-
+	
 	while (mad_timer_compare(destination, _curTime) > 0 && _state != MP3_STATE_EOS)
 		readHeader(*_inStream);
 
 	decodeMP3Data(*_inStream);
+
+#elif defined(USE_MPG123)
+	// For now, just seek to beginning and decode until we reach the target
+	// A more sophisticated implementation would use mpg123_seek
+	_inStream->seek(0, SEEK_SET);
+	deinitStream();
+	initStream();
+	
+	// Calculate target sample
+	uint32 targetSample = where.convertToFramerate(_rate).totalNumberOfFrames();
+	uint32 currentSample = 0;
+	
+	// Read and discard samples until we reach the target
+	int16 tempBuffer[1024];
+	while (currentSample < targetSample && _state != MP3_STATE_EOS) {
+		int samplesToRead = MIN((int)(targetSample - currentSample), 1024);
+		int samplesRead = readBuffer(tempBuffer, samplesToRead);
+		currentSample += samplesRead;
+		if (samplesRead == 0) {
+			break;
+		}
+	}
+#endif
 
 	return (_state != MP3_STATE_EOS);
 }
@@ -417,7 +663,7 @@ Common::SeekableReadStream *MP3Stream::skipID3(Common::SeekableReadStream *strea
 PacketizedMP3Stream::PacketizedMP3Stream(Common::SeekableReadStream &firstPacket) :
 		BaseMP3Stream(),
 		_finished(false) {
-
+#ifdef USE_MAD
 	// Load some data to get the channels/rate
 	_queue.push(&firstPacket);
 	decodeMP3Data(firstPacket);
@@ -428,6 +674,24 @@ PacketizedMP3Stream::PacketizedMP3Stream(Common::SeekableReadStream &firstPacket
 	deinitStream();
 	_state = MP3_STATE_INIT;
 	_queue.clear();
+
+#elif defined(USE_MPG123)
+	// Initialize the decoder first
+	initStream();
+
+	// Feed the first packet to get channel/rate info
+	byte buffer[4096];
+	firstPacket.seek(0, SEEK_SET);
+	int size = firstPacket.read(buffer, sizeof(buffer));
+	if (size > 0) {
+		feedData(buffer, size);
+		drainDecoder();
+	}
+
+	// Reset for later use
+	firstPacket.seek(0, SEEK_SET);
+	_queue.push(&firstPacket);
+#endif
 }
 
 PacketizedMP3Stream::PacketizedMP3Stream(uint channels, uint rate) :
@@ -463,14 +727,37 @@ int PacketizedMP3Stream::readBuffer(int16 *buffer, const int numSamples) {
 
 		if (_state == MP3_STATE_INIT) {
 			// Initialize everything
+#ifdef USE_MAD
 			decodeMP3Data(*packet);
+#elif defined(USE_MPG123)
+			initStream();
+			// Feed the packet data
+			byte tempBuffer[4096];
+			packet->seek(0, SEEK_SET);
+			int size = packet->read(tempBuffer, sizeof(tempBuffer));
+			if (size > 0) {
+				feedData(tempBuffer, size);
+				drainDecoder();
+			}
+			packet->seek(0, SEEK_SET);
+#endif
+			_state = MP3_STATE_READY;
 		} else if (_state == MP3_STATE_EOS) {
 			// Reset the end-of-stream setting
 			_state = MP3_STATE_READY;
 		}
-
+#ifdef USE_MAD
 		samples += fillBuffer(*packet, buffer + samples, numSamples - samples);
+#elif defined(USE_MPG123)
+		// Feed remaining data from packet
+		byte tempBuffer[4096];
+		int readBytes = packet->read(tempBuffer, sizeof(tempBuffer));
+		if (readBytes > 0) {
+			feedData(tempBuffer, readBytes);
+		}
 
+		samples += fillBuffer(buffer + samples, numSamples - samples);
+#endif
 		// If the stream is done, kill it
 		if (packet->pos() >= packet->size()) {
 			_queue.pop();
@@ -560,4 +847,4 @@ PacketizedAudioStream *makePacketizedMP3Stream(uint channels, uint rate) {
 
 } // End of namespace Audio
 
-#endif // #ifdef USE_MAD
+#endif // #ifdef USE_MP3

@@ -55,7 +55,7 @@ static const CompressedSpeechFile compressedSpeechFilesTable[] = {
 #ifdef USE_VORBIS
 	{ "TOUCHE.SOG", Audio::makeVorbisStream },
 #endif
-#ifdef USE_MAD
+#ifdef USE_MP3
 	{ "TOUCHE.SO3", Audio::makeMP3Stream },
 #endif
 	{ 0, 0 }

@@ -156,7 +156,7 @@ void AudioPlayer::handleFanmadeSciAudio(reg_t sciAudioObject, SegManager *segMan
 
 		switch (audioCompressionType) {
 		case MKTAG('M','P','3',' '):
-#ifdef USE_MAD
+#ifdef USE_MP3
 			audioStream = Audio::makeMP3Stream(sciAudioFile, DisposeAfterUse::YES);
 #endif
 			break;
@@ -401,7 +401,7 @@ Audio::RewindableAudioStream *AudioPlayer::getAudioStream(uint32 number, uint32 
 	if (audioCompressionType) {
 		// Compressed audio made by our tool
 		switch (audioCompressionType) {
-#ifdef USE_MAD
+#ifdef USE_MP3
 		case MKTAG('M','P','3',' '):
 			audioSeekStream = Audio::makeMP3Stream(memoryStream, DisposeAfterUse::YES);
 			break;

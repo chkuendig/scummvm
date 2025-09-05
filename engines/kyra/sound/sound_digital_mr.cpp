@@ -237,9 +237,9 @@ const SoundDigital_MR::AudioCodecs SoundDigital_MR::_supportedCodecs[] = {
 #ifdef USE_VORBIS
 	{ ".OGG", Audio::makeVorbisStream },
 #endif // USE_VORBIS
-#ifdef USE_MAD
+#ifdef USE_MP3
 	{ ".MP3", Audio::makeMP3Stream },
-#endif // USE_MAD
+#endif // USE_MP3
 	{ ".AUD", makeAUDStream },
 	{ nullptr, nullptr }
 };

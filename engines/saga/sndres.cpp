@@ -419,7 +419,7 @@ bool SndRes::load(ResourceContext *context, uint32 resourceId, SoundBuffer &buff
 		Common::SeekableReadStream *memStream = READ_STREAM(soundResourceLength - 9);
 
 		if (resourceType == kSoundMP3) {
-#ifdef USE_MAD
+#ifdef USE_MP3
 			audStream = Audio::makeMP3Stream(memStream, DisposeAfterUse::YES);
 #endif
 		} else if (resourceType == kSoundOGG) {

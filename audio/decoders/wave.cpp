@@ -160,7 +160,7 @@ bool loadWAVFromStream(Common::SeekableReadStream &stream, int &size, int &rate,
 	case kWaveFormatALawPCM:
 	case kWaveFormatMuLawPCM:
 	case kWaveFormatMSIMAADPCM:
-	#ifdef USE_MAD
+	#ifdef USE_MP3
 	case kWaveFormatMP3:
 	#endif
 		break;
@@ -260,7 +260,7 @@ SeekableAudioStream *makeWAVStream(Common::SeekableReadStream *stream, DisposeAf
 		return makeADPCMStream(dataStream, DisposeAfterUse::YES, 0, Audio::kADPCMMSIma, rate, channels, blockAlign);
 	case kWaveFormatMSADPCM:
 		return makeADPCMStream(dataStream, DisposeAfterUse::YES, 0, Audio::kADPCMMS, rate, channels, blockAlign);
-	#ifdef USE_MAD
+	#ifdef USE_MP3
 	case kWaveFormatMP3:
 		return makeMP3Stream(dataStream, DisposeAfterUse::YES);
 	#endif

@@ -94,7 +94,7 @@ const char gScummVMFeatures[] = ""
 	"FLAC "
 #endif
 
-#ifdef USE_MAD
+#ifdef USE_MP3
 	"MP3 "
 #endif
 

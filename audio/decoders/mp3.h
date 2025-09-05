@@ -44,7 +44,14 @@
 #include "common/scummsys.h"
 #include "common/types.h"
 
-#ifdef USE_MAD
+// Define USE_MP3 if we have either MAD or MPG123
+#if defined(USE_MAD) || defined(USE_MPG123)
+#ifndef USE_MP3
+#define USE_MP3
+#endif
+#endif
+
+#ifdef USE_MP3
 
 namespace Common {
 class SeekableReadStream;
@@ -89,5 +96,5 @@ PacketizedAudioStream *makePacketizedMP3Stream(
 
 } // End of namespace Audio
 
-#endif // #ifdef USE_MAD
+#endif // #ifdef USE_MP3
 #endif // #ifndef AUDIO_MP3_H
