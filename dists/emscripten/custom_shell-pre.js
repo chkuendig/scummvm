@@ -16,45 +16,36 @@ globalThis.httpShowProgressBar = function (filename) {
 	window.progressBarStartTime = Date.now();
 
 	// Reset progress bar state
-	document.getElementById("download-modal-progress-fill").style.transition =
-		"none";
+	document.getElementById("download-modal-progress-fill").style.transition = "none";
 	document.getElementById("download-modal-progress-fill").style.width = "0%";
 
 	// Set the filename in the modal title
-	document.getElementById("download-modal-title").firstChild.innerHTML =
-		filename;
+	document.getElementById("download-modal-title").firstElementChild.innerHTML = filename;
 
 	// Show the modal
 	document.getElementById("download-modal").style.display = "block";
 
 	// Enable smooth transition after a short delay
 	setTimeout(() => {
-		document.getElementById(
-			"download-modal-progress-fill"
-		).style.transition = "width 0.5s ease";
+		document.getElementById("download-modal-progress-fill").style.transition = "width 0.5s ease";
 	}, 10);
 };
 
-globalThis.httpUpdateProgressBar = function (current, total) {
+globalThis.httpUpdateProgressBar = function (currentBytes, totalBytes) {
 	if (window.progressBarStartTime === undefined) {
 		window.progressBarStartTime = Date.now();
 	}
 
-	const progressPercent = (current / total) * 100 + "%";
-	document.getElementById("download-modal-progress-fill").style.width =
-		progressPercent;
-	document.getElementById("download-modal-progress-text").innerHTML =
-		"Downloaded " +
-		globalThis.formatBytes(current) +
-		" / " +
-		globalThis.formatBytes(total);
+	const progressPercent = (currentBytes / totalBytes) * 100 + "%";
+	document.getElementById("download-modal-progress-fill").style.width = progressPercent;
+	const progressText = "Downloaded " + globalThis.formatBytes(currentBytes) + " / " + globalThis.formatBytes(totalBytes);
+	document.getElementById("download-modal-progress-text").innerHTML = progressText;
 
 	// Calculate download speed
 	const elapsedSeconds = (Date.now() - window.progressBarStartTime) / 1000;
 	if (elapsedSeconds > 0) {
-		const speed = current / elapsedSeconds;
-		document.getElementById("download-modal-speed-text").innerHTML =
-			"Download speed: " + globalThis.formatBytes(speed) + "/s";
+		const speedText = "Download speed: " + globalThis.formatBytes( currentBytes / elapsedSeconds) + "/s";
+		document.getElementById("download-modal-speed-text").innerHTML = speedText;
 	}
 };
 
@@ -63,8 +54,7 @@ globalThis.httpHideProgressBar = function () {
 	document.getElementById("download-modal").style.display = "none";
 
 	// Reset progress bar for future use
-	document.getElementById("download-modal-progress-fill").style.transition =
-		"none";
+	document.getElementById("download-modal-progress-fill").style.transition = "none";
 	document.getElementById("download-modal-progress-fill").style.width = "0%";
 
 	// Reset the start time
@@ -95,34 +85,24 @@ fetch = (input, init) => {
 		startTime = Date.now();
 		filename = input.split("/").pop();
 		return originalFetch(input, init).then((response) => {
-			document.getElementById("download-modal-title").firstChild.innerHTML = filename;
-			document.getElementById('download-modal').style.display = 'block';
+			globalThis.httpShowProgressBar(filename);
 			var contentLength = response.headers.get("Content-Length");
-			var total = parseInt(contentLength, 10);
-			var loaded = 0;
-
-			function progressHandler(bytesLoaded, totalBytes) {
-				document.getElementById("download-modal-progress-fill").style.width = (bytesLoaded / totalBytes) * 100 + "%";
-				document.getElementById("download-modal-progress-text").innerHTML = "Downloaded " + globalThis.formatBytes(bytesLoaded) + " / " + globalThis.formatBytes(totalBytes);
-				document.getElementById("download-modal-speed-text").innerHTML = "Download speed: " + globalThis.formatBytes(bytesLoaded / ((Date.now() - startTime) / 1000)) + "/s";
-			}
+			var totalBytes = parseInt(contentLength, 10);
+			var loadedBytes = 0;
 
 			var res = new Response( new ReadableStream( {
 						async start(controller) {
 							var reader = response.body.getReader();
 							for (;;) {
 								var { done, value } = await reader.read();
-
 								if (done) {
-									progressHandler(total, total);
 									break;
 								}
-
 								controller.enqueue(value);
-								loaded += value.byteLength;
-								progressHandler(loaded, total);
+								loadedBytes += value.byteLength;
+								globalThis.httpUpdateProgressBar(loadedBytes, totalBytes);
 							}
-							document.getElementById('download-modal').style.display = 'none';
+							globalThis.httpHideProgressBar();
 							controller.close();
 						},
 					},
