@@ -34,7 +34,7 @@ mergeInto(LibraryManager.library, {
         const method = UTF8ToString(methodPtr);
         const url = UTF8ToString(urlPtr);
         const fetchId = window.scummvmNextFetchId++;
-        console.log("Starting fetch #" + fetchId + " for URL: " + url + " with method: " + method);
+        console.debug("Starting fetch #" + fetchId + " for URL: " + url + " with method: " + method);
         
         // Initialize fetch object
         const fetch = {
@@ -67,12 +67,12 @@ mergeInto(LibraryManager.library, {
                 const valuePtr = HEAP32[(headersPtr >> 2) + (i*2+1)];
                 const key = UTF8ToString(keyPtr);
                 const value = UTF8ToString(valuePtr);
-                console.log(`Adding header: ${key} = ${value}`);
+                console.debug(`Adding header: ${key} = ${value}`);
                 headersObj.append(key, value);
                 i++;
             }
             headers = headersObj;
-            console.log("Request headers:", JSON.stringify(headers));
+            console.debug("Request headers:", JSON.stringify(headers));
         }
         
         const options = {
@@ -84,7 +84,7 @@ mergeInto(LibraryManager.library, {
         if (requestDataPtr && requestDataSize > 0) {
             const bodyData = new Uint8Array(HEAPU8.buffer, requestDataPtr, requestDataSize);
             options.body = bodyData;
-            console.log("Added request body, size:", requestDataSize);
+            console.debug("Added request body, size:", requestDataSize);
         }
         
         // Start the fetch
@@ -132,7 +132,7 @@ mergeInto(LibraryManager.library, {
             const contentLength = response.headers.get('Content-Length');
             if (contentLength) {
                 fetch.totalBytes = parseInt(contentLength, 10);
-                fetch.bufferSize = fetch.totalBytes;
+                fetch.bufferSize = fetch.totalBytes * 1.2; // Allocate 20% extra space for gzipped content
             } else {
                 fetch.bufferSize = 1024 * 1024; // 1MB
             }
@@ -141,7 +141,7 @@ mergeInto(LibraryManager.library, {
 
             // Check for error status codes (4xx, 5xx)
             if (!response.ok) {
-                console.log(`Fetch #${fetchId} received error status: ${response.status} ${response.statusText}`);
+                console.debug(`Fetch #${fetchId} received error status: ${response.status} ${response.statusText}`);
                 // For error responses, we still want to read the body for potential error details
                 // but mark the request as not successful
                 fetch.success = false;
@@ -161,8 +161,6 @@ mergeInto(LibraryManager.library, {
                 try {
                     while (true) {
                         const {done, value} = await reader.read();
-                        if(value)
-                            console.debug(`Fetch #${fetchId} read ${value.length} bytes`);
                         if (done) {
                             // Finished reading
                             fetch.completed = true;
@@ -173,9 +171,9 @@ mergeInto(LibraryManager.library, {
                         }
                         
                         // Ensure we have enough buffer space
-                        if (fetch.numBytes + value.length > fetch.bufferSize &&
-                            fetch.totalBytes === 0) { // totalBytes is based on content-length header
-                            fetch.bufferSize = fetch.bufferSize * 2;
+                        if (fetch.numBytes + value.length > fetch.bufferSize) { // totalBytes is based on content-length header which is off for gzipped content
+                            console.debug(`Fetch #${fetchId} expanding buffer from ${fetch.bufferSize} to ${(fetch.numBytes + value.length) * 1.2}`);
+                            fetch.bufferSize = (fetch.numBytes + value.length) * 1.2; 
                             const newBuffer = _malloc(fetch.bufferSize);
                             if (fetch.numBytes > 0) {
                                 // Copy existing data if needed
@@ -184,6 +182,9 @@ mergeInto(LibraryManager.library, {
                             _free(fetch.buffer);
                             fetch.buffer = newBuffer;
                         } 
+                        if(fetch.totalBytes && fetch.numBytes + value.length > fetch.totalBytes) {
+                            fetch.totalBytes = fetch.numBytes + value.length; // Adjust totalBytes if we underestimated due to gzip
+                        }
                         
                         // Copy data to the buffer
                         HEAPU8.set(value, fetch.buffer + fetch.numBytes);
@@ -220,7 +221,7 @@ mergeInto(LibraryManager.library, {
         const fetch = window.scummvmFetches[fetchId];
         if (!fetch) return;
         
-        console.log("Closing fetch #" + fetchId);
+        console.debug("Closing fetch #" + fetchId);
         
         // Cancel reader if active
         if (fetch.reader) {
@@ -277,7 +278,7 @@ mergeInto(LibraryManager.library, {
     
     httpFetchGetDataPointer: function(fetchId) {
         const fetch = window.scummvmFetches[fetchId];
-        //console.log("Fetch #" + fetchId + " data pointer requested:", fetch ? fetch.buffer : "not found");
+        //console.debug("Fetch #" + fetchId + " data pointer requested:", fetch ? fetch.buffer : "not found");
         if (!fetch) return 0;
         return fetch.buffer;
     },
