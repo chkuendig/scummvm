@@ -18,6 +18,9 @@ dist-emscripten: $(EXECUTABLE) $(PLUGINS)
 ifdef DIST_FILES_ENGINEDATA
 	cp $(DIST_FILES_ENGINEDATA) ./build-emscripten/data
 endif
+ifdef DIST_FILES_ENGINEDATA_BIG
+	cp $(DIST_FILES_ENGINEDATA_BIG) ./build-emscripten/data
+endif
 ifdef DIST_FILES_NETWORKING
 	cp $(DIST_FILES_NETWORKING) ./build-emscripten/data
 endif
