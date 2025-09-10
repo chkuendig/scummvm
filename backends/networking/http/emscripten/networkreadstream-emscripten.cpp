@@ -277,9 +277,8 @@ const char *NetworkReadStreamEmscripten::getError() const {
 	}
 
 	// Get error message directly from JavaScript side
-	// Note: This allocates memory that should be freed after use
-	// but since this is a const method that returns const char*,
-	// we have to accept a small memory leak here
+	// TODO: This should be freed after use, but how?
+
 	return httpFetchGetErrorMessage(_fetchId);
 }
 

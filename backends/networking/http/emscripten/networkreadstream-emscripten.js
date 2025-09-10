@@ -39,7 +39,6 @@ mergeInto(LibraryManager.library, {
         // Initialize fetch object
         const fetch = {
             id: fetchId,
-            readyState: 0,
             status: 0,
             statusText: 0, // Will allocate when response arrives
             url: urlPtr,
@@ -90,15 +89,8 @@ mergeInto(LibraryManager.library, {
         // Start the fetch
         window.fetch(url, options)
         .then(response => {
-            fetch.readyState = 2; // HEADERS_RECEIVED
             fetch.status = response.status;
-            
-            // Store status text
-            if (fetch.statusText) _free(fetch.statusText);
-            const statusTextJS = response.statusText;
-            const statusTextLen = lengthBytesUTF8(statusTextJS) + 1;
-            fetch.statusText = _malloc(statusTextLen);
-            stringToUTF8(statusTextJS, fetch.statusText, statusTextLen);
+            fetch.statusText = response.statusText;
             
             // Store headers array for efficient access
             let responseHeadersArray = 0;
@@ -149,7 +141,6 @@ mergeInto(LibraryManager.library, {
                 fetch.success = true;
             }
             
-            fetch.readyState = 3; // LOADING
             console.debug("Fetch #" + fetchId + " headers received, status: " + response.status);
 
             // Start reading the data
@@ -165,7 +156,6 @@ mergeInto(LibraryManager.library, {
                             // Finished reading
                             fetch.completed = true;
                             fetch.active = false;
-                            fetch.readyState = 4; // DONE
                             console.debug(`Fetch #${fetchId} complete: Read ${fetch.numBytes} bytes total`);
                             break;
                         }
