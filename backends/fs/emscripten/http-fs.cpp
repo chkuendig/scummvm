@@ -65,14 +65,12 @@ void HTTPFilesystemNode::errorCallbackGetChildren(const Networking::ErrorRespons
 }
 
 HTTPFilesystemNode::HTTPFilesystemNode(const Common::String &path, const Common::String &displayName, const Common::String &baseUrl, bool isValid, bool isDirectory, int size) : _path(path), _displayName(displayName), _url(baseUrl), _isValid(isValid), _isDirectory(isDirectory), _size(size) {
-	debug(5, "HTTPFilesystemNode::HTTPFilesystemNode(%s, %s)", path.c_str(), baseUrl.c_str());
 	assert(path.size() > 0);
 	assert(isDirectory || size >= 0 || !isValid);
 	_children = new AbstractFSList();
 }
 
 HTTPFilesystemNode::HTTPFilesystemNode(const Common::String &p) : _path(p), _isValid(false), _isDirectory(false), _size(-1) {
-	debug(5, "HTTPFilesystemNode::HTTPFilesystemNode(%s)", p.c_str());
 	assert(p.size() > 0);
 	_children = new AbstractFSList();
 

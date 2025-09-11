@@ -113,6 +113,8 @@ ifdef USE_CLOUD
 MODULE_OBJS += \
 	fs/emscripten/cloud-fs.o \
 	fs/emscripten/cloud-file-stream.o
+else
+	MODULE_OBJS += cloud/cloudicon.o
 endif
 ifdef USE_TTS
 MODULE_OBJS += \

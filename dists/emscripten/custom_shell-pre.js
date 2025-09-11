@@ -1,9 +1,8 @@
 /*global Module*/
 Module["arguments"] = [];
 
-// Shared utility function for formatting bytes - used by both pre-js and library code
 const units = ['bytes', 'KB', 'MB', 'GB'];
-globalThis.formatBytes = function(x) {
+function formatBytes(x) {
 	let l = 0, n = parseInt(x, 10) || 0;
 	while(n >= 1000 && ++l){
 		n = n/1000;
@@ -11,7 +10,7 @@ globalThis.formatBytes = function(x) {
 	return(n.toFixed(n < 10 && l > 0 ? 1 : 0) + ' ' + units[l]);
 };
 
-globalThis.httpShowProgressBar = function (filename) {
+function httpShowProgressBar(filename) {
 	// Reset and initialize the progress bar
 	window.progressBarStartTime = Date.now();
 
@@ -31,7 +30,7 @@ globalThis.httpShowProgressBar = function (filename) {
 	}, 10);
 };
 
-globalThis.httpUpdateProgressBar = function (currentBytes, totalBytes) {
+function httpUpdateProgressBar(currentBytes, totalBytes) {
 	if (window.progressBarStartTime === undefined) {
 		window.progressBarStartTime = Date.now();
 	}
@@ -49,7 +48,7 @@ globalThis.httpUpdateProgressBar = function (currentBytes, totalBytes) {
 	}
 };
 
-globalThis.httpHideProgressBar = function () {
+function httpHideProgressBar() {
 	// Hide the modal
 	document.getElementById("download-modal").style.display = "none";
 
@@ -81,11 +80,11 @@ window.addEventListener("hashchange", function () {
 
 var originalFetch = fetch;
 fetch = (input, init) => {
-	if (typeof input == "string" && (input.endsWith(".wasm") || input.endsWith(".so"))) {
+	if (typeof input == "string" && (input.endsWith("scummvm.wasm"))) {
 		startTime = Date.now();
 		filename = input.split("/").pop();
 		return originalFetch(input, init).then((response) => {
-			globalThis.httpShowProgressBar(filename);
+			httpShowProgressBar("Loading ScummVM... ");
 			var contentLength = response.headers.get("Content-Length");
 			var totalBytes = parseInt(contentLength, 10);
 			var loadedBytes = 0;
@@ -102,7 +101,7 @@ fetch = (input, init) => {
 								loadedBytes += value.byteLength;
 								globalThis.httpUpdateProgressBar(loadedBytes, totalBytes);
 							}
-							globalThis.httpHideProgressBar();
+							httpHideProgressBar();
 							controller.close();
 						},
 					},

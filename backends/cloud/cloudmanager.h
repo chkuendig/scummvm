@@ -288,6 +288,10 @@ public:
 	/** Shows a "cloud disabled" icon for three seconds. */
 	void showCloudDisabledIcon();
 
+	Cloud::CloudIcon *getCloudIcon() {
+		return &_icon;
+	}
+
 	///// DownloadFolderRequest-related /////
 
 	/** Starts a folder download. */

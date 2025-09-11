@@ -38,6 +38,7 @@ protected:
 	uint64 _fileSize;
 	uint64 _currentPos;
 	bool _eos;  // True when a read operation has hit EOF
+	bool _downloadProgressShowedOverlay = false;
 	static const uint64 CHUNK_SIZE = 10 * 1024 * 1024; // 10MB chunks
 	/*
 	 * Note on CHUNK_SIZE: 10MB is probably too big, but avoids the following issue
@@ -64,6 +65,11 @@ protected:
 
 	// Abstract method to be implemented by subclasses
 	virtual void downloadChunk(uint32 chunkIndex, uint64 chunkStart, uint64 chunkLength) = 0;
+
+	// Progress management methods
+	void startDownloadProgress(uint32 chunkIndex, uint64 chunkLength);
+	void updateDownloadProgress(double progress, uint64 chunkLength, uint32 downloadStartTime);
+	void completeDownloadProgress(uint64 chunkLength);
 
 public:
 	NetworkFileStream(const Common::String &displayName, const Common::String &cachePath, uint64 fileSize);

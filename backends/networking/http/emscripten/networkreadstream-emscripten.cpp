@@ -185,6 +185,9 @@ void NetworkReadStreamEmscripten::setupFormMultipart(const Common::HashMap<Commo
 }
 double NetworkReadStreamEmscripten::getProgress() const {
 	uint64 numBytes = httpFetchGetNumBytes(_fetchId);
+	if(numBytes == 0){ 
+		return 0.0; // avoid division by zero in case totalBytes zero
+	}
 	uint64 totalBytes = httpFetchGetTotalBytes(_fetchId);
 	debug(5, "NetworkReadStreamEmscripten::getProgress - Progress: %llu / %llu for %s", numBytes, totalBytes, _url.c_str());
 	return (double)numBytes / (double)totalBytes;

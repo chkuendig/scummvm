@@ -56,11 +56,9 @@ void CloudFileStream::downloadChunk(uint32 chunkIndex, uint64 chunkStart, uint64
 	debug(5, "CloudFileStream: Downloading chunk %u: bytes %llu-%llu",
 		  chunkIndex + 1, chunkStart, chunkStart + chunkLength - 1);
 
-	// Show progress bar with chunk info
-	Common::String progressText = _displayName.c_str();
-	if (_numChunks > 1)
-		progressText = Common::String::format("%s - part %u/%u", _displayName.c_str(), chunkIndex + 1, _numChunks);
-	httpShowProgressBar(progressText.c_str());
+		  
+	startDownloadProgress(chunkIndex, chunkLength);
+	uint32 downloadStartTime = g_system->getMillis();
 
 	// Download the chunk
 	Cloud::DownloadRequest *downloadRequest = dynamic_cast<Cloud::DownloadRequest *>(_storage->downloadById(
@@ -73,7 +71,8 @@ void CloudFileStream::downloadChunk(uint32 chunkIndex, uint64 chunkStart, uint64
 
 	// Wait for download to complete with progress updates
 	while (!chunkFile->exists()) {
-		httpUpdateProgressBar(downloadRequest->getProgress() * chunkLength, chunkLength);
+		// Update download progress
+		updateDownloadProgress(downloadRequest->getProgress(), chunkLength, downloadStartTime);
 		g_system->delayMillis(10);
 	}
 
@@ -81,7 +80,7 @@ void CloudFileStream::downloadChunk(uint32 chunkIndex, uint64 chunkStart, uint64
 		error("CloudFileStream: Failed to download chunk %u", chunkIndex + 1);
 	}
 
-	httpHideProgressBar();
+	completeDownloadProgress(chunkLength);
 }
 
 #endif // EMSCRIPTEN

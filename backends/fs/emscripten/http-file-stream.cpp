@@ -47,7 +47,7 @@ void HttpFileStream::errorCallbackDownloadFile(const Networking::ErrorResponse &
 	// Error is handled by SessionRequest
 }
 
-void HttpFileStream::downloadChunk(uint32 chunkIndex,uint64 chunkStart, uint64 chunkLength) {
+void HttpFileStream::downloadChunk(uint32 chunkIndex, uint64 chunkStart, uint64 chunkLength) {
 	assert(chunkIndex < _numChunks);
 
 	Common::String chunkPath = getChunkPath(chunkIndex);
@@ -70,25 +70,23 @@ void HttpFileStream::downloadChunk(uint32 chunkIndex,uint64 chunkStart, uint64 c
 
 	// Start the download - this sets state to PROCESSING
 	request->start();
-	// Show progress bar with chunk info
-	Common::String progressText = _displayName.c_str();
-	if (_numChunks > 1)
-		progressText = Common::String::format("%s - part %u/%u", _displayName.c_str(), chunkIndex + 1, _numChunks);
-	httpShowProgressBar(progressText.c_str());
 
 	// Wait for completion by checking both request state AND file existence/size
 	// This matches the original HTTPFilesystemNode pattern
+
+	startDownloadProgress(chunkIndex, chunkLength);
+	uint32 downloadStartTime = g_system->getMillis();
 	while (!chunkFile->exists()) {
-		httpUpdateProgressBar(request->getProgress() * chunkLength, chunkLength);
+		updateDownloadProgress(request->getProgress(), chunkLength, downloadStartTime);
 		g_system->delayMillis(10);
 	}
 	debug(5, "HTTPFilesystemNode::createReadStream() download completed for %s", chunkPath.c_str());
 	if (!request->success()) {
 		error("HttpFileStream: Failed to download chunk %u", chunkIndex + 1);
 	}
+	completeDownloadProgress(chunkLength);
 
 	request->close();
-	httpHideProgressBar();
 }
 
 #endif // EMSCRIPTEN

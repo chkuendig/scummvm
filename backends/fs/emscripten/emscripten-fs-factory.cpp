@@ -45,7 +45,6 @@ AbstractFSNode *EmscriptenFilesystemFactory::makeRootFileNode() const {
 }
 
 AbstractFSNode *EmscriptenFilesystemFactory::makeFileNodePath(const Common::String &path) const {
-	debug(5, "EmscriptenFilesystemFactory::makeFileNodePath(%s)", path.c_str());
 	assert(!path.empty());
 	if (path.hasPrefix(DATA_PATH)) {
 		if (!_httpNodes->contains(path)) {

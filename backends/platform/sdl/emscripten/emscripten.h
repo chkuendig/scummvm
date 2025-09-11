@@ -23,6 +23,7 @@
 #define PLATFORM_SDL_EMSCRIPTEN_H
 
 #include "backends/platform/sdl/posix/posix.h"
+#include "backends/cloud/cloudicon.h"
 #ifdef USE_CLOUD
 #include "backends/networking/http/request.h"
 #include "common/ustr.h"
@@ -36,9 +37,7 @@ void toggleFullscreen(bool enable);
 void downloadFile(const char *filenamePtr, char *dataPtr, int dataSize);
 // Filesystem functions
 void fsInitSettingsFile(const char *pathPtr);
-void httpUpdateProgressBar(int current, int total);
-void httpShowProgressBar(const char *filename);
-void httpHideProgressBar();
+
 // Cloud functions
 #ifdef USE_CLOUD
 void cloudConnectionWizardCallback(char *str); // pass cloud storage activation data from JS to setup wizard
@@ -71,10 +70,19 @@ public:
 	void init() override;
 	void addSysArchivesToSearchSet(Common::SearchSet &s, int priority) override;
 
+	/* 
+	 * Returns the Cloud Icon 
+	 * Emscripten uses the cloud icon for network backed file streams, 
+	 * even if Cloud is not compiled in.
+	 */
+	Cloud::CloudIcon *getCloudIcon();
 #ifdef USE_CLOUD
 	void setCloudConnectionCallback(CloudConnectionCallback cb) { _cloudConnectionCallback = cb; }
 	bool openUrl(const Common::String &url) override;
 #endif // USE_CLOUD
+
+	// Download progress functionality
+	void updateDownloadProgress(int currentBytes, int totalBytes, int downloadStartTime);
     
 protected:
 	Common::Path getDefaultConfigFileName() override;
@@ -82,6 +90,9 @@ protected:
 
 private:
 	void updateTimers();
+#ifndef USE_CLOUD
+	Cloud::CloudIcon *_cloudIcon; 
+#endif
 };
 
 #endif

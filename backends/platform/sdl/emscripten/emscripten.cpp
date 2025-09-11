@@ -28,12 +28,21 @@
 #include "backends/events/emscriptensdl/emscriptensdl-events.h"
 #include "backends/fs/emscripten/emscripten-fs-factory.h"
 #include "backends/mutex/null/null-mutex.h"
-#include "backends/fs/emscripten/emscripten-fs-factory.h"
 #include "backends/platform/sdl/emscripten/emscripten.h"
 #include "backends/timer/default/default-timer.h"
 #include "common/file.h"
+#include "common/std/algorithm.h"
+#include "common/util.h"
+#ifdef USE_OPENGL
+#include "backends/graphics/opengl/opengl-graphics.h"
+#endif
+#include "graphics/font.h"
+#include "graphics/fontman.h"
 #ifdef USE_TTS
 #include "backends/text-to-speech/emscripten/emscripten-text-to-speech.h"
+#endif
+#ifdef USE_CLOUD
+#include "backends/cloud/cloudmanager.h"
 #endif
 
 extern "C" {
@@ -57,7 +66,6 @@ void OSystem_Emscripten::initBackend() {
 	// Initialize Text to Speech manager
 	_textToSpeechManager = new EmscriptenTextToSpeechManager();
 #endif
-
 
 	// Event source
 	_eventSource = new EmscriptenSdlEventSource();
@@ -201,8 +209,21 @@ void OSystem_Emscripten::delayMillis(uint msecs) {
 		pause = pause > 10 ? 10 : pause; // ensure we don't pause for too long
 	} while (pause > 0);
 	lastThreshold = threshold;
+	if (getCloudIcon() && getCloudIcon()->needsUpdate()) {
+		getCloudIcon()->update();
+	}
 }
 
+Cloud::CloudIcon *OSystem_Emscripten::getCloudIcon() {
+#ifndef USE_CLOUD
+	if (!_cloudIcon) {
+		_cloudIcon = new Cloud::CloudIcon();
+	}
+	return _cloudIcon;
+#else
+	return CloudMan.getCloudIcon();
+#endif
+}
 #ifdef USE_CLOUD
 bool OSystem_Emscripten::openUrl(const Common::String &url) {
 	if(url.hasPrefix("https://cloud.scummvm.org/")){
@@ -211,5 +232,93 @@ bool OSystem_Emscripten::openUrl(const Common::String &url) {
 	return	OSystem_SDL::openUrl(url);
 }
 #endif
+
+void OSystem_Emscripten::updateDownloadProgress(int currentBytes, int totalBytes, int downloadStartTime) {
+	int elapsedMs = g_system->getMillis() - downloadStartTime;
+	if (totalBytes <= 0 || elapsedMs <= 0) {
+		return;
+	}
+	// Calculate progress from bytes
+
+	if (_graphicsManager) {
+
+		double progress = (double)currentBytes / totalBytes;
+
+		// Make progress bar appropriately sized but within overlay bounds
+		int wRect = _graphicsManager->getOverlayWidth() * 0.7;
+		int lRect = 80;
+		int borderWidth = 3;
+		// Get overlay pixel format for proper color handling
+		Graphics::PixelFormat overlayFormat = _graphicsManager->getOverlayFormat();
+
+		// Create a temporary surface for drawing
+		Graphics::Surface tempSurface;
+		tempSurface.create(wRect, lRect, overlayFormat);
+
+		int wProgressFill = (int)((wRect - 2 * borderWidth) * progress);
+		uint32 bgColor = overlayFormat.ARGBToColor(128, 60, 60, 60); // Semi-transparent dark gray
+		uint32 borderColor = overlayFormat.RGBToColor(0, 0, 0);      // Black border
+		uint32 fillColor = overlayFormat.RGBToColor(255, 255, 255);  // White fill
+
+		// Fill background
+		tempSurface.fillRect(Common::Rect(0, 0, wRect, lRect), bgColor);
+		// Draw border
+		for (int b = 0; b < borderWidth; b++) {
+			tempSurface.frameRect(Common::Rect(b, b, wRect - b, lRect - b), borderColor);
+		}
+		// Draw progress fill
+		if (wProgressFill > 0) {
+			tempSurface.fillRect(Common::Rect(borderWidth, borderWidth, borderWidth + wProgressFill, lRect - borderWidth), fillColor);
+		}
+
+		// Draw text elements
+		const Graphics::Font *localizedFont = FontMan.getFontByUsage(Graphics::FontManager::kLocalizedFont);
+
+		// Percentage text (centered)
+		Common::String percentText = Common::String::format("%.0f%%", progress * 100);
+		int percentWidth = localizedFont->getStringWidth(percentText);
+		int percentHeight = localizedFont->getFontHeight();
+		int percentX = (wRect - percentWidth) / 2;
+		int percentY = (lRect - percentHeight) / 2;
+		uint32 percentColor = (percentX < borderWidth + wProgressFill) && (percentX + percentWidth > borderWidth) ? overlayFormat.RGBToColor(0, 0, 0) : // Black text on white fill
+								  overlayFormat.RGBToColor(255, 255, 255);                                                                              // White text on dark background
+		localizedFont->drawString(&tempSurface, percentText, percentX, percentY, percentWidth, percentColor, Graphics::kTextAlignCenter);
+
+		// Progress bytes text (bottom-left aligned)
+		const char *currentUnits, *totalUnits;
+		Common::String currentBytesStr = Common::getHumanReadableBytes((uint64)currentBytes, currentUnits);
+		Common::String totalBytesStr = Common::getHumanReadableBytes((uint64)totalBytes, totalUnits);
+		Common::String progressText = Common::String::format("%s%s/%s%s", currentBytesStr.c_str(), currentUnits, totalBytesStr.c_str(), totalUnits);
+		int progressWidth = localizedFont->getStringWidth(progressText);
+		int progressX = borderWidth + 3;                                                                                                                    // Left aligned with small margin
+		int progressY = lRect - localizedFont->getFontHeight() - borderWidth - 1;                                                                           // Bottom aligned with small margin
+		uint32 progressColor = (progressX < borderWidth + wProgressFill) && (progressX + progressWidth > borderWidth) ? overlayFormat.RGBToColor(0, 0, 0) : // Black text on white fill
+								   overlayFormat.RGBToColor(255, 255, 255);                                                                                 // White text on dark background
+		localizedFont->drawString(&tempSurface, progressText, progressX, progressY, progressWidth, progressColor, Graphics::kTextAlignLeft);
+
+		// Speed text (bottom-right aligned)
+		if (currentBytes > 0) {
+			double bytesPerSecond = (double)currentBytes / (elapsedMs / 1000.0);
+			const char *speedUnits;
+			Common::String speed = Common::getHumanReadableBytes((uint64)bytesPerSecond, speedUnits);
+			Common::String speedText = Common::String::format("%s %s/s", speed.c_str(), speedUnits);
+			int speedWidth = localizedFont->getStringWidth(speedText);
+			int speedX = wRect - speedWidth - borderWidth - 2;                                                                                      // Right aligned with small margin
+			int speedY = lRect - localizedFont->getFontHeight() - borderWidth - 3;                                                                  // Bottom aligned with small margin
+			uint32 speedColor = (speedX < borderWidth + wProgressFill) && (speedX + speedWidth > borderWidth) ? overlayFormat.RGBToColor(0, 0, 0) : // Black text on white fill
+									overlayFormat.RGBToColor(255, 255, 255);                                                                        // White text on dark background
+			localizedFont->drawString(&tempSurface, speedText, speedX, speedY, speedWidth, speedColor, Graphics::kTextAlignLeft);
+		}
+
+		// Copy to overlay
+		int x = Std::max(0, (_graphicsManager->getOverlayWidth() - wRect) / 2); // Center horizontally
+		int y = Std::max(10, _graphicsManager->getOverlayHeight() - 2 * lRect); // Bottom with spacing equal to height (40px from bottom)
+		_graphicsManager->copyRectToOverlay(tempSurface.getPixels(), tempSurface.pitch, x, y, wRect, lRect);
+		_graphicsManager->updateScreen();
+
+		// Clean up
+		tempSurface.free();
+	}
+}
 
 #endif

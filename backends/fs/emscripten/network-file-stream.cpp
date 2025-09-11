@@ -20,36 +20,43 @@
  */
 
 #ifdef EMSCRIPTEN
-#include <cstdio>
-#include <cstdlib>
-#include <fstream>
-#include <iostream>
 #include "backends/fs/emscripten/network-file-stream.h"
 #include "backends/fs/posix/posix-iostream.h"
 #include "backends/platform/sdl/emscripten/emscripten.h"
 #include "common/debug.h"
-#include "common/system.h"
 #include "common/file.h"
 #include "common/fs.h"
+#include "common/system.h"
+#include "common/translation.h"
 
 NetworkFileStream::NetworkFileStream(const Common::String &displayName, const Common::String &cachePath, uint64 fileSize)
 	: _displayName(displayName), _baseCachePath(cachePath), _fileSize(fileSize), _currentPos(0), _eos(false),
 	  _singleFullFile(false) {
-	
+	if (fileSize == 0) {
+		_singleFullFile = true;
+		debug(5, "NetworkFileStream::NetworkFileStream file empty %s", _displayName.c_str());
+		Common::DumpFile *_localFile = new Common::DumpFile();
+		if (!_localFile->open(Common::Path(_baseCachePath), true)) {
+			warning("Storage: unable to open file to download into %s", _baseCachePath.c_str());
+			return;
+		}
+		_localFile->close();
+		return;
+	}
+
 	// Calculate number of chunks needed
 	_numChunks = (_fileSize + CHUNK_SIZE - 1) / CHUNK_SIZE; // Round up division
 	_downloadedChunks.resize(_numChunks);
-	
-	debug(5, "NetworkFileStream: Initialized for file %s, size %llu, chunks %u", 
-	      _displayName.c_str(), _fileSize, _numChunks);
-	
+	debug(5, "NetworkFileStream: Initialized for file %s, size %llu, chunks %u",
+		  _displayName.c_str(), _fileSize, _numChunks);
+
 	// Check if the full file already exists
 	debug(5, "NetworkFileStream: Checking if full file exists at: %s", _baseCachePath.c_str());
 	if (isFullFileDownloaded()) {
 		debug(5, "NetworkFileStream: Full file already exists - setting singleFullFile=true");
 		_singleFullFile = true;
 		return;
-	} 
+	}
 
 	// Check which chunks already exist
 	for (uint32 i = 0; i < _numChunks; i++) {
@@ -73,8 +80,9 @@ Common::String NetworkFileStream::getChunkPath(uint32 chunkIndex) const {
 }
 
 bool NetworkFileStream::isChunkDownloaded(uint32 chunkIndex) const {
-	if (chunkIndex >= _numChunks) return false;
-	
+	if (chunkIndex >= _numChunks)
+		return false;
+
 	Common::String chunkPath = getChunkPath(chunkIndex);
 	POSIXFilesystemNode chunkFile(chunkPath);
 	return chunkFile.exists();
@@ -120,7 +128,7 @@ void NetworkFileStream::ensureChunkDownloaded(uint32 chunkIndex) {
 					  actualSize, chunkIndex + 1, chunkLength);
 				// Rename the chunk file to the full file path
 				Common::String fullPath = _baseCachePath;
-				std::rename(chunkPath.c_str(), fullPath.c_str());
+				rename(chunkPath.c_str(), fullPath.c_str());
 				_singleFullFile = true;
 				debug(5, "NetworkFileStream: Marked as single full file download");
 			} else if (actualSize == chunkLength) {
@@ -138,7 +146,7 @@ void NetworkFileStream::ensureChunkDownloaded(uint32 chunkIndex) {
 }
 
 bool NetworkFileStream::eos() const {
-	return _eos ;
+	return _eos;
 }
 
 bool NetworkFileStream::err() const {
@@ -152,7 +160,7 @@ void NetworkFileStream::clearErr() {
 uint32 NetworkFileStream::read(void *dataPtr, uint32 dataSize) {
 	if (!dataPtr)
 		return 0;
-	
+
 	// Read at most as many bytes as are still available...
 	if (dataSize > _fileSize - _currentPos) {
 		dataSize = _fileSize - _currentPos;
@@ -160,9 +168,9 @@ uint32 NetworkFileStream::read(void *dataPtr, uint32 dataSize) {
 	}
 
 	if (!_singleFullFile) {
-			uint32 chunkIndex = getChunkIndex(_currentPos);
-			// Ensure the chunk is downloaded
-			ensureChunkDownloaded(chunkIndex);
+		uint32 chunkIndex = getChunkIndex(_currentPos);
+		// Ensure the chunk is downloaded
+		ensureChunkDownloaded(chunkIndex);
 	}
 	// If we have the full file, read from it directly
 	if (_singleFullFile) {
@@ -182,52 +190,45 @@ uint32 NetworkFileStream::read(void *dataPtr, uint32 dataSize) {
 	}
 
 	uint32 totalBytesRead = 0;
-	uint8 *outputPtr = (uint8*)dataPtr;
-	
+	uint8 *outputPtr = (uint8 *)dataPtr;
 	while (totalBytesRead < dataSize) {
 		// Figure out which chunk we need
 		uint32 chunkIndex = getChunkIndex(_currentPos);
 		uint64 chunkStart = chunkIndex * CHUNK_SIZE;
 		uint64 offsetInChunk = _currentPos - chunkStart;
-		
+
 		// Open the chunk file
 		Common::String chunkPath = getChunkPath(chunkIndex);
 		Common::SeekableReadStream *chunkStream = PosixIoStream::makeFromPath(chunkPath, StdioStream::WriteMode_Read);
-		
 		if (!chunkStream) {
 			warning("NetworkFileStream: Failed to open chunk file: %s", chunkPath.c_str());
 			break;
 		}
-		
 		// Seek to the correct position in the chunk
 		if (!chunkStream->seek(offsetInChunk)) {
 			warning("NetworkFileStream: Failed to seek in chunk file");
 			delete chunkStream;
 			break;
 		}
-		
 		// Calculate how much to read from this chunk
 		uint64 chunkSize = (chunkIndex == _numChunks - 1) ? (_fileSize - chunkStart) : CHUNK_SIZE;
 		uint64 bytesAvailableInChunk = chunkSize - offsetInChunk;
 		uint32 bytesToReadFromChunk = MIN(dataSize - totalBytesRead, (uint32)bytesAvailableInChunk);
-		
 		// Read from the chunk
 		uint32 bytesReadFromChunk = chunkStream->read(outputPtr + totalBytesRead, bytesToReadFromChunk);
 		delete chunkStream;
-		
 		if (bytesReadFromChunk == 0) {
 			break; // EOF or error
 		}
-		
+
 		totalBytesRead += bytesReadFromChunk;
 		_currentPos += bytesReadFromChunk;
-		
 		// If we read less than expected, we're done
 		if (bytesReadFromChunk < bytesToReadFromChunk) {
 			break;
 		}
 	}
-		
+
 	return totalBytesRead;
 }
 
@@ -242,7 +243,7 @@ int64 NetworkFileStream::size() const {
 bool NetworkFileStream::seek(int64 offset, int whence) {
 	_eos = false; // seeking always cancels EOS
 	int64 newPos = _currentPos;
-	
+
 	switch (whence) {
 	case SEEK_SET:
 		newPos = offset;
@@ -256,13 +257,56 @@ bool NetworkFileStream::seek(int64 offset, int whence) {
 	default:
 		return false;
 	}
-	
+
 	if (newPos < 0 || newPos > (int64)_fileSize) {
 		return false;
 	}
-	
+
 	_currentPos = newPos;
 	return true;
+}
+
+void NetworkFileStream::startDownloadProgress(uint32 chunkIndex, uint64 chunkLength) {
+	OSystem_Emscripten *system = dynamic_cast<OSystem_Emscripten *>(g_system);
+	if (!system->getGraphicsManager()) {
+		return;
+	}
+
+	if (!system->isOverlayVisible()) {
+		_downloadProgressShowedOverlay = true;
+		system->showOverlay(true);
+	}
+	Common::U32String osdMessage = Common::U32String(Common::U32String::format(_("Downloading %s"), _displayName.c_str()));
+	if (_numChunks > 1) {
+		osdMessage = Common::U32String(Common::U32String::format(_("Downloading %s\n Part %u of %u"), _displayName.c_str(), chunkIndex + 1, _numChunks));
+	}
+	system->displayMessageOnOSD(osdMessage);
+}
+
+void NetworkFileStream::updateDownloadProgress(double progress, uint64 chunkLength, uint32 downloadStartTime) {
+	OSystem_Emscripten *system = dynamic_cast<OSystem_Emscripten *>(g_system);
+	if (!system->getGraphicsManager()) {
+		return;
+	}
+
+	system->updateDownloadProgress(progress * chunkLength, chunkLength, system->getMillis() - downloadStartTime);
+	if (system->getCloudIcon()->needsUpdate()) {
+		system->getCloudIcon()->show(Cloud::CloudIcon::kSyncing);
+		system->getCloudIcon()->update();
+	}
+	system->updateScreen();
+}
+
+void NetworkFileStream::completeDownloadProgress(uint64 chunkLength) {
+	OSystem_Emscripten *system = dynamic_cast<OSystem_Emscripten *>(g_system);
+	if (!system->getGraphicsManager()) {
+		return;
+	}
+	if (_downloadProgressShowedOverlay) {
+		_downloadProgressShowedOverlay = false;
+		system->hideOverlay();
+	}
+	system->getCloudIcon()->show(Cloud::CloudIcon::kNone);
 }
 
 #endif // EMSCRIPTEN
