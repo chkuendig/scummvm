@@ -42,7 +42,7 @@ void BaseStorage::getAccessToken(const Common::String &code, Networking::ErrorCa
 	Networking::JsonCallback innerCallback = new Common::CallbackBridge<BaseStorage, const Networking::ErrorResponse &, const Networking::JsonResponse &>(this, &BaseStorage::codeFlowComplete, callback);
 	Networking::ErrorCallback errorCallback = new Common::CallbackBridge<BaseStorage, const Networking::ErrorResponse &, const Networking::ErrorResponse &>(this, &BaseStorage::codeFlowFailed, callback);
 
-	Common::String url = Common::String::format("https://cloud.scummvm.org/%s/token/%s", cloudProvider().c_str(), code.c_str());
+	Common::String url = Common::String::format("http://localhost:8080/%s/token/%s", cloudProvider().c_str(), code.c_str());
 	Networking::HttpJsonRequest *request = new Networking::HttpJsonRequest(innerCallback, errorCallback, url);
 
 	addRequest(request);
@@ -141,10 +141,12 @@ void BaseStorage::refreshAccessToken(BoolCallback callback, Networking::ErrorCal
 	}
 
 	Networking::JsonCallback innerCallback = new Common::CallbackBridge<BaseStorage, const BoolResponse &, const Networking::JsonResponse &>(this, &BaseStorage::tokenRefreshed, callback);
-	if (errorCallback == nullptr)
+	if (errorCallback == nullptr){
+		warning("BaseStorage: no error callback provided to refreshAccessToken, using default one.");
 		errorCallback = getErrorPrintingCallback();
+	}
 
-	Common::String url = Common::String::format("https://cloud.scummvm.org/%s/refresh", cloudProvider().c_str());
+	Common::String url = Common::String::format("http://localhost:8080/%s/refresh", cloudProvider().c_str());
 	Networking::HttpJsonRequest *request = new Networking::HttpJsonRequest(innerCallback, errorCallback, url);
 	request->addHeader("X-ScummVM-Refresh-Token: " + _refreshToken);
 	addRequest(request);

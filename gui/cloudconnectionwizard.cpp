@@ -283,7 +283,7 @@ void CloudConnectionWizard::showStepQuickMode2() {
 	showBackButton();
 
 	_label0 = new StaticTextWidget(_container, "ConnectionWizard_QuickModeStep2.Line1", _("Now, open this link in your browser:"));
-	_button0 = new ButtonWidget(_container, "ConnectionWizard_QuickModeStep2.OpenLinkButton", Common::U32String("https://cloud.scummvm.org/"), _("Open URL"), kCloudConnectionWizardOpenUrlStorageCmd);
+	_button0 = new ButtonWidget(_container, "ConnectionWizard_QuickModeStep2.OpenLinkButton", Common::U32String("http://localhost:8080/"), _("Open URL"), kCloudConnectionWizardOpenUrlStorageCmd);
 
 	Common::U32StringTokenizer tok(_("It will automatically pass the data to ScummVM,\n"
 									 "and warn you should there be any errors."), "\n");
@@ -344,7 +344,7 @@ void CloudConnectionWizard::showStepManualMode1() {
 	showNextButton();
 
 	_label0 = new StaticTextWidget(_container, "ConnectionWizard_ManualModeStep1.Line1", _("Open this link in your browser:"));
-	_button0 = new ButtonWidget(_container, "ConnectionWizard_ManualModeStep1.OpenLinkButton", Common::U32String("https://cloud.scummvm.org/"), _("Open URL"), kCloudConnectionWizardOpenUrlStorageCmd);
+	_button0 = new ButtonWidget(_container, "ConnectionWizard_ManualModeStep1.OpenLinkButton", Common::U32String("http://localhost:8080/"), _("Open URL"), kCloudConnectionWizardOpenUrlStorageCmd);
 
 	Common::U32StringTokenizer tok(_("When it fails to pass the JSON code to ScummVM,\n"
 									 "find it on the Troubleshooting section of the page,\n"
@@ -647,7 +647,7 @@ void CloudConnectionWizard::handleCommand(CommandSender *sender, uint32 cmd, uin
 		break;
 
 	case kCloudConnectionWizardOpenUrlStorageCmd: {
-		Common::String url = "https://cloud.scummvm.org/";
+		Common::String url = "http://localhost:8080/";
 		switch (_selectedStorageIndex) {
 		case Cloud::kStorageDropboxId:
 			url += "dropbox/271?refresh_token=true";

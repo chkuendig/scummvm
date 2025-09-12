@@ -37,6 +37,7 @@ HttpJsonRequest::~HttpJsonRequest() {
 }
 
 void HttpJsonRequest::handle() {
+	warning("HttpJsonRequest: handling URL: %s", _url.c_str());
 	if (!_stream) _stream = makeStream();
 
 	if (_stream) {
@@ -51,6 +52,7 @@ void HttpJsonRequest::handle() {
 			if (json) {
 				finishJson(json); //it's JSON even if's not 200 OK? That's fine!..
 			} else {
+				warning("HTTPJsonRequest: Response code is %ld", _stream->httpResponseCode());
 				if (_stream->httpResponseCode() == 200) //no JSON, but 200 OK? That's fine!..
 					finishJson(nullptr);
 				else

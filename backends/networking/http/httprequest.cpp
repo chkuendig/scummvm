@@ -36,6 +36,7 @@ HttpRequest::~HttpRequest() {
 }
 
 NetworkReadStream *HttpRequest::makeStream() {
+	warning("HttpRequest: making stream for URL: %s", _url.c_str());
 	if (_bytesBuffer)
 		return NetworkReadStream::make(_url.c_str(), &_headersList, _bytesBuffer, _bytesBufferSize, _uploading, _usingPatch, true, _keepAlive, _keepAliveIdle, _keepAliveInterval);
 	if (!_formFields.empty() || !_formFiles.empty())
