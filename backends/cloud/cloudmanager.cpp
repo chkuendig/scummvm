@@ -585,7 +585,6 @@ Common::Path CloudManager::getDownloadLocalDirectory() const {
 bool CloudManager::pollEvent(Common::Event &event) {
 	if (_icon.needsUpdate()) {
 		if (_icon.getShownType() != CloudIcon::kDisabled) {
-			//warning("CloudManager::pollEvent: updating Cloud icon while not disabled isWorking: %d", isWorking());
 			if (isWorking()) {
 				_icon.show(CloudIcon::kSyncing);
 			} else {

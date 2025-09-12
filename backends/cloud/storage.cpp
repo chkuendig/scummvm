@@ -50,8 +50,8 @@ Networking::ErrorCallback Storage::getErrorPrintingCallback() {
 }
 
 void Storage::printErrorResponse(const Networking::ErrorResponse &error) {
-	warning("Storage: error response (%s, %ld):", (error.failed ? "failed" : "interrupted"), error.httpResponseCode);
-	warning("%s", error.response.c_str());
+	debug(9, "Storage: error response (%s, %ld):", (error.failed ? "failed" : "interrupted"), error.httpResponseCode);
+	debug(9, "%s", error.response.c_str());
 }
 
 Networking::Request *Storage::addRequest(Networking::Request *request) {

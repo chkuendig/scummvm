@@ -209,11 +209,9 @@ void OSystem_Emscripten::delayMillis(uint msecs) {
 		pause = pause > 10 ? 10 : pause; // ensure we don't pause for too long
 	} while (pause > 0);
 	lastThreshold = threshold;
-#ifndef USE_CLOUD
-	if (_cloudIcon && _cloudIcon->needsUpdate()) {
-		_cloudIcon->update();
+	if (getCloudIcon() && getCloudIcon()->needsUpdate()) {
+		getCloudIcon()->update();
 	}
-#endif
 }
 
 Cloud::CloudIcon *OSystem_Emscripten::getCloudIcon() {

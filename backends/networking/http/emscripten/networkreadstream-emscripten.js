@@ -193,9 +193,6 @@ mergeInto(LibraryManager.library, {
         })
         .catch(error => {
             console.error("Fetch #" + fetchId + " failed:", error);
-            // this is a bit of a hack, but emscripten malloc returns a valid pointer for size 0
-            fetch.buffer = _malloc(fetch.bufferSize); 
-            fetch.bufferSize = 0;
             fetch.completed = true;
             fetch.active = false;
             fetch.success = false;

@@ -239,11 +239,11 @@ uint32 NetworkReadStreamEmscripten::read(void *dataPtr, uint32 dataSize) {
 		warning("NetworkReadStreamEmscripten::read - Invalid state");
 		return 0;
 	}
-	warning("NetworkReadStreamEmscripten::read - Requested %u bytes for %s", dataSize, _url.c_str());
+
 	// Get direct pointer to JS buffer
 	char *jsBuffer = httpFetchGetDataPointer(_fetchId);
 	if (!jsBuffer) {
-		warning("NetworkReadStreamEmscripten::read - No JS buffer available (yet) for %s", _url.c_str());
+		//debug("NetworkReadStreamEmscripten::read - No JS buffer available (yet) for %s", _url.c_str());
 		return 0;
 	}
 
