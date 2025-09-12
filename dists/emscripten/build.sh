@@ -32,7 +32,7 @@ TASKS=()
 CONFIGURE_ARGS=()
 _bundle_games=()
 _verbose=false
-EMSDK_VERSION="${EMSDK_VERSION:-4.0.13}"
+EMSDK_VERSION="${EMSDK_VERSION:-4.0.14}"
 EMSCRIPTEN_VERSION="$EMSDK_VERSION"
 
 usage="\
@@ -164,15 +164,17 @@ fi
 
 cd "$DIST_FOLDER/emsdk-${EMSDK_VERSION}"
 ret=0 # https://stackoverflow.com/questions/18621990/bash-get-exit-status-of-command-when-set-e-is-active
-./emsdk activate ${EMSCRIPTEN_VERSION} || ret=$?
-if [[ $ret != 0 ]]; then
-  echo "install missing emscripten version"
-  cd "$DIST_FOLDER/emsdk-${EMSDK_VERSION}"
-  ./emsdk install ${EMSCRIPTEN_VERSION}
-
-  cd "$DIST_FOLDER/emsdk-${EMSDK_VERSION}"
-  ./emsdk activate ${EMSCRIPTEN_VERSION}
-fi
+# https://github.com/emscripten-core/emsdk/#how-do-i-use-my-own-emscripten-github-fork-with-the-sdk
+#./emsdk install git-1.9.4
+./emsdk install sdk-main-64bit
+./emsdk activate sdk-main-64bit
+cd emscripten/main
+# Add a git remote link to your own repository.
+git remote add chkuendig https://github.com/chkuendig/emscripten.git
+# Obtain the changes in your link.
+git fetch chkuendig
+# Switch the emscripten-main tool to use your fork.
+git checkout -b main --track chkuendig/main
 
 source "$DIST_FOLDER/emsdk-$EMSDK_VERSION/emsdk_env.sh"
 
