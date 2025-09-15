@@ -75,6 +75,7 @@ protected:
 
 private:
 	void tokenRefreshed(BoolCallback callback, const Networking::JsonResponse &response);
+	void tokenRefreshError(BoolCallback callback, const Networking::ErrorResponse &response);
 
 protected:
 	/** Helper function to save Storage::_isEnabled into config. */
