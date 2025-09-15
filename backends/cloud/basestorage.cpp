@@ -142,12 +142,20 @@ void BaseStorage::refreshAccessToken(BoolCallback callback, Networking::ErrorCal
 
 	Networking::JsonCallback innerCallback = new Common::CallbackBridge<BaseStorage, const BoolResponse &, const Networking::JsonResponse &>(this, &BaseStorage::tokenRefreshed, callback);
 	if (errorCallback == nullptr)
-		errorCallback = getErrorPrintingCallback();
+		errorCallback = new Common::CallbackBridge<BaseStorage, const BoolResponse &, const Networking::ErrorResponse &>(this, &BaseStorage::tokenRefreshError, callback);
 
 	Common::String url = Common::String::format("https://cloud.scummvm.org/%s/refresh", cloudProvider().c_str());
 	Networking::HttpJsonRequest *request = new Networking::HttpJsonRequest(innerCallback, errorCallback, url);
 	request->addHeader("X-ScummVM-Refresh-Token: " + _refreshToken);
 	addRequest(request);
+}
+
+void BaseStorage::tokenRefreshError(BoolCallback callback, const Networking::ErrorResponse &response) { 
+	printErrorResponse(response);
+	bool success = false;
+	if (callback)
+		(*callback)(BoolResponse(nullptr, success));
+	delete callback;
 }
 
 void BaseStorage::tokenRefreshed(BoolCallback callback, const Networking::JsonResponse &response) {
