@@ -93,7 +93,7 @@ MODULE_OBJS := \
 	engine/impl/CGProgram.o \
 	engine/impl/CharacterBodyNewton.o \
 	engine/impl/CollideShapeNewton.o \
-	engine/impl/LowLevelGraphicsSDL.o \
+	engine/impl/LowLevelGraphicsAndroid.o \
 	engine/impl/LowLevelPhysicsNewton.o \
 	engine/impl/LowLevelSoundOpenAL.o \
 	engine/impl/MeshLoaderCollada.o \
@@ -112,10 +112,10 @@ MODULE_OBJS := \
 	engine/impl/PhysicsJointSliderNewton.o \
 	engine/impl/PhysicsMaterialNewton.o \
 	engine/impl/PhysicsWorldNewton.o \
-	engine/impl/SDLTexture.o \
+	engine/impl/AndroidTexture.o \
 	engine/impl/SqScript.o \
 	engine/impl/VertexBufferOGL.o \
-	engine/impl/VertexBufferVBO.o \
+	engine/impl/VertexBufferGLES.o \
 	engine/libraries/angelscript/add-ons/scriptstdstring.o \
 	engine/libraries/angelscript/add-ons/scripthelper.o \
 	engine/libraries/angelscript/add-ons/scriptarray.o \

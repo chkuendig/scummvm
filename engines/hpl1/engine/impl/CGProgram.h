@@ -40,6 +40,8 @@
 
 namespace hpl {
 
+class cCamera3D; // Forward declaration
+
 class cCGProgram : public iGpuProgram {
 public:
 	cCGProgram(const tString &vertex, const tString &fragment);
@@ -63,12 +65,19 @@ public:
 	bool SetMatrixf(const tString &asName, eGpuProgramMatrix mType,
 					eGpuProgramMatrixOp mOp);
 
+	// Static methods for managing camera context (OpenGL ES compatibility)
+	static void SetCurrentCamera(cCamera3D *apCamera) { s_pCurrentCamera = apCamera; }
+	static cCamera3D* GetCurrentCamera() { return s_pCurrentCamera; }
+
 private:
 	OpenGL::Shader *_shader;
 
 	tString msName;
 	tString msFile;
 	tString msEntry;
+
+	// Static camera context for OpenGL ES compatibility
+	static cCamera3D *s_pCurrentCamera;
 };
 
 } // namespace hpl

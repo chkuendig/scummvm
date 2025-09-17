@@ -175,10 +175,13 @@ enum eGraphicCaps {
 	eGraphicCaps_Multisampling,
 
 	eGraphicCaps_GL_GpuPrograms,
+	eGraphicCaps_GL_VertexProgram,
+	eGraphicCaps_GL_FragmentProgram,
 	eGraphicCaps_GL_NVRegisterCombiners,
 	eGraphicCaps_GL_NVRegisterCombiners_MaxStages,
 	eGraphicCaps_GL_BlendFunctionSeparate,
 	eGraphicCaps_GL_MultiTexture,
+	eGraphicCaps_GL_ATIFragmentShader,
 
 	eGraphicCaps_LastEnum
 };
@@ -378,6 +381,7 @@ public:
 	// Index array, vtxArray, etc perhaps?
 
 	virtual void FlushTriBatch(tVtxBatchFlag aTypeFlags, bool abAutoClear = true) = 0;
+
 	virtual void FlushQuadBatch(tVtxBatchFlag aTypeFlags, bool abAutoClear = true) = 0;
 	virtual void ClearBatch() = 0;
 

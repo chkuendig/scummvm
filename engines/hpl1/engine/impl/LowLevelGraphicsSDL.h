@@ -35,6 +35,11 @@
 #include "hpl1/engine/math/MathTypes.h"
 #include "hpl1/opengl.h"
 
+#ifdef USE_FORCED_GLES2
+#include "common/stack.h"
+#include "hpl1/engine/impl/AndroidTexture.h"
+#endif
+
 #ifdef HPL1_USE_OPENGL
 
 namespace hpl {
@@ -309,6 +314,12 @@ private:
 
 	// Vtx helper
 	void SetVtxBatchStates(tVtxBatchFlag flags);
+
+#ifdef USE_FORCED_GLES2
+	// OpenGL ES software matrix stack
+	Common::Stack<cMatrixf> mMatrixStack[eMatrix_LastEnum];
+	void UploadShaderMatrix();
+#endif
 };
 
 } // namespace hpl

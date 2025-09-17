@@ -34,6 +34,7 @@
 
 #include "hpl1/engine/math/Math.h"
 #include "hpl1/engine/system/String.h"
+#include "hpl1/engine/scene/Camera3D.h"
 
 #include "common/array.h"
 #include "common/str.h"
@@ -41,6 +42,9 @@
 #include "math/matrix4.h"
 
 namespace hpl {
+
+// Static camera context for OpenGL ES compatibility
+cCamera3D *cCGProgram::s_pCurrentCamera = nullptr;
 
 static OpenGL::Shader *createShader(const char *vertex, const char *fragment) {
 	const char *attributes[] = {nullptr};
@@ -142,12 +146,40 @@ bool cCGProgram::SetMatrixf(const tString &asName, const cMatrixf &mMtx) {
 
 bool cCGProgram::SetMatrixf(const tString &asName, eGpuProgramMatrix mType,
 							eGpuProgramMatrixOp mOp) {
-	if (mType != eGpuProgramMatrix_ViewProjection)
-		error("unsupported shader matrix %d", mOp);
-	Math::Matrix4 modelView, projection;
-	glGetFloatv(GL_PROJECTION_MATRIX, projection.getData());
-	glGetFloatv(GL_MODELVIEW_MATRIX, modelView.getData());
-	_shader->setUniform(asName.c_str(), modelView * projection);
+	if (mType != eGpuProgramMatrix_ViewProjection) {
+		error("unsupported shader matrix %d", mType);
+		return false;
+	}
+	
+	if (mOp != eGpuProgramMatrixOp_Identity) {
+		error("unsupported shader matrix operation %d", mOp);
+		return false;
+	}
+	
+	// OpenGL ES doesn't support glGetFloatv with GL_MODELVIEW_MATRIX or GL_PROJECTION_MATRIX
+	// Instead, use the camera context to compute the view-projection matrix
+	if (s_pCurrentCamera == nullptr) {
+		// Fallback to identity matrix if no camera context is available
+		Math::Matrix4 identity;
+		identity.setToIdentity();
+		_shader->setUniform(asName.c_str(), identity);
+		Hpl1::logWarning(Hpl1::kDebugShaders, "%s", "CGProgram::SetMatrixf: No camera context available, using identity matrix");
+		return true;
+	}
+	
+	// Calculate view-projection matrix using current camera
+	const cMatrixf &viewMatrix = s_pCurrentCamera->GetViewMatrix();
+	const cMatrixf &projMatrix = s_pCurrentCamera->GetProjectionMatrix();
+	
+	// Combine projection and view matrices (note: HPL uses column-major matrices)
+	cMatrixf viewProjMatrix = cMath::MatrixMul(projMatrix, viewMatrix);
+	
+	// Convert to Math::Matrix4 format and set uniform
+	Math::Matrix4 mat4;
+	mat4.setData(viewProjMatrix.v);
+	mat4.transpose(); // HPL matrices are row-major, OpenGL expects column-major
+	_shader->setUniform(asName.c_str(), mat4);
+	
 	return true;
 }
 

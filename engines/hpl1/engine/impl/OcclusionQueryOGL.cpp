@@ -29,6 +29,59 @@
 
 #ifdef HPL1_USE_OPENGL
 
+// OpenGL ES compatibility for occlusion queries
+#ifdef USE_FORCED_GLES2
+// OpenGL ES 2.0 doesn't have occlusion queries, provide dummy constants
+#ifndef GL_SAMPLES_PASSED_EXT
+#define GL_SAMPLES_PASSED_EXT 0x8914
+#endif
+#ifndef GL_QUERY_RESULT_EXT
+#define GL_QUERY_RESULT_EXT 0x8866
+#endif
+#ifndef GL_QUERY_RESULT_AVAILABLE_EXT
+#define GL_QUERY_RESULT_AVAILABLE_EXT 0x8867
+#endif
+
+// Define dummy function prototypes (will be no-ops)
+#ifdef USE_FORCED_GLES2
+// OpenGL ES 2.0 has these as extension functions, but we'll provide no-op implementations
+// since occlusion queries aren't critical for basic functionality
+#define glGenQueriesEXT(n, ids) do { (void)(n); (void)(ids); } while(0)
+#define glDeleteQueriesEXT(n, ids) do { (void)(n); (void)(ids); } while(0)
+#define glBeginQueryEXT(target, id) do { (void)(target); (void)(id); } while(0)
+#define glEndQueryEXT(target) do { (void)(target); } while(0)
+#define glGetQueryObjectivEXT(id, pname, params) do { \
+    (void)(id); (void)(pname); \
+    if (params) *(params) = 1; \
+} while(0)
+#else
+// Desktop OpenGL - provide dummy implementations if extensions not available
+static void glGenQueriesEXT(GLsizei n, GLuint* ids) { (void)n; (void)ids; }
+static void glDeleteQueriesEXT(GLsizei n, const GLuint* ids) { (void)n; (void)ids; }
+static void glBeginQueryEXT(GLenum target, GLuint id) { (void)target; (void)id; }
+static void glEndQueryEXT(GLenum target) { (void)target; }
+static void glGetQueryObjectivEXT(GLuint id, GLenum pname, GLint* params) { 
+    (void)id; (void)pname; 
+    if (params) *params = 1; // Always return 1 sample for compatibility
+}
+#endif
+
+#ifndef GL_SAMPLES_PASSED
+#define GL_SAMPLES_PASSED GL_SAMPLES_PASSED_EXT
+#endif
+#ifndef GL_QUERY_RESULT
+#define GL_QUERY_RESULT GL_QUERY_RESULT_EXT
+#endif
+#ifndef GL_QUERY_RESULT_AVAILABLE
+#define GL_QUERY_RESULT_AVAILABLE GL_QUERY_RESULT_AVAILABLE_EXT
+#endif
+#define glGenQueries glGenQueriesEXT
+#define glDeleteQueries glDeleteQueriesEXT
+#define glBeginQuery glBeginQueryEXT
+#define glEndQuery glEndQueryEXT
+#define glGetQueryObjectiv glGetQueryObjectivEXT
+#endif // USE_FORCED_GLES2
+
 namespace hpl {
 
 //////////////////////////////////////////////////////////////////////////

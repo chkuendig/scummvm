@@ -20,7 +20,7 @@
  */
 
 #include "hpl1/engine/game/low_level_game_setup.h"
-#include "hpl1/engine/impl/LowLevelGraphicsSDL.h"
+#include "hpl1/engine/impl/LowLevelGraphicsAndroid.h"
 #include "hpl1/engine/impl/LowLevelPhysicsNewton.h"
 #include "hpl1/engine/impl/LowLevelSoundOpenAL.h"
 #include "hpl1/engine/impl/low_level_graphics_tgl.h"
@@ -34,7 +34,7 @@ namespace hpl {
 static iLowLevelGraphics *createLowLevelGfx() {
 #ifdef HPL1_USE_OPENGL
 	if (Hpl1::useOpenGL())
-		return hplNew(cLowLevelGraphicsSDL, ());
+		return hplNew(cLowLevelGraphicsAndroid, ());
 #endif
 #ifdef USE_TINYGL
 	return hplNew(LowLevelGraphicsTGL, ());

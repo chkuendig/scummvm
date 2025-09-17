@@ -47,6 +47,7 @@ Image::JPEGDecoder *setupJPEGDecoder(Image::JPEGDecoder *jpeg) {
 
 Bitmap2D::Bitmap2D(const tString &filepath, const tString &type, const Graphics::PixelFormat &desiredFormat)
 	: LowLevelPicture(type), _isSurfaceActive(false) {
+		Hpl1::logInfo(Hpl1::kDebugTextures,"Loading bitmap from file %s, pixelformat: %d", filepath.c_str(), desiredFormat.bytesPerPixel);
 	if (type == "png")
 		_decoder.reset(loadImage(filepath, new Image::PNGDecoder));
 	else if (type == "bmp")
@@ -69,6 +70,7 @@ Bitmap2D::Bitmap2D(const tString &filepath, const tString &type, const Graphics:
 
 Bitmap2D::Bitmap2D(const cVector2l &size, const Graphics::PixelFormat &format)
 	: LowLevelPicture("none"), _isSurfaceActive(true) {
+		Hpl1::logInfo(Hpl1::kDebugTextures,"Creating bitmap, pixelformat: %d", format.bytesPerPixel);
 	create(size, format);
 }
 

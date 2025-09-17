@@ -31,7 +31,7 @@
 #include "common/scummsys.h"
 #include "hpl1/engine/graphics/Texture.h"
 #include "hpl1/engine/graphics/bitmap2D.h"
-#include "hpl1/engine/impl/LowLevelGraphicsSDL.h"
+#include "hpl1/engine/impl/LowLevelGraphicsAndroid.h"
 #include "hpl1/opengl.h"
 
 #ifdef HPL1_USE_OPENGL
@@ -93,7 +93,7 @@ private:
 
 	tUIntVec mvTextureHandles;
 	bool mbContainsData;
-	cLowLevelGraphicsSDL *mpGfxSDL;
+	cLowLevelGraphicsAndroid *mpGfxSDL;
 
 	float mfTimeCount;
 	int mlTextureIndex;
