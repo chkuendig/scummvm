@@ -90,7 +90,7 @@ MODULE_OBJS := \
 	engine/gui/WidgetSlider.o \
 	engine/gui/WidgetTextBox.o \
 	engine/gui/WidgetWindow.o \
-	engine/impl/CGProgram.o \
+	engine/impl/GLSLProgram.o \
 	engine/impl/CharacterBodyNewton.o \
 	engine/impl/CollideShapeNewton.o \
 	engine/impl/LowLevelGraphicsAndroid.o \

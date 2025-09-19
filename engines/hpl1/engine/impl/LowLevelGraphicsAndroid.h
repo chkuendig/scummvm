@@ -302,8 +302,6 @@ namespace hpl
 		iTexture* mpCurrentTexture[MAX_TEXTUREUNITS];
 
 
-		iTexture *_screenBuffer;
-		iGpuProgram *_gammaCorrectionProgram;
 
 		// CG Compiler Variables
 		// CGcontext mCG_Context;

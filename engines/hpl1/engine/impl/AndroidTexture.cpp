@@ -30,7 +30,7 @@
 namespace hpl
 {
 
-	static GLenum GetGLWrapEnum(eTextureWrap aMode) {
+	static GLenum GetGLWrap(eTextureWrap aMode) {
 		switch (aMode) {
 		case eTextureWrap_Clamp:
 			return GL_CLAMP_TO_EDGE;  // GL_CLAMP not available in GLES2
@@ -429,53 +429,62 @@ namespace hpl
 		}
 	}
 
-	void cAndroidTexture::SetWrapS(eTextureWrap aMode)
-	{
-		if(mbContainsData){
-			GLenum GLTarget = GetGLTextureTargetEnum(mTarget);
-
-Hpl1::logInfo(Hpl1::kDebugTextures, "setting texture '%s' s wrap to %d, target %04X\n", msName.c_str(), aMode	, GLTarget);
-
-			for(size_t i=0; i < mvTextureHandles.size(); ++i){
-				glBindTexture(GLTarget, mvTextureHandles[i]);
-				glTexParameteri(GLTarget,GL_TEXTURE_WRAP_S,GetGLWrapEnum(aMode));
-			}
-					GL_CHECK_FN();
-		}
-	}
-
-	void cAndroidTexture::SetWrapT(eTextureWrap aMode)
-	{
-		if(mbContainsData){
-
-		
-			GLenum GLTarget = GetGLTextureTargetEnum(mTarget);
-Hpl1::logInfo(Hpl1::kDebugTextures, "setting texture '%s' t wrap to %d, target %04X\n", msName.c_str(), aMode	, GLTarget);
-
-			for(size_t i=0; i < mvTextureHandles.size(); ++i){
-				glBindTexture(GLTarget, mvTextureHandles[i]);
-				glTexParameteri(GLTarget,GL_TEXTURE_WRAP_T,GetGLWrapEnum(aMode));
-			}
-		}
-	}
-
-	void cAndroidTexture::SetWrapR(eTextureWrap aMode)
-	{
 	
-		if(mbContainsData){
-			GLenum GLTarget = GetGLTextureTargetEnum(mTarget);
-				GL_CHECK(glEnable(GLTarget));
-		glEnable(GLTarget);
-	
-			for(size_t i=0; i < mvTextureHandles.size(); ++i){
-				glBindTexture(GLTarget, mvTextureHandles[i]);
-				glTexParameteri(GLTarget,GL_TEXTURE_WRAP_R,GetGLWrapEnum(aMode));
-			}
-					GL_CHECK(glDisable(GLTarget));
+//-----------------------------------------------------------------------
+
+void cAndroidTexture::SetWrapS(eTextureWrap aMode) {
+	if (mbContainsData) {
+		GLenum GLTarget = GetGLTextureTargetEnum(mTarget);
+
+		Hpl1::logInfo(Hpl1::kDebugTextures, "setting texture '%s' s wrap to %d for target %d\n", msName.c_str(), aMode, GLTarget);
+
+		GL_CHECK(glEnable(GLTarget));
+		for (size_t i = 0; i < mvTextureHandles.size(); ++i) {
+			glBindTexture(GLTarget, mvTextureHandles[i]);
+
+			glTexParameteri(GLTarget, GL_TEXTURE_WRAP_S, GetGLWrap(aMode));
+		}
+		GL_CHECK_FN();
+		GL_CHECK(glDisable(GLTarget));
+	}
+}
+
+//-----------------------------------------------------------------------
+
+void cAndroidTexture::SetWrapT(eTextureWrap aMode) {
+	if (mbContainsData) {
+		GLenum GLTarget = GetGLTextureTargetEnum(mTarget);
+
+		Hpl1::logInfo(Hpl1::kDebugTextures, "setting texture '%s' t wrap to %d for target %d\n", msName.c_str(), aMode, GLTarget);
+
+		GL_CHECK(glEnable(GLTarget));
+		for (size_t i = 0; i < mvTextureHandles.size(); ++i) {
+			glBindTexture(GLTarget, mvTextureHandles[i]);
+
+			glTexParameteri(GLTarget, GL_TEXTURE_WRAP_T, GetGLWrap(aMode));
+		}
+		GL_CHECK(glDisable(GLTarget));
+	}
+}
+
+//-----------------------------------------------------------------------
+
+void cAndroidTexture::SetWrapR(eTextureWrap aMode) {
+	if (mbContainsData) {
+		GLenum GLTarget = GetGLTextureTargetEnum(mTarget);
+		Hpl1::logInfo(Hpl1::kDebugTextures, "setting texture '%s' r wrap to %d for target %d\n", msName.c_str(), aMode, GLTarget);
+
+		GL_CHECK(glEnable(GLTarget));
+		for (size_t i = 0; i < mvTextureHandles.size(); ++i) {
+			glBindTexture(GLTarget, mvTextureHandles[i]);
+
+			glTexParameteri(GLTarget, GL_TEXTURE_WRAP_R, GetGLWrap(aMode));
+		}
+		GL_CHECK(glDisable(GLTarget));
 
 		glDisable(GLTarget);
-		}
 	}
+}
 
 	//-----------------------------------------------------------------------
 

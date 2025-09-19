@@ -21,7 +21,7 @@
 
 #include "hpl1/engine/graphics/bitmap2D.h"
 #include "hpl1/engine/graphics/font_data.h"
-#include "hpl1/engine/impl/CGProgram.h"
+#include "hpl1/engine/impl/GLSLProgram.h"
 #include "hpl1/engine/impl/AndroidTexture.h"
 // #include "hpl1/engine/impl/VertexBufferOGL.h"
 // #include "hpl1/engine/impl/VertexBufferVBO.h"
@@ -289,6 +289,8 @@ GLenum cLowLevelGraphicsAndroid::GetGLStencilOpEnum(eStencilOp type) {
 
 		for(int i=0;i<eMatrix_LastEnum;i++)
 			mMatrixStack[i].push(cMatrixf::Identity);
+		
+		Common::fill(mpCurrentTexture, mpCurrentTexture + MAX_TEXTUREUNITS, nullptr);
 
 		mbClearColor = true;
 		mbClearDepth = true;
@@ -333,12 +335,12 @@ GLenum cLowLevelGraphicsAndroid::GetGLStencilOpEnum(eStencilOp type) {
 
 		initGraphics3d(mvScreenSize.x, mvScreenSize.y);
 		//Turn off cursor as default
-		ShowCursor(false);
 
 		//GL
 		Log(" Setting up OpenGL\n");
 		SetupGL();
 
+		ShowCursor(false);
 		//Set the clear color
 		//eglSwapBuffers(mEglDisplay,mEglSurface);
 			g_system->updateScreen();
@@ -349,12 +351,21 @@ GLenum cLowLevelGraphicsAndroid::GetGLStencilOpEnum(eStencilOp type) {
 								  32, cColor(0, 0, 0, 0), false,
 								  eTextureType_Normal, eTextureTarget_Rect);
 */
-mSimpleShader =  CreateGpuProgram("hpl1_gamma_correction", "hpl1_gamma_correction");
+//mSimpleShader =  CreateGpuProgram("hpl1_gamma_correction", "hpl1_gamma_correction");
 
+		mSimpleShader = CreateGpuProgram("hpl1_Simple", "hpl1_Simple");
+	//	mSimpleShader->CreateFromFiles("hpl1_gamma_correction", "hpl1_gamma_correction");
 		mSimpleShader->Bind();
 
 		mDefaultTexture = CreateTexture({1,1},32,cColor(1,1),false,eTextureType_Normal,eTextureTarget_2D);
 
+		//Show some info
+		Log("  Max texture image units: %d\n",GetCaps(eGraphicCaps_MaxTextureImageUnits));
+		Log("  Max texture coord units: %d\n",GetCaps(eGraphicCaps_MaxTextureCoordUnits));
+
+		Log("  Anisotropic filtering: %d\n",GetCaps(eGraphicCaps_AnisotropicFiltering));
+		if(GetCaps(eGraphicCaps_AnisotropicFiltering))
+			Log("  Max Anisotropic degree: %d\n",GetCaps(eGraphicCaps_MaxAnisotropicFiltering));
 		return true;
 	}
 	
@@ -367,32 +378,32 @@ mSimpleShader =  CreateGpuProgram("hpl1_gamma_correction", "hpl1_gamma_correctio
 		GL_CHECK(glClearColor(0.0f, 0.0f, 0.0f, 0.0f));
 
 		//Depth Test setup
-		glClearDepthf(1.0f);//Values buffer is cleared with
-		glEnable(GL_DEPTH_TEST); //enable depth testing
-		glDepthFunc(GL_LEQUAL); //function to do depth test with
-		//glDisable(GL_ALPHA_TEST);
+	GL_CHECK(glClearDepthf(1.0f));      // VAlues buffer is cleared with
+	GL_CHECK(glEnable(GL_DEPTH_TEST)); // enable depth testing
+	GL_CHECK(glDepthFunc(GL_LEQUAL));  // function to do depth test with
+	//GL_CHECK(glDisable(GL_ALPHA_TEST));
+
 
 		//Set best perspective correction
 		//glHint(GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST);
 
 		//Stencil setup
-		glClearStencil(0);
+	GL_CHECK(glClearStencil(0));
 
 		//Clear the screen
-		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
-
-		/////  BEGIN BATCH ARRAY STUFF ///////////////
+	GL_CHECK(glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT));
+	/////  BEGIN BATCH ARRAY STUFF ///////////////
 /*
-		//Enable all the vertex arrays that are used:
-		glEnableClientState(GL_VERTEX_ARRAY ); //The positions
-		glEnableClientState(GL_COLOR_ARRAY ); //The color
-		glEnableClientState(GL_TEXTURE_COORD_ARRAY); //Tex coords
-		glDisableClientState(GL_NORMAL_ARRAY);
-		//Disable the once not used.
-		glDisableClientState(GL_INDEX_ARRAY); //color index
-		glDisableClientState(GL_EDGE_FLAG_ARRAY);
+	// Enable all the vertex arrays that are used:
+	GL_CHECK(glEnableClientState(GL_VERTEX_ARRAY));        // The positions
+	GL_CHECK(glEnableClientState(GL_COLOR_ARRAY));         // The color
+	GL_CHECK(glEnableClientState(GL_TEXTURE_COORD_ARRAY)); // Tex coords
+	GL_CHECK(glDisableClientState(GL_NORMAL_ARRAY));
+	// Disable the once not used.
+	GL_CHECK(glDisableClientState(GL_INDEX_ARRAY)); // color index
+	GL_CHECK(glDisableClientState(GL_EDGE_FLAG_ARRAY));
 */
-		///// END BATCH ARRAY STUFF ///////////////
+	///// END BATCH ARRAY STUFF ///////////////
 
 
 
@@ -613,7 +624,7 @@ mSimpleShader =  CreateGpuProgram("hpl1_gamma_correction", "hpl1_gamma_correctio
 	}
 
 	iGpuProgram *cLowLevelGraphicsAndroid::CreateGpuProgram(const tString &vertex, const tString &fragment) {
-		return hplNew(cCGProgram, (vertex, fragment));
+		return hplNew(cGLSLProgram,(vertex, fragment) );
 	}
 	
 	iVertexBuffer* cLowLevelGraphicsAndroid::CreateVertexBuffer(tVertexFlag aFlags, eVertexBufferDrawType aDrawType,
@@ -657,7 +668,7 @@ mSimpleShader =  CreateGpuProgram("hpl1_gamma_correction", "hpl1_gamma_correctio
 	}
 	void cLowLevelGraphicsAndroid::SwapBuffers()
 	{
-		glFlush();
+	
 	//	eglSwapBuffers(mEglDisplay, mEglSurface);
 	SetBlendActive(false);
 
@@ -665,7 +676,18 @@ mSimpleShader =  CreateGpuProgram("hpl1_gamma_correction", "hpl1_gamma_correctio
 	CopyContextToTexure(mDefaultTexture, 0,
 						cVector2l((int)mvScreenSize.x, (int)mvScreenSize.y));
 
+	tVertexVec vVtx;
+	vVtx.push_back(cVertex(cVector3f(-1.0, 1.0, 0), cVector2f(0, mvScreenSize.y), cColor(0)));
+	vVtx.push_back(cVertex(cVector3f(1.0, 1.0, 0), cVector2f(mvScreenSize.x, mvScreenSize.y), cColor(0)));
+	vVtx.push_back(cVertex(cVector3f(1.0, -1.0, 0), cVector2f(mvScreenSize.x, 0), cColor(0)));
+	vVtx.push_back(cVertex(cVector3f(-1.0, -1.0, 0), cVector2f(0, 0), cColor(0)));
+
+//	mSimpleShader->Bind();
 	SetTexture(0, mDefaultTexture);
+DrawQuad(vVtx);
+
+//	mSimpleShader->UnBind();
+	GL_CHECK(glFlush());
 	g_system->updateScreen();
 	}
 

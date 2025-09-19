@@ -40,6 +40,7 @@ class iTexture;
 enum eGpuProgramType {
 	eGpuProgramType_Vertex,
 	eGpuProgramType_Fragment,
+	eGpuProgramType_Linked,
 	eGpuProgramType_LastEnum
 };
 
