@@ -741,6 +741,10 @@ bool SdlEventSource::dispatchSDLEvent(SDL_Event &ev, Common::Event &event) {
 			return false;
 
 		case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
+#ifdef EMSCRIPTEN
+			// iOS Safari on Emscripten produces odd 0x0 and 32x32 events, ignore those
+			if (ev.window.data1 >= 320 && ev.window.data2 >= 240)
+#endif
 			return handleResizeEvent(event, ev.window.data1, ev.window.data2);
 
 		case SDL_EVENT_WINDOW_FOCUS_GAINED: {
