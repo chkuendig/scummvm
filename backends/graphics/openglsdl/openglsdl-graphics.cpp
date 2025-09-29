@@ -468,6 +468,17 @@ void OpenGLSdlGraphicsManager::notifyResize(const int width, const int height) {
 }
 
 bool OpenGLSdlGraphicsManager::loadVideoMode(uint requestedWidth, uint requestedHeight, bool resizable, int antialiasing) {
+	#ifdef EMSCRIPTEN
+	// The canvas element is fixed to 100% of the browser window size. To avoid scaling 
+	// by the browser, we can't support arbitrary values here as it would lead to a squeezed
+	// image that won't be corrected until the next resize event sets the window size back 
+	// to the the canvas size.
+	int sdlWindowWidth, sdlWindowHeight;
+	SDL_GetWindowSizeInPixels(_window->getSDLWindow(), &sdlWindowWidth, &sdlWindowHeight);
+	requestedWidth = sdlWindowWidth /  SDL_GetWindowDisplayScale(_window->getSDLWindow());
+	requestedHeight = sdlWindowHeight /  SDL_GetWindowDisplayScale(_window->getSDLWindow());
+#endif
+
 	// This function should never be called from notifyResize thus we know
 	// that the requested size came from somewhere else.
 	_gotResize = false;
