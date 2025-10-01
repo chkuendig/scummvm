@@ -36,7 +36,11 @@
 #include "hpl1/debug.h"
 #include "hpl1/engine/impl/OcclusionQueryOGL.h"
 #include "hpl1/graphics.h"
+#ifndef GL_EXT_texture_filter_anisotropic
+#define GL_EXT_texture_filter_anisotropic                       1
 
+#define GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT                       0x84FF
+#endif
 namespace hpl
 {
 

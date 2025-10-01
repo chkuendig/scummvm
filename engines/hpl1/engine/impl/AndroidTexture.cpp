@@ -27,6 +27,9 @@
 #ifndef GL_TEXTURE_WRAP_R
 #define GL_TEXTURE_WRAP_R 0x8072
 #endif
+#ifndef GL_TEXTURE_MAX_ANISOTROPY_EXT
+#define GL_TEXTURE_MAX_ANISOTROPY_EXT                           0x84FE
+#endif
 namespace hpl
 {
 
