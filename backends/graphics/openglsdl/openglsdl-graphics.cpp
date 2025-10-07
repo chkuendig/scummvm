@@ -88,7 +88,11 @@ OpenGLSdlGraphicsManager::OpenGLSdlGraphicsManager(SdlEventSource *eventSource, 
 		DEFAULT_GLES_MAJOR = 1,
 		DEFAULT_GLES_MINOR = 1,
 
+#ifdef EMSCRIPTEN
+		DEFAULT_GLES2_MAJOR = 3,
+#else
 		DEFAULT_GLES2_MAJOR = 2,
+#endif
 		DEFAULT_GLES2_MINOR = 0
 	};
 

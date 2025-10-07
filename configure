@@ -6574,7 +6574,7 @@ if test "$_opengl_mode" != none ; then
 		emscripten)
 			_opengl_mode=gles2
 			_opengl_glad=no # https://github.com/Dav1dde/glad-web/issues/12
-			append_var OPENGL_LIBS "-s FULL_ES2=1 -s MAX_WEBGL_VERSION=1"
+			append_var OPENGL_LIBS "-s FULL_ES3=1 -s FULL_ES2=1 -s MIN_WEBGL_VERSION=2"
 			;;
 		ios7)
 			_opengl_mode=gles2
