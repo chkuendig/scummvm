@@ -6816,7 +6816,9 @@ if test "$_opengl_mode" != none ; then
 		emscripten)
 			_opengl_mode=gles2
 			_opengl_glad=no # https://github.com/Dav1dde/glad-web/issues/12
-			append_var OPENGL_LIBS "-s FULL_ES2=1 -s MAX_WEBGL_VERSION=1"
+			# Force a WebGL2 context (no WebGL1 fallback) and emulate the full
+			# ES3 API, so GLSL-ES shader engines (e.g. HPL1) run out of the box.
+			append_var OPENGL_LIBS "-s FULL_ES3=1 -s MAX_WEBGL_VERSION=2 -s MIN_WEBGL_VERSION=2"
 			;;
 		ios7)
 			_opengl_mode=gles2
