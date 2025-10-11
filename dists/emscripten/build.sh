@@ -311,11 +311,11 @@ fi
 
 if [ "$_retrowave" = true ]; then
   if [[ ! -f "$LIBS_FOLDER/build/lib/libRetroWave.a" ]]; then
-    echo "build libRetroWave-e6bf60e"
+    echo "build libRetroWave-d7d4c8b8"
     cd "$LIBS_FOLDER"
-    wget -nc --content-disposition "https://github.com/SudoMaker/RetroWave/archive/e6bf60eed2d2bd1deff688d645be71a32bbf05bb.tar.gz"
-    tar -xf RetroWave-e6bf60eed2d2bd1deff688d645be71a32bbf05bb.tar.gz
-    cd "$LIBS_FOLDER/RetroWave-e6bf60eed2d2bd1deff688d645be71a32bbf05bb/"
+    wget -nc --content-disposition "https://github.com/chkuendig/RetroWave/archive/d7d4c8b8060623eec9e1d09d850a3ed1cc644721.tar.gz"
+    tar -xf RetroWave-d7d4c8b8060623eec9e1d09d850a3ed1cc644721.tar.gz
+    cd "$LIBS_FOLDER/RetroWave-d7d4c8b8060623eec9e1d09d850a3ed1cc644721/"
     CFLAGS="-fPIC -s USE_ZLIB=1 -Oz"  emcmake cmake -B "build/" -DRETROWAVE_BUILD_PLAYER=0  -DCMAKE_INSTALL_PREFIX="$LIBS_FOLDER/build/" -DCMAKE_INSTALL_LIBDIR="lib"
     cmake --build "build/"  
     cmake --install "build/"  
