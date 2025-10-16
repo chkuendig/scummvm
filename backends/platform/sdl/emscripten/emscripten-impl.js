@@ -82,11 +82,15 @@ mergeInto(LibraryManager.library, {
         const url = UTF8ToString(urlPtr);
         const oauth_window = window.open(url);
         
-        window.addEventListener("message", (event) => {
+        const messageHandler = function(event) {
+            if(event.origin == "https://cloud.scummvm.org") { // Ensure message is from trusted origin
             // Call the C++ callback function with the JSON data
             ccall('cloudConnectionWizardCallback', null, ['string'], [JSON.stringify(event.data)]);
             oauth_window.close();
-        }, {once: true});
+            window.removeEventListener("message", messageHandler);
+            }
+        };
+        window.addEventListener("message", messageHandler);
         
         return true;
     },
