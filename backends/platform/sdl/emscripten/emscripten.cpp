@@ -183,22 +183,16 @@ void OSystem_Emscripten::addSysArchivesToSearchSet(Common::SearchSet &s, int pri
 }
 
 void OSystem_Emscripten::delayMillis(uint msecs) {
-	static uint32 lastThreshold = 0;
-	const uint32 threshold = getMillis() + msecs;
-	if (msecs == 0 && threshold - lastThreshold < 10) {
+	static uint32 lastSleep = 0;
+	if (msecs == 0 && getMillis() - lastSleep < 20) {
 		return;
 	}
-	uint32 pause = 0;
-	do {
 #ifdef ENABLE_EVENTRECORDER
-		if (!g_eventRec.processDelayMillis())
+	if (!g_eventRec.processDelayMillis())
 #endif
-		SDL_Delay(pause);
-		updateTimers();
-		pause = getMillis() > threshold ? 0 : threshold - getMillis(); // Avoid negative values
-		pause = pause > 10 ? 10 : pause; // ensure we don't pause for too long
-	} while (pause > 0);
-	lastThreshold = threshold;
+	SDL_Delay(msecs);
+	updateTimers();
+	lastSleep = getMillis();
 }
 
 #ifdef USE_CLOUD
