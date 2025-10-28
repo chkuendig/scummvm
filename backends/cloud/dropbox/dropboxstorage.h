@@ -106,8 +106,6 @@ public:
 	 * Remove all DropboxStorage-related data from config.
 	 */
 	static void removeFromConfig(const Common::String &keyPrefix);
-
-	Common::String accessToken() const { return _token; }
 };
 
 } // End of namespace Dropbox
