@@ -97,6 +97,11 @@ public:
 	 * continue your work when new token is available.
 	 */
 	virtual void refreshAccessToken(BoolCallback callback, Networking::ErrorCallback errorCallback = nullptr);
+
+	/**
+	 * Returns the current access token.
+	 */
+	Common::String accessToken() const { return _token; }
 };
 
 } // End of namespace Cloud
