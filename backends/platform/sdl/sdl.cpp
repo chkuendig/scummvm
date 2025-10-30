@@ -78,7 +78,7 @@
 #include <SDL_clipboard.h>
 #endif
 
-#if (defined(USE_OPENGL_GAME) || defined(USE_OPENGL_SHADERS)) && !USE_FORCED_GLES2
+#if (defined(USE_OPENGL_GAME) || defined(USE_OPENGL_SHADERS)) && (!USE_FORCED_GLES2 || defined(EMSCRIPTEN))
 #if SDL_VERSION_ATLEAST(3, 0, 0)
 static bool sdlGetAttribute(SDL_GLAttr attr, int *value) {
 	return SDL_GL_GetAttribute(attr, value);
@@ -402,8 +402,8 @@ void OSystem_SDL::initBackend() {
 void OSystem_SDL::detectOpenGLFeaturesSupport() {
 	_oglType = OpenGL::kContextNone;
 	_supportsShaders = false;
-#if USE_FORCED_GLES2
-	// Framebuffers and shaders are always available with GLES2
+#if USE_FORCED_GLES2 && !defined(EMSCRIPTEN)
+	// Framebuffers and shaders are always available with GLES2 (unless we run in a browser without WebGL)
 	_oglType = OpenGL::kContextGLES2;
 	_supportsShaders = true;
 #else
@@ -445,6 +445,8 @@ void OSystem_SDL::detectOpenGLFeaturesSupport() {
 	}
 	SDL_GLContext glContext = SDL_GL_CreateContext(window);
 	if (!glContext) {
+		_oglType = OpenGL::kContextNone;
+		warning("SDL_GL_CreateContext() failed");
 		SDL_DestroyWindow(window);
 		return;
 	}
@@ -944,8 +946,13 @@ SdlGraphicsManager *OSystem_SDL::createGraphicsManager(SdlEventSource *sdlEventS
 		return new SurfaceSdlGraphicsManager(sdlEventSource, window);
 #ifdef USE_OPENGL
 	case GraphicsManagerOpenGL:
-		debug(1, "creating OpenGL graphics manager");
-		return new OpenGLSdlGraphicsManager(sdlEventSource, window);
+		if(_oglType > OpenGL::kContextNone) {
+			debug(1, "creating OpenGL graphics manager");
+			return new OpenGLSdlGraphicsManager(sdlEventSource, window);
+		} else {
+			warning("OpenGL graphics manager requested, but OpenGL is not supported!");
+			return nullptr;
+		}
 #endif
 	default:
 		assert(0);
@@ -1026,9 +1033,12 @@ bool OSystem_SDL::setGraphicsMode(int mode, uint flags) {
 			sdlGraphicsManager->deactivateManager();
 			delete sdlGraphicsManager;
 		}
-		_graphicsManager = sdlGraphicsManager = createGraphicsManager(_eventSource, _window, (GraphicsManagerType)i);
-		switchedManager = true;
-		break;
+		SdlGraphicsManager *newManager = createGraphicsManager(_eventSource, _window, (GraphicsManagerType)i);
+		if (newManager) {
+			_graphicsManager = sdlGraphicsManager = newManager;
+			switchedManager = true;
+			break;
+		}
 	}
 
 	_graphicsMode = mode;
@@ -1088,24 +1098,28 @@ void OSystem_SDL::setupGraphicsModes() {
 		_defaultMode[i] = -1;
 		_firstMode[i] = _graphicsModes.size();
 		manager = createGraphicsManager(_eventSource, _window, (GraphicsManagerType)i);
-		defaultMode = manager->getDefaultGraphicsMode();
-		srcMode = manager->getSupportedGraphicsModes();
-		while (srcMode->name) {
-			if (defaultMode == srcMode->id) {
-				_defaultMode[i] = _graphicsModes.size();
+		if(manager) {
+			defaultMode = manager->getDefaultGraphicsMode();
+			srcMode = manager->getSupportedGraphicsModes();
+			while (srcMode->name) {
+				if (defaultMode == srcMode->id) {
+					_defaultMode[i] = _graphicsModes.size();
+				}
+				OSystem::GraphicsMode mode = *srcMode;
+				// Do deep copy as we are going to delete the GraphicsManager and this may free
+				// the memory used for its graphics modes.
+				mode.name = scumm_strdup(srcMode->name);
+				mode.description = scumm_strdup(srcMode->description);
+				_graphicsModes.push_back(mode);
+				srcMode++;
 			}
-			OSystem::GraphicsMode mode = *srcMode;
-			// Do deep copy as we are going to delete the GraphicsManager and this may free
-			// the memory used for its graphics modes.
-			mode.name = scumm_strdup(srcMode->name);
-			mode.description = scumm_strdup(srcMode->description);
-			_graphicsModes.push_back(mode);
-			srcMode++;
+			_lastMode[i] = _graphicsModes.size() - 1;
+			_supports3D[i] = manager->hasFeature(kFeatureOpenGLForGame);
+			delete manager;
+			assert(_defaultMode[i] != -1);
+		} else {
+			warning("No graphics modes found for manager %d", i);
 		}
-		_lastMode[i] = _graphicsModes.size() - 1;
-		_supports3D[i] = manager->hasFeature(kFeatureOpenGLForGame);
-		delete manager;
-		assert(_defaultMode[i] != -1);
 	}
 
 	// Set a null mode at the end
