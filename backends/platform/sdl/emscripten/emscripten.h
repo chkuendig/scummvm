@@ -23,7 +23,6 @@
 #define PLATFORM_SDL_EMSCRIPTEN_H
 
 #include "backends/platform/sdl/posix/posix.h"
-#include "backends/cloud/cloudicon.h"
 #ifdef USE_CLOUD
 #include "backends/networking/http/request.h"
 #include "common/ustr.h"
@@ -69,6 +68,11 @@ public:
 	void delayMillis(uint msecs) override;
 	void init() override;
 	void addSysArchivesToSearchSet(Common::SearchSet &s, int priority) override;
+
+#ifdef USE_CLOUD
+	void setCloudConnectionCallback(CloudConnectionCallback cb) { _cloudConnectionCallback = cb; }
+	bool openUrl(const Common::String &url) override;
+#endif // USE_CLOUD
     
 protected:
 	Common::Path getDefaultConfigFileName() override;

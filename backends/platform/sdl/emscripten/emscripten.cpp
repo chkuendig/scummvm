@@ -34,9 +34,6 @@
 #ifdef USE_TTS
 #include "backends/text-to-speech/emscripten/emscripten-text-to-speech.h"
 #endif
-#ifdef USE_CLOUD
-#include "backends/cloud/cloudmanager.h"
-#endif
 
 extern "C" {
 #ifdef USE_CLOUD
