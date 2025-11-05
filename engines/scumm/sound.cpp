@@ -476,7 +476,10 @@ static Audio::AudioStream *checkForBrokenIndy4Sample(Common::SeekableReadStream 
 void Sound::startTalkSound(uint32 offset, uint32 length, int mode, Audio::SoundHandle *handle) {
 	int num = 0, i;
 	int id = -1;
+
+#if defined(USE_FLAC) || defined(USE_VORBIS) || defined(USE_MAD)
 	int size = 0;
+#endif
 	Common::ScopedPtr<ScummFile> file;
 	uint32 origOffset = offset;
 
