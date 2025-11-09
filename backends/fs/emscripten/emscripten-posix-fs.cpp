@@ -22,6 +22,7 @@
 #define FORBIDDEN_SYMBOL_EXCEPTION_getenv
 #include <stdio.h>
 
+#include "backends/fs/emscripten/dragdrop-fs.h"
 #include "backends/fs/emscripten/emscripten-fs-factory.h"
 #include "backends/fs/emscripten/emscripten-posix-fs.h"
 #include "backends/fs/emscripten/http-fs.h"
@@ -47,6 +48,8 @@ bool EmscriptenPOSIXFilesystemNode::getChildren(AbstractFSList &myList, ListMode
 		HTTPFilesystemNode *data_entry = new HTTPFilesystemNode(DATA_PATH);
 		myList.push_back(data_entry);
 
+		DragDropFilesystemNode *dragdrop_entry = new DragDropFilesystemNode(DRAGDROP_FS_PATH);
+		myList.push_back(dragdrop_entry);
 #ifdef USE_CLOUD
 		if (CloudMan.isStorageEnabled()) {
 			CloudFilesystemNode *cloud_entry = new CloudFilesystemNode(CLOUD_FS_PATH);
