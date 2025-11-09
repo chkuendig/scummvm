@@ -26,12 +26,15 @@
 #include <emscripten.h>
 
 #include "backends/events/emscriptensdl/emscriptensdl-events.h"
+#include "backends/fs/emscripten/dragdrop-fs.h"
 #include "backends/fs/emscripten/emscripten-fs-factory.h"
 #include "backends/mixer/emscriptensdl/emscriptensdl-mixer.h"
 #include "backends/mutex/null/null-mutex.h"
 #include "backends/platform/sdl/emscripten/emscripten.h"
 #include "backends/timer/emscripten/emscripten-timer.h"
 #include "common/file.h"
+#include "common/fs.h"
+#include "common/translation.h"
 #ifdef USE_TTS
 #include "backends/text-to-speech/emscripten/emscripten-text-to-speech.h"
 #endif
@@ -167,6 +170,25 @@ void OSystem_Emscripten::addSysArchivesToSearchSet(Common::SearchSet &s, int pri
 	if (dataNode.exists() && dataNode.isDirectory()) {
 		s.addDirectory(dataNode, priority, 2, false);
 	}
+}
+
+bool OSystem_Emscripten::setGraphicsMode(int mode, uint flags) {
+	debug(3, "Removing drag & drop event listeners before setGraphicsMode");
+	DragDropFilesystemNode_removeDragEventListeners();
+	bool ok = OSystem_SDL::setGraphicsMode(mode, flags);
+	if (ok) {
+		debug(3, "Re-adding drag & drop event listeners after setGraphicsMode");
+		DragDropFilesystemNode_addDragEventListeners();
+	}
+	return ok;
+}
+
+void OSystem_Emscripten::applyBackendSettings() {
+	// Remove SDL3 drag-and-drop listeners and add our own.
+	// SDL3 default listeners don't support directories, are buggy (libsdl-org/SDL#13924) and
+	// load every file into memory after dropping
+	DragDropFilesystemNode_removeDragEventListeners();
+	DragDropFilesystemNode_addDragEventListeners();
 }
 
 void OSystem_Emscripten::delayMillis(uint msecs) {
