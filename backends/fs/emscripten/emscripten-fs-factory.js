@@ -44,12 +44,18 @@ mergeInto(LibraryManager.library, {
 
             // Check if the settings file exists and download a default copy if needed.
             if (!FS.analyzePath(settingsPath).exists) {
-                console.debug('EmscriptenFilesystemFactory_initDefaultConfigFile');
+                console.debug('EmscriptenFilesystemFactory_initDefaultConfigFile: Download default scummvm.ini');
                 const response = await fetch('scummvm.ini');
                 if (response.ok) {
                     const text = await response.text();
                     FS.writeFile(settingsPath, text);
                 }
+            }
+
+            // Check if the extras folder exists and create it if needed.
+            if (!FS.analyzePath(path + "/extras").exists) {
+                console.debug("Create empty settings folder at " + path + "/extras");
+                FS.mkdir(path + "/extras");
             }
             console.debug('Filesystem initialized at %s', path);
         } catch (err) {
