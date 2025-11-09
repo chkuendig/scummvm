@@ -673,7 +673,11 @@ void LauncherDialog::handleOtherEvent(const Common::Event &evt) {
 		Common::Path path = evt.path;
 		Common::FSNode node(path);
 		if (!node.isDirectory())
+#ifndef EMSCRIPTEN 
 			path = node.getParent().getPath();
+#else
+			return; // if somebody drops a file in emscripten, do nothing 
+#endif
 		doGameDetection(path);
 	}
 }

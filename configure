@@ -3381,6 +3381,7 @@ EOF
 		append_var LDFLAGS "--js-library backends/fs/emscripten/emscripten-fs-factory.js"
         append_var LDFLAGS "--js-library backends/networking/http/emscripten/networkreadstream-emscripten.js"
         append_var LDFLAGS "--js-library backends/platform/sdl/emscripten/emscripten.js"
+		append_var LDFLAGS "--js-library backends/fs/emscripten/dragdrop-fs.js"
 		if test "$_tts" != "no" ; then
 			append_var LDFLAGS "--js-library backends/text-to-speech/emscripten/emscripten-text-to-speech.js"
 		fi
