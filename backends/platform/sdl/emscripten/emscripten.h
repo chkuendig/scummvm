@@ -66,6 +66,8 @@ public:
 	void delayMillis(uint msecs) override;
 	void init() override;
 	void addSysArchivesToSearchSet(Common::SearchSet &s, int priority) override;
+	bool setGraphicsMode(int mode, uint flags = OSystem::kGfxModeNoFlags) override;
+	void applyBackendSettings() override;
 
 #ifdef USE_CLOUD
 	void setCloudConnectionCallback(CloudConnectionCallback cb) { _cloudConnectionCallback = cb; }
