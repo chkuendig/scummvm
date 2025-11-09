@@ -100,6 +100,8 @@ endif
 
 ifdef EMSCRIPTEN
 MODULE_OBJS += \
+	fs/emscripten/dragdrop-fs.o \
+	fs/emscripten/dragdrop-readstream.o \
 	fs/emscripten/emscripten-fs-factory.o \
 	fs/emscripten/emscripten-posix-fs.o \
 	fs/emscripten/http-fs.o \
