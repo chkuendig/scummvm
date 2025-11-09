@@ -23,6 +23,7 @@
 #define PLATFORM_SDL_EMSCRIPTEN_H
 
 #include "backends/platform/sdl/posix/posix.h"
+#include "common/fs.h"
 #ifdef USE_CLOUD
 #include "backends/networking/http/request.h"
 #include "common/ustr.h"
@@ -68,6 +69,7 @@ public:
 	void addSysArchivesToSearchSet(Common::SearchSet &s, int priority) override;
 	bool setGraphicsMode(int mode, uint flags = OSystem::kGfxModeNoFlags) override;
 	void applyBackendSettings() override;
+	void importExtrasFile(const Common::FSNode &node);
 
 #ifdef USE_CLOUD
 	void setCloudConnectionCallback(CloudConnectionCallback cb) { _cloudConnectionCallback = cb; }
