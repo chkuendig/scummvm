@@ -148,6 +148,10 @@ void OneDriveStorage::fileInfoCallback(Networking::NetworkReadStreamCallback out
 	}
 
 	const char *url = result.getVal("@microsoft.graph.downloadUrl")->asString().c_str();
+	// Cache the download URL for future range requests
+	if ((_pendingRangeStartPos > 0 || _pendingRangeLength > 0) && !_pendingFilePath.empty())
+		cacheDownloadUrl(_pendingFilePath, Common::String(url));
+
 	// Add Range header if needed
 	Networking::RequestHeaders *headers = nullptr;
 	if (_pendingRangeStartPos > 0 || _pendingRangeLength > 0) {
@@ -164,8 +168,35 @@ void OneDriveStorage::fileInfoCallback(Networking::NetworkReadStreamCallback out
 			Networking::NetworkReadStream::make(url, headers, "")
 		));
 
+	_pendingFilePath.clear();
+
 	delete json;
 	delete outerCallback;
+}
+
+bool OneDriveStorage::isUrlCacheValid(const Common::String &fileId) const {
+	if (!_downloadUrlCache.contains(fileId)) {
+		return false;
+	}
+	
+	// Check if cache entry has expired
+	uint32 currentTime = g_system->getMillis() / 1000; // Convert to seconds
+	uint32 cachedTime = _downloadUrlCache.getVal(fileId).timestamp;
+	return (currentTime - cachedTime) < URL_CACHE_TIMEOUT;
+}
+
+Common::String OneDriveStorage::getCachedDownloadUrl(const Common::String &fileId) const {
+	if (isUrlCacheValid(fileId)) {
+		debug(9, "OneDriveStorage: Using cached download URL for file %s", fileId.c_str());
+		return _downloadUrlCache.getVal(fileId).url;
+	}
+	return Common::String();
+}
+
+void OneDriveStorage::cacheDownloadUrl(const Common::String &fileId, const Common::String &downloadUrl) {
+	uint32 currentTime = g_system->getMillis() / 1000; // Convert to seconds
+	_downloadUrlCache.setVal(fileId, CachedDownloadUrl(downloadUrl, currentTime));
+	debug(9, "OneDriveStorage: Cached download URL for file %s", fileId.c_str());
 }
 
 Networking::Request *OneDriveStorage::listDirectory(const Common::String &path, ListDirectoryCallback callback, Networking::ErrorCallback errorCallback, bool recursive) {
@@ -180,6 +211,31 @@ Networking::Request *OneDriveStorage::upload(const Common::String &path, Common:
 
 Networking::Request *OneDriveStorage::streamFileById(const Common::String &path, Networking::NetworkReadStreamCallback outerCallback, Networking::ErrorCallback errorCallback, uint64 startPos, uint64 length) {
 	debug(9, "OneDrive: `download \"%s\"`", path.c_str());
+
+	if (startPos > 0 || length > 0) {
+		Common::String cachedUrl = getCachedDownloadUrl(path);
+		if (!cachedUrl.empty()) {
+			debug(9, "OneDriveStorage: Using cached download URL for %s", path.c_str());
+
+			Networking::RequestHeaders *headers = new Networking::RequestHeaders();
+			Common::String rangeHeader = Common::String::format("Range: bytes=%llu-%s",
+				startPos,
+				length > 0 ? Common::String::format("%llu", startPos + length - 1).c_str() : "");
+			headers->push_back(rangeHeader);
+
+			if (outerCallback) {
+				(*outerCallback)(Networking::NetworkReadStreamResponse(
+					nullptr,
+					Networking::NetworkReadStream::make(cachedUrl.c_str(), headers, "")
+				));
+			}
+			delete outerCallback;
+			return nullptr;
+		}
+		_pendingFilePath = path;
+	}
+
+	debug(9, "OneDriveStorage: No cached URL, fetching metadata for %s", path.c_str());
 	Common::String url = ONEDRIVE_API_SPECIAL_APPROOT_ID + Common::percentEncodeString(path);
 
 	_pendingRangeStartPos = startPos;
