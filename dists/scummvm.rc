@@ -134,6 +134,10 @@ shaders/playground3d_viewport.fragment  FILE    "engines/playground3d/shaders/pl
 shaders/playground3d_viewport.vertex    FILE    "engines/playground3d/shaders/playground3d_viewport.vertex"
 #endif
 #if PLUGIN_ENABLED_STATIC(HPL1)
+shaders/hpl1_gamma_correction.fragment                 FILE   "engines/hpl1/engine/impl/shaders/hpl1_gamma_correction.fragment"
+shaders/hpl1_gamma_correction.vertex                   FILE   "engines/hpl1/engine/impl/shaders/hpl1_gamma_correction.vertex"
+shaders/hpl1_Simple.fragment                           FILE   "engines/hpl1/engine/impl/shaders/hpl1_Simple.fragment"
+shaders/hpl1_Simple.vertex                             FILE   "engines/hpl1/engine/impl/shaders/hpl1_Simple.vertex"
 shaders/hpl1_Ambient_Color.fragment                    FILE   "engines/hpl1/engine/impl/shaders/hpl1_Ambient_Color.fragment"
 shaders/hpl1_Bump2D_Light.fragment                     FILE   "engines/hpl1/engine/impl/shaders/hpl1_Bump2D_Light.fragment"
 shaders/hpl1_Bump2D_Light.vertex                       FILE   "engines/hpl1/engine/impl/shaders/hpl1_Bump2D_Light.vertex"
