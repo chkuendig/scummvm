@@ -31,6 +31,7 @@
 #include "backends/fs/posix/posix-iostream.h"
 #include "common/debug.h"
 #include "common/formats/json.h"
+#include "common/ptr.h"
 #include <emscripten.h>
 
 HTTPFilesystemNode::HTTPFilesystemNode(const Common::String &path, const Common::String &displayName, const Common::String &baseUrl, bool isValid, bool isDirectory, int size) : _path(path), _displayName(displayName), _url(baseUrl), _isValid(isValid), _isDirectory(isDirectory), _size(size) {
@@ -98,7 +99,7 @@ EM_ASYNC_JS(char *, _httpFsFetchIndex, (const char *url), {
 		returnString = globalThis['httpFsIndexCache'][url];
 	} else {
 		try {
-			const response = await fetch(url);
+			const response = await fetch(url, {cache: 'no-store'});
 			if (response.ok) {
 				returnString = await response.text();
 				globalThis['httpFsIndexCache'][url] = returnString;
@@ -118,7 +119,10 @@ EM_ASYNC_JS(bool, _httpFsFetchFile, (const char *url, byte *dataPtr, int dataSiz
 	url = UTF8ToString(url);
 	console.debug("Downloading %s", url);
 	try {
-		const response = await fetch(url);
+		// cache: 'no-store' bypasses Chrome's disk cache which can otherwise
+		// serve stale game-data (e.g. patched shaders) even though the server
+		// sends Cache-Control: no-store.
+		const response = await fetch(url, {cache: 'no-store'});
 		if (response.ok) {
 			returnBytes = await response.bytes();
 			if (returnBytes.length == dataSize) {
@@ -219,7 +223,17 @@ Common::SeekableReadStream *HTTPFilesystemNode::createReadStream() {
 	// todo: this should not be cached on the filesystem, but in memory
 	// and support range requests
 	// port https://github.com/emscripten-core/emscripten/blob/main/src/lib/libwasmfs_fetch.js over
-	if (!cacheFile->exists() && _size > 0) {
+	bool cacheValid = cacheFile->exists();
+	if (cacheValid && _size > 0) {
+		Common::ScopedPtr<Common::SeekableReadStream> existing(
+			PosixIoStream::makeFromPath(fsCachePath, StdioStream::WriteMode_Read));
+		if (!existing || existing->size() != _size) {
+			debug(5, "HTTPFilesystemNode::createReadStream() stale cache for %s (have %d, want %d), refetching",
+			      _path.c_str(), existing ? (int)existing->size() : -1, _size);
+			cacheValid = false;
+		}
+	}
+	if (!cacheValid && _size > 0) {
 		byte *buffer = new byte[_size];
 		bool success = _httpFsFetchFile(_url.c_str(), buffer, _size);
 		if (success) {
