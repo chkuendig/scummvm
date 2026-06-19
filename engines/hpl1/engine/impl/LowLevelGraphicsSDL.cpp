@@ -26,7 +26,6 @@
  */
 
 #include "hpl1/engine/impl/LowLevelGraphicsSDL.h"
-#include "hpl1/engine/graphics/font_data.h"
 
 #include "hpl1/engine/graphics/bitmap2D.h"
 #include "hpl1/engine/graphics/font_data.h"
@@ -34,9 +33,11 @@
 #include "hpl1/engine/impl/SDLTexture.h"
 #include "hpl1/engine/impl/VertexBufferOGL.h"
 #include "hpl1/engine/impl/VertexBufferVBO.h"
+#include "hpl1/engine/math/Math.h"
 #include "hpl1/engine/system/low_level_system.h"
 
 #include "common/algorithm.h"
+#include "common/array.h"
 #include "common/config-manager.h"
 #include "common/system.h"
 #include "engines/util.h"
@@ -46,6 +47,7 @@
 #include "hpl1/graphics.h"
 
 #ifdef HPL1_USE_OPENGL
+#if !USE_FORCED_GLES2
 
 namespace hpl {
 
@@ -77,9 +79,12 @@ cLowLevelGraphicsSDL::cLowLevelGraphicsSDL() {
 	mvVirtualSize.y = 600;
 	mfGammaCorrection = 1.0;
 	mpRenderTarget = nullptr;
+	_screenBuffer = nullptr;
+	_gammaCorrectionProgram = nullptr;
 	mpPixelFormat = Graphics::PixelFormat::createFormatRGBA32();
 
 	Common::fill(mpCurrentTexture, mpCurrentTexture + MAX_TEXTUREUNITS, nullptr);
+
 
 	mbClearColor = true;
 	mbClearDepth = true;
@@ -169,7 +174,7 @@ void cLowLevelGraphicsSDL::SetupGL() {
 	GL_CHECK(glClearColor(0.0f, 0.0f, 0.0f, 0.0f));
 
 	// Depth Test setup
-	GL_CHECK(glClearDepth(1.0f));      // VAlues buffer is cleared with
+	GL_CHECK(glClearDepth(1.0f));      // Values buffer is cleared with
 	GL_CHECK(glEnable(GL_DEPTH_TEST)); // enable depth testing
 	GL_CHECK(glDepthFunc(GL_LEQUAL));  // function to do depth test with
 	GL_CHECK(glDisable(GL_ALPHA_TEST));
@@ -210,6 +215,11 @@ int cLowLevelGraphicsSDL::GetCaps(eGraphicCaps type) const {
 
 	// Texture Rectangle
 	case eGraphicCaps_TextureTargetRectangle:
+		// WebGL2 has no GL_TEXTURE_RECTANGLE, but on USE_FORCED_GLES2 the
+		// renderer remaps Rect→2D in GetGLTextureTargetEnum and the shader
+		// preamble polyfills texture2DRect() to a normalized-UV texture2D()
+		// sample via _hpl1_invFramebufferSize. The post-effects pipeline
+		// (refraction, gamma, screen capture) is treated as available.
 		return 1;
 
 	// Vertex Buffer Object
@@ -459,6 +469,7 @@ void cLowLevelGraphicsSDL::SetOrthoProjection(const cVector2f &avSize, float afM
 //-----------------------------------------------------------------------
 
 void cLowLevelGraphicsSDL::SetTexture(unsigned int alUnit, iTexture *apTex) {
+
 	if (apTex == mpCurrentTexture[alUnit])
 		return;
 
@@ -576,15 +587,23 @@ void cLowLevelGraphicsSDL::FlushRendering() {
 }
 
 void cLowLevelGraphicsSDL::applyGammaCorrection() {
-	if (!_gammaCorrectionProgram)
+	if (!_gammaCorrectionProgram || !_screenBuffer)
+		return;
+	// User has gamma == 1.0 effectively means "don't bother"; skip the
+	// round-trip to save the per-frame screen capture + composite.
+	if (mfGammaCorrection == 1.0f)
 		return;
 
 	SetBlendActive(false);
 
-	// Copy screen to texture
+	// Copy screen to texture.
 	CopyContextToTexure(_screenBuffer, 0,
 						cVector2l((int)mvScreenSize.x, (int)mvScreenSize.y));
 
+	// Full-screen quad in clip space (the gamma vertex shader writes
+	// gl_Position = a_position directly, no worldViewProj). Texcoords
+	// differ between paths: desktop _screenBuffer is GL_TEXTURE_RECTANGLE
+	// (pixel-space), GLES2 remaps it to GL_TEXTURE_2D (normalized).
 	tVertexVec vVtx;
 	vVtx.push_back(cVertex(cVector3f(-1.0, 1.0, 0), cVector2f(0, mvScreenSize.y), cColor(0)));
 	vVtx.push_back(cVertex(cVector3f(1.0, 1.0, 0), cVector2f(mvScreenSize.x, mvScreenSize.y), cColor(0)));
@@ -608,7 +627,6 @@ void cLowLevelGraphicsSDL::SwapBuffers() {
 
 void cLowLevelGraphicsSDL::DrawTri(const tVertexVec &avVtx) {
 	assert(avVtx.size() == 3);
-
 	glBegin(GL_TRIANGLES);
 	{
 		for (int i = 0; i < 3; i++) {
@@ -635,6 +653,9 @@ void cLowLevelGraphicsSDL::DrawTri(const cVertex *avVtx) {
 	glEnd();
 	GL_CHECK_FN();
 }
+
+//-----------------------------------------------------------------------
+
 
 //-----------------------------------------------------------------------
 
@@ -1321,7 +1342,22 @@ void cLowLevelGraphicsSDL::DrawFilledRect2D(const cRect2f &aRect, float afZ, cCo
 //-----------------------------------------------------------------------
 
 void cLowLevelGraphicsSDL::DrawLineCircle2D(const cVector2f &avCenter, float afRadius, float afZ, cColor aCol) {
-	// Implement later
+	// Legacy desktop GL: the original "Implement later" stub. Mirror the
+	// GLES2 path so debug overlays look consistent across builds.
+	const int kSegments = 32;
+	const float kStep = k2Pif / (float)kSegments;
+	SetTexture(0, nullptr);
+	SetBlendActive(false);
+	glColor4f(aCol.r, aCol.g, aCol.b, aCol.a);
+	glBegin(GL_LINE_STRIP);
+	for (int i = 0; i <= kSegments; ++i) {
+		const float a = i * kStep;
+		glVertex3f(avCenter.x + cosf(a) * afRadius,
+				   avCenter.y + sinf(a) * afRadius,
+				   afZ);
+	}
+	glEnd();
+	GL_CHECK_FN();
 }
 
 //-----------------------------------------------------------------------
@@ -1787,6 +1823,10 @@ void cLowLevelGraphicsSDL::SetMatrixMode(eMatrix type) {
 
 //-----------------------------------------------------------------------
 
+
+//-----------------------------------------------------------------------
+
 } // namespace hpl
 
+#endif // !USE_FORCED_GLES2
 #endif // HPL1_USE_OPENGL

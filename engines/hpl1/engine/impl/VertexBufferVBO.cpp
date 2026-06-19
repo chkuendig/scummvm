@@ -26,6 +26,11 @@
  */
 
 #include "hpl1/engine/impl/VertexBufferVBO.h"
+#if USE_FORCED_GLES2
+#include "hpl1/engine/impl/LowLevelGraphicsGLES.h"
+#else
+#include "hpl1/engine/impl/LowLevelGraphicsSDL.h"
+#endif
 #include "hpl1/engine/math/Math.h"
 #include "hpl1/engine/system/low_level_system.h"
 
@@ -321,9 +326,14 @@ void cVertexBufferVBO::Draw(eVertexBufferDrawType aDrawType) {
 	///////////////////////////////
 	// Get the draw type
 	GLenum mode = GL_TRIANGLES;
+#if !USE_FORCED_GLES2
+	// GL_QUADS doesn't exist in GLES2; the engine doesn't actually request quad
+	// draws on this path so just fall through to GL_TRIANGLES.
 	if (drawType == eVertexBufferDrawType_Quad)
 		mode = GL_QUADS;
-	else if (drawType == eVertexBufferDrawType_Lines)
+	else
+#endif
+	if (drawType == eVertexBufferDrawType_Lines)
 		mode = GL_LINE_STRIP;
 
 	//////////////////////////////////
@@ -347,9 +357,14 @@ void cVertexBufferVBO::DrawIndices(unsigned int *apIndices, int alCount, eVertex
 	///////////////////////////////
 	// Get the draw type
 	GLenum mode = GL_TRIANGLES;
+#if !USE_FORCED_GLES2
+	// GL_QUADS doesn't exist in GLES2; the engine doesn't actually request quad
+	// draws on this path so just fall through to GL_TRIANGLES.
 	if (drawType == eVertexBufferDrawType_Quad)
 		mode = GL_QUADS;
-	else if (drawType == eVertexBufferDrawType_Lines)
+	else
+#endif
+	if (drawType == eVertexBufferDrawType_Lines)
 		mode = GL_LINE_STRIP;
 
 	//////////////////////////////////
@@ -498,6 +513,61 @@ int cVertexBufferVBO::GetElementNum(tVertexFlag aFlag) {
 //-----------------------------------------------------------------------
 
 void cVertexBufferVBO::SetVertexStates(tVertexFlag aFlags) {
+#if USE_FORCED_GLES2
+	// GLES2 has no fixed-function client-state arrays; use generic vertex
+	// attributes bound by cCGProgram via glBindAttribLocation. Only the five
+	// attribute slots we actually bind are touched; eVertexFlag_Texture2..4
+	// are unused on this path.
+	if (aFlags & eVertexFlag_Position) {
+		glEnableVertexAttribArray(eVtxAttr_Position);
+		int idx = cMath::Log2ToInt(eVertexFlag_Position);
+		glBindBuffer(GL_ARRAY_BUFFER, mvArrayHandle[idx]);
+		glVertexAttribPointer(eVtxAttr_Position, kvVertexElements[idx], GL_FLOAT, false, 0, 0);
+	} else {
+		glDisableVertexAttribArray(eVtxAttr_Position);
+	}
+
+	if (aFlags & eVertexFlag_Color0) {
+		glEnableVertexAttribArray(eVtxAttr_Color0);
+		int idx = cMath::Log2ToInt(eVertexFlag_Color0);
+		glBindBuffer(GL_ARRAY_BUFFER, mvArrayHandle[idx]);
+		glVertexAttribPointer(eVtxAttr_Color0, kvVertexElements[idx], GL_FLOAT, false, 0, 0);
+	} else {
+		glDisableVertexAttribArray(eVtxAttr_Color0);
+	}
+
+	if (aFlags & eVertexFlag_Normal) {
+		glEnableVertexAttribArray(eVtxAttr_Normal);
+		int idx = cMath::Log2ToInt(eVertexFlag_Normal);
+		glBindBuffer(GL_ARRAY_BUFFER, mvArrayHandle[idx]);
+		glVertexAttribPointer(eVtxAttr_Normal, 3, GL_FLOAT, false, 0, 0);
+	} else {
+		glDisableVertexAttribArray(eVtxAttr_Normal);
+	}
+
+	if (aFlags & eVertexFlag_Texture0) {
+		glEnableVertexAttribArray(eVtxAttr_Texture0);
+		int idx = cMath::Log2ToInt(eVertexFlag_Texture0);
+		glBindBuffer(GL_ARRAY_BUFFER, mvArrayHandle[idx]);
+		glVertexAttribPointer(eVtxAttr_Texture0, kvVertexElements[idx], GL_FLOAT, false, 0, 0);
+	} else {
+		glDisableVertexAttribArray(eVtxAttr_Texture0);
+	}
+
+	if (aFlags & eVertexFlag_Texture1) {
+		glEnableVertexAttribArray(eVtxAttr_Tangent);
+		int idx = cMath::Log2ToInt(eVertexFlag_Texture1);
+		glBindBuffer(GL_ARRAY_BUFFER, mvArrayHandle[idx]);
+		if (mbTangents)
+			glVertexAttribPointer(eVtxAttr_Tangent, 4, GL_FLOAT, false, 0, 0);
+		else
+			glVertexAttribPointer(eVtxAttr_Tangent, kvVertexElements[idx], GL_FLOAT, false, 0, 0);
+	} else {
+		glDisableVertexAttribArray(eVtxAttr_Tangent);
+	}
+
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+#else
 	/// COLOR 0 /////////////////////////
 	if (aFlags & eVertexFlag_Color0) {
 		GL_CHECK(glEnableClientState(GL_COLOR_ARRAY));
@@ -602,6 +672,7 @@ void cVertexBufferVBO::SetVertexStates(tVertexFlag aFlags) {
 	}
 
 	GL_CHECK(glBindBuffer(GL_ARRAY_BUFFER, 0));
+#endif // USE_FORCED_GLES2
 }
 
 //-----------------------------------------------------------------------

@@ -1101,6 +1101,8 @@ XcodeProvider::ValueList& XcodeProvider::getResourceFiles(const BuildSetup &setu
 			files.push_back("engines/hpl1/engine/impl/shaders/hpl1_Fog_Trans_Alpha.fragment");
 			files.push_back("engines/hpl1/engine/impl/shaders/hpl1_Fog_Trans_Mod.fragment");
 			files.push_back("engines/hpl1/engine/impl/shaders/hpl1_Fog_Trans_ModX2.fragment");
+			files.push_back("engines/hpl1/engine/impl/shaders/hpl1_gles2compat.fragment");
+			files.push_back("engines/hpl1/engine/impl/shaders/hpl1_gles2compat.vertex");
 			files.push_back("engines/hpl1/engine/impl/shaders/hpl1_PostEffect_Bloom.fragment");
 			files.push_back("engines/hpl1/engine/impl/shaders/hpl1_PostEffect_Bloom.vertex");
 			files.push_back("engines/hpl1/engine/impl/shaders/hpl1_PostEffect_Blur.vertex");

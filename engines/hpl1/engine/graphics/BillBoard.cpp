@@ -26,6 +26,7 @@
  */
 
 #include "hpl1/engine/graphics/BillBoard.h"
+#include "hpl1/opengl.h" // USE_FORCED_GLES2
 
 #include "hpl1/engine/impl/tinyXML/tinyxml.h"
 
@@ -254,6 +255,14 @@ void cBillboard::UpdateGraphics(cCamera3D *apCamera, float afFrameTime, cRenderL
 	if (mbIsHalo == false)
 		return;
 
+	if (mQueryObject.mpQuery == nullptr) {
+		// No backend support for occlusion queries (GLES2 path skips creation
+		// in SetIsHalo). Render the halo at full brightness — it won't dim on
+		// partial occlusion but the porthole case looks correct.
+		SetHaloAlpha(1.0f);
+		return;
+	}
+
 	////////////////////////
 	// Set the alpha
 	float fAlpha = 0;
@@ -437,8 +446,13 @@ void cBillboard::SetIsHalo(bool abX) {
 	mbIsHalo = abX;
 
 	if (mbIsHalo) {
+#if !USE_FORCED_GLES2
+		// WebGL2 only exposes a boolean occlusion query (ANY_SAMPLES_PASSED);
+		// see UpdateGraphics for the alpha=1 fast path that runs in lieu of
+		// the visible/total samples ratio when no query objects exist.
 		mQueryObject.mpQuery = mpLowLevelGraphics->CreateOcclusionQuery();
 		mMaxQueryObject.mpQuery = mpLowLevelGraphics->CreateOcclusionQuery();
+#endif
 
 		mfHaloAlpha = 1; // THis is to make sure that the new alpha is set to the mesh.
 		SetHaloAlpha(0);
