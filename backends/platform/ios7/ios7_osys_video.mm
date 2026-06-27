@@ -27,6 +27,8 @@
 
 #include "backends/platform/ios7/ios7_app_delegate.h"
 
+#include "common/config-manager.h"
+
 #define UIViewParentController(__view) ({ \
 	UIResponder *__responder = __view; \
 	while ([__responder isKindOfClass:[UIView class]]) \
@@ -155,6 +157,12 @@ void OSystem_iOS7::updateOutputSurface() {
 
 void OSystem_iOS7::updateTouchMode() {
 #if TARGET_OS_IOS
+	// Keep the native on-screen virtual controller in sync with the resolved
+	// touch mode: connected in the gamepad touch mode, or when the user enabled
+	// it independently via the gamepad_controller setting. This is the single
+	// place the virtual controller is (dis)connected as the touch mode changes.
+	virtualController(_currentTouchMode == Common::kTouchModeGamepad || ConfMan.getBool("gamepad_controller"));
+
 	execute_on_main_thread(^ {
 		[[iOS7AppDelegate iPhoneView] updateTouchMode];
 	});
