@@ -187,6 +187,29 @@
 #endif
 }
 
+- (BOOL)isPhysicalControllerConnected {
+#ifdef __IPHONE_14_0
+	if (@available(iOS 14.0, tvOS 14.0, *)) {
+		GCController *virtualBacking = nil;
+#if TARGET_OS_IOS
+#ifdef __IPHONE_15_0
+		if (@available(iOS 15.0, *)) {
+			// The on-screen virtual controller shows up in [GCController controllers]
+			// too; exclude its backing GCController so only real hardware counts.
+			virtualBacking = _currentController.controller;
+		}
+#endif
+#endif
+		for (GCController *c in [GCController controllers]) {
+			if (c != virtualBacking) {
+				return YES;
+			}
+		}
+	}
+#endif
+	return NO;
+}
+
 - (void)controllerDidConnect:(NSNotification *)notification {
 	_controller = (GCController*)notification.object;
 
