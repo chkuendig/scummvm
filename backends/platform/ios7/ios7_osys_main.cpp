@@ -92,7 +92,7 @@ OSystem_iOS7::OSystem_iOS7() :
 	_screenOrientation(kScreenOrientationAuto),
 	_runningTasks(0) {
 	_queuedInputEvent.type = Common::EVENT_INVALID;
-	_currentTouchMode = kTouchModeTouchpad;
+	_currentTouchMode = Common::kTouchModeTouchpad;
 
 	_chrootBasePath = iOS7_getDocumentsDir();
 	ChRootFilesystemFactory *chFsFactory = new ChRootFilesystemFactory(_chrootBasePath);
@@ -191,6 +191,10 @@ bool OSystem_iOS7::hasFeature(Feature f) {
 	case kFeatureNoQuit:
 	case kFeatureKbdMouseSpeed:
 	case kFeatureTouchscreen:
+	// Opt in to the shared Control-tab touch section (on-screen control
+	// checkbox + per-context touch-mode dropdowns). iOS renders the toggle and
+	// the on-screen gamepad natively (see ios7_video / GCVirtualController).
+	case kFeatureTouchpadMode:
 #ifdef SCUMMVM_NEON
 	case kFeatureCpuNEON:
 #endif
@@ -217,6 +221,11 @@ bool OSystem_iOS7::getFeatureState(Feature f) {
 	switch (f) {
 	case kFeatureVirtualKeyboard:
 		return isKeyboardShown();
+
+	case kFeatureTouchpadMode:
+		// The per-context touch modes are driven by the shared Control tab and
+		// the native toggle, not by this legacy single-mode flag.
+		return false;
 
 	default:
 		return ModularGraphicsBackend::getFeatureState(f);
@@ -437,7 +446,7 @@ TouchMode iOS7_getCurrentTouchMode() {
 	if (!sys) {
 		// If the system has not finished loading, just return a
 		// default value.
-		return kTouchModeDirect;
+		return Common::kTouchModeMouse;
 	}
 	return sys->getCurrentTouchMode();
 }
