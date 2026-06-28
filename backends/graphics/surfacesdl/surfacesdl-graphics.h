@@ -33,6 +33,7 @@
 #include "backends/events/sdl/sdl-events.h"
 
 #include "backends/platform/sdl/sdl-sys.h"
+#include "backends/platform/sdl/touchcontrols.h"
 
 #ifndef RELEASE_BUILD
 // Define this to allow for focus rectangle debugging
@@ -47,7 +48,7 @@ enum {
 /**
  * SDL graphics manager
  */
-class SurfaceSdlGraphicsManager : public SdlGraphicsManager {
+class SurfaceSdlGraphicsManager : public SdlGraphicsManager, public TouchControlsDrawer {
 public:
 	SurfaceSdlGraphicsManager(SdlEventSource *sdlEventSource, SdlWindow *window);
 	virtual ~SurfaceSdlGraphicsManager();
@@ -132,6 +133,13 @@ public:
 	// SdlGraphicsManager interface
 	void notifyVideoExpose() override;
 	void notifyResize(const int width, const int height) override;
+
+	// TouchControlsDrawer API
+	// The on-screen touch controls (gamepad overlay) are composited in software
+	// onto _hwScreen, on top of the game/overlay, before the frame is presented.
+	void touchControlInitSurface(const Graphics::ManagedSurface &surf) override;
+	void touchControlNotifyChanged() override;
+	void touchControlDraw(uint8 alpha, int16 x, int16 y, int16 w, int16 h, const Common::Rect &clip) override;
 
 #if defined(USE_IMGUI) && (defined(USE_IMGUI_SDLRENDERER2) || defined(USE_IMGUI_SDLRENDERER3))
 	void *getImGuiTexture(const Graphics::Surface &image, const byte *palette, int palCount) override;
@@ -479,6 +487,28 @@ private:
 	bool _needRestoreAfterOverlay;
 	bool _prevForceRedraw;
 	bool _prevCursorNeedsRedraw;
+
+	// On-screen touch controls (gamepad overlay). The TouchControls object is
+	// owned by OSystem_SDL; here we only own the SDL surfaces used to render it
+	// in software onto _hwScreen.
+	SDL_Surface *_touchControlsSurface;
+	// Re-entrancy guard: on Emscripten, loading the SVG performs a blocking
+	// network fetch that pumps the main loop and re-enters internUpdateScreen();
+	// we must not start a second init() while one is in progress.
+	bool _touchControlsIniting;
+
+	// On-screen mode-toggle button.
+	SDL_Surface *_touchToggleSurface;
+	int _touchToggleRenderedMode;
+	void drawTouchToggle();
+
+	// Lazy-init the controls, (re)bind this drawer and run their per-frame
+	// bookkeeping; must run before the dirty-rect/_forceRedraw decision.
+	void updateTouchControls();
+	// Composite the controls + mode-toggle onto _hwScreen (called after the
+	// game/overlay is drawn, before the frame is presented).
+	void drawTouchControls();
+	void freeTouchControls();
 };
 
 #endif
