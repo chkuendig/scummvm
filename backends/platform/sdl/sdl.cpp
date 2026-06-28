@@ -351,7 +351,13 @@ void OSystem_SDL::applyTouchSettings() {
 
 void OSystem_SDL::cycleTouchMode() {
 	const TouchMode oldMode = _touchMode;
+	// The on-screen gamepad is not offered by the toggle in the menus context, nor
+	// when a physical controller is connected - cycle straight past it in that case.
+	const bool gamepadAvailable = (currentTouchContext() != kTouchContextMenus) &&
+			!(_eventSource && _eventSource->isJoystickConnected());
 	_touchMode = (TouchMode)((_touchMode + 1) % TOUCH_MODE_MAX);
+	if (_touchMode == TOUCH_MODE_GAMEPAD && !gamepadAvailable)
+		_touchMode = (TouchMode)((_touchMode + 1) % TOUCH_MODE_MAX);
 
 	// Remember this manual choice so applyTouchSettings() keeps it for the current
 	// context instead of reverting to the per-context preset on the next overlay
@@ -382,7 +388,12 @@ void OSystem_SDL::cycleTouchMode() {
 }
 
 bool OSystem_SDL::isTouchToggleVisible() const {
-	return _touchUiReady && hasTouchscreen() && ConfMan.getBool("onscreen_control");
+	// The on-screen toggle is only rendered (and hit-tested) by overlay-capable
+	// renderers, which are exactly the ones that initialize the touch controls
+	// (OpenGL). SurfaceSDL is settings-only and never initializes them, so this
+	// keeps it from exposing a phantom invisible toggle in the top-right corner.
+	return _touchUiReady && hasTouchscreen() && ConfMan.getBool("onscreen_control") &&
+	       _touchControls.isInitialized();
 }
 
 Common::Rect OSystem_SDL::getTouchToggleRect(int screenW, int screenH) const {

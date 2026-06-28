@@ -33,7 +33,6 @@
 #include "backends/events/sdl/sdl-events.h"
 
 #include "backends/platform/sdl/sdl-sys.h"
-#include "backends/platform/sdl/touchcontrols.h"
 
 #ifndef RELEASE_BUILD
 // Define this to allow for focus rectangle debugging
@@ -48,7 +47,7 @@ enum {
 /**
  * SDL graphics manager
  */
-class SurfaceSdlGraphicsManager : public SdlGraphicsManager, public TouchControlsDrawer {
+class SurfaceSdlGraphicsManager : public SdlGraphicsManager {
 public:
 	SurfaceSdlGraphicsManager(SdlEventSource *sdlEventSource, SdlWindow *window);
 	virtual ~SurfaceSdlGraphicsManager();
@@ -135,15 +134,6 @@ public:
 	// SdlGraphicsManager interface
 	void notifyVideoExpose() override;
 	void notifyResize(const int width, const int height) override;
-
-	// TouchControlsDrawer API
-	// On the SDL2/SDL3 renderer path the controls are composited in window/
-	// drawable-pixel space (so draw-space == input hit-test space) by rendering
-	// SDL textures on top of the game texture, just before SDL_RenderPresent.
-	// On the legacy SDL1 path (no renderer) they are blitted onto _hwScreen.
-	void touchControlInitSurface(const Graphics::ManagedSurface &surf) override;
-	void touchControlNotifyChanged() override;
-	void touchControlDraw(uint8 alpha, int16 x, int16 y, int16 w, int16 h, const Common::Rect &clip) override;
 
 #if defined(USE_IMGUI) && (defined(USE_IMGUI_SDLRENDERER2) || defined(USE_IMGUI_SDLRENDERER3))
 	void *getImGuiTexture(const Graphics::Surface &image, const byte *palette, int palCount) override;
@@ -491,36 +481,6 @@ private:
 	bool _needRestoreAfterOverlay;
 	bool _prevForceRedraw;
 	bool _prevCursorNeedsRedraw;
-
-	// On-screen touch controls (gamepad overlay). The TouchControls object is
-	// owned by OSystem_SDL; here we only own the SDL surfaces (and, on the
-	// renderer path, the textures created from them) used to render it.
-	SDL_Surface *_touchControlsSurface;
-	// Re-entrancy guard: on Emscripten, loading the SVG performs a blocking
-	// network fetch that pumps the main loop and re-enters internUpdateScreen();
-	// we must not start a second init() while one is in progress.
-	bool _touchControlsIniting;
-
-	// On-screen mode-toggle button.
-	SDL_Surface *_touchToggleSurface;
-	int _touchToggleRenderedMode;
-	void drawTouchToggle();
-
-#if SDL_VERSION_ATLEAST(2, 0, 0)
-	// Textures (lazily created from the surfaces above) used to composite the
-	// controls in window/drawable-pixel space via the SDL renderer.
-	SDL_Texture *_touchControlsTexture;
-	SDL_Texture *_touchToggleTexture;
-#endif
-
-	// Lazy-init the controls, (re)bind this drawer and run their per-frame
-	// bookkeeping; must run before the dirty-rect/_forceRedraw decision.
-	void updateTouchControls();
-	// Composite the controls + mode-toggle. On SDL2/SDL3 this renders into the
-	// window after the game texture and before the present; on SDL1 it blits
-	// onto _hwScreen before the frame is flipped.
-	void drawTouchControls();
-	void freeTouchControls();
 };
 
 #endif
