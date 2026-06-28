@@ -53,15 +53,92 @@ bool SdlEventSource::processMouseEvent(Common::Event &event, int x, int y, int r
 }
 
 #if SDL_VERSION_ATLEAST(2, 0, 0)
+// Safely fetch the SDL window, which may not exist yet during early startup or
+// while the window is being (re)created. Returns nullptr if not available.
+static SDL_Window *safeGetSdlWindow(SdlGraphicsManager *gm) {
+	if (!gm || !gm->getWindow())
+		return nullptr;
+	return gm->getWindow()->getSDLWindow();
+}
+
 Common::Point SdlEventSource::getTouchscreenSize() {
+	SDL_Window *win = safeGetSdlWindow(_graphicsManager);
+	if (!win)
+		return Common::Point(0, 0);
 	int windowWidth, windowHeight;
-	SDL_GetWindowSize((dynamic_cast<SdlGraphicsManager*>(_graphicsManager))->getWindow()->getSDLWindow(), &windowWidth, &windowHeight);
+	SDL_GetWindowSize(win, &windowWidth, &windowHeight);
 	return Common::Point(windowWidth, windowHeight);
 }
 
-bool SdlEventSource::isTouchPortTouchpadMode(SDL_TouchID port) {
-       return g_system->getFeatureState(OSystem::kFeatureTouchpadMode);
+#ifdef USE_OPENGL
+Common::Point SdlEventSource::getTouchscreenSizePixels() {
+	// The on-screen touch controls are drawn in framebuffer/drawable pixels
+	// (getWindowWidth/Height), so hit-testing must use the same space, not the
+	// logical window size (which differs on HiDPI / browser canvases).
+	SDL_Window *win = safeGetSdlWindow(_graphicsManager);
+	if (!win)
+		return Common::Point(0, 0);
+	int w, h;
+#if SDL_VERSION_ATLEAST(3, 0, 0)
+	SDL_GetWindowSizeInPixels(win, &w, &h);
+#else
+	SDL_GL_GetDrawableSize(win, &w, &h);
+#endif
+	return Common::Point(w, h);
 }
+#endif
+
+bool SdlEventSource::isTouchPortTouchpadMode(SDL_TouchID port) {
+#ifdef USE_OPENGL
+	OSystem_SDL *sdlSystem = dynamic_cast<OSystem_SDL *>(g_system);
+	if (sdlSystem) {
+		return sdlSystem->getTouchMode() == OSystem_SDL::TOUCH_MODE_TOUCHPAD;
+	}
+#endif
+	return g_system->getFeatureState(OSystem::kFeatureTouchpadMode);
+}
+
+#ifdef USE_OPENGL
+bool SdlEventSource::handleTouchControlsGamepad(int action, int ptr, float normX, float normY) {
+	OSystem_SDL *sdlSystem = dynamic_cast<OSystem_SDL *>(g_system);
+	if (!sdlSystem || sdlSystem->getTouchMode() != OSystem_SDL::TOUCH_MODE_GAMEPAD) {
+		return false;
+	}
+	// A physical controller (incl. via the Web Gamepad API) takes over: don't
+	// drive the on-screen gamepad while one is connected.
+	if (isJoystickConnected()) {
+		return false;
+	}
+	TouchControls &touchControls = sdlSystem->getTouchControls();
+	if (!touchControls.isInitialized()) {
+		return false;
+	}
+	Common::Point size = getTouchscreenSizePixels();
+	touchControls.update((TouchControls::Action)action, ptr,
+			(int)(normX * size.x), (int)(normY * size.y));
+	return true;
+}
+
+bool SdlEventSource::handleTouchToggle(int action, float normX, float normY) {
+	// Act on finger-down only; the matching motion/up are harmless no-ops in the
+	// normal finger path because the finger was never registered there.
+	if (action != TouchControls::JACTION_DOWN) {
+		return false;
+	}
+	OSystem_SDL *sdlSystem = dynamic_cast<OSystem_SDL *>(g_system);
+	if (!sdlSystem || !sdlSystem->isTouchToggleVisible()) {
+		return false;
+	}
+	Common::Point size = getTouchscreenSizePixels();
+	int x = (int)(normX * size.x);
+	int y = (int)(normY * size.y);
+	if (!sdlSystem->getTouchToggleRect(size.x, size.y).contains(x, y)) {
+		return false;
+	}
+	sdlSystem->cycleTouchMode();
+	return true;
+}
+#endif
 
 bool SdlEventSource::isTouchPortActive(SDL_TouchID port) {
 	return true;

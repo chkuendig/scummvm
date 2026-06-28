@@ -4,6 +4,11 @@ MODULE_OBJS := \
 	sdl.o \
 	sdl-window.o
 
+ifdef USE_OPENGL
+MODULE_OBJS += \
+	touchcontrols.o
+endif
+
 ifdef KOLIBRIOS
 MODULE_OBJS += \
 	kolibrios/kolibrios-main.o \

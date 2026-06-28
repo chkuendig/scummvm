@@ -151,6 +151,21 @@ protected:
 	virtual bool isTouchPortActive(SDL_TouchID port);
 	virtual Common::Point getTouchscreenSize();
 	virtual void convertTouchXYToGameXY(float touchX, float touchY, int *gameX, int *gameY);
+#ifdef USE_OPENGL
+	/** Drawable/framebuffer size in pixels (for touch-controls hit-testing). */
+	Common::Point getTouchscreenSizePixels();
+	/**
+	 * Route a touch finger event to the on-screen gamepad when the active
+	 * touch mode is GAMEPAD. @p action is a TouchControls::Action value.
+	 * Returns true if the event was consumed by the gamepad.
+	 */
+	bool handleTouchControlsGamepad(int action, int ptr, float normX, float normY);
+	/**
+	 * Hit-test a touch finger against the on-screen mode-toggle button.
+	 * @p action is a TouchControls::Action value. Returns true if consumed.
+	 */
+	bool handleTouchToggle(int action, float normX, float normY);
+#endif
 #endif
 
 	//@}
