@@ -57,18 +57,14 @@ void EMSCRIPTEN_KEEPALIVE OSystem_Emscripten_cloudConnectionWizardCallback(char 
 
 void OSystem_Emscripten::initBackend() {
 #ifdef USE_TTS
-	// Initialize Text to Speech manager
 	_textToSpeechManager = new EmscriptenTextToSpeechManager();
 #endif
 
-	// Event source
 	_eventSource = new EmscriptenSdlEventSource();
 
-	// Emscripten-specific mixer manager
 	_mixerManager = new EmscriptenSdlMixerManager();
 	_mixerManager->init();
 
-	// Invoke parent implementation of this method
 	OSystem_POSIX::initBackend();
 
 	ConfMan.setPath("extrapath", Common::Path(Common::String::format("%s/extras/", getenv("HOME"))));
@@ -83,11 +79,9 @@ void OSystem_Emscripten::init() {
 	// being loaded over HTTP.
 	_timerManager = new EmscriptenTimerManager();
 
-	// Initialze File System Factory
 	EmscriptenFilesystemFactory *fsFactory = new EmscriptenFilesystemFactory();
 	_fsFactory = fsFactory;
 
-	// Invoke parent implementation of this method
 	OSystem_SDL::init();
 }
 
@@ -142,6 +136,13 @@ bool OSystem_Emscripten::displayLogFile() {
 #ifdef USE_OPENGL
 OSystem_SDL::GraphicsManagerType OSystem_Emscripten::getDefaultGraphicsManager() const {
 	return GraphicsManagerOpenGL;
+}
+
+bool OSystem_Emscripten::hasTouchscreen() const {
+	// SDL's touch/mouse detection is unreliable in the browser (touchpads look
+	// like touch devices, touchscreens synthesize mouse events). Use the
+	// browser's maxTouchPoints as the authoritative touch-capability signal.
+	return EM_ASM_INT({ return (navigator.maxTouchPoints || 0) > 0 ? 1 : 0; }) != 0;
 }
 #endif
 
