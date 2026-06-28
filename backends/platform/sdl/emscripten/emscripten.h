@@ -62,6 +62,12 @@ public:
 #ifdef USE_OPENGL
 	GraphicsManagerType getDefaultGraphicsManager() const override;
 #endif
+	/**
+	 * SDL mis-reports touch in the browser (touchpads register touch devices,
+	 * touchscreens also look like a mouse). Use navigator.maxTouchPoints instead.
+	 * Used by every graphics backend, so it must not be guarded by USE_OPENGL.
+	 */
+	bool hasTouchscreen() const override;
 	Common::MutexInternal *createMutex() override;
 	void exportFile(const Common::Path &filename);
 	void delayMillis(uint msecs) override;

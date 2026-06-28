@@ -24,7 +24,9 @@
 #if defined(SDL_BACKEND)
 #include "backends/graphics/surfacesdl/surfacesdl-graphics.h"
 #include "backends/events/sdl/sdl-events.h"
+#include "backends/platform/sdl/sdl.h"
 #include "common/config-manager.h"
+#include "common/memstream.h"
 #include "common/mutex.h"
 #include "common/textconsole.h"
 #include "common/translation.h"
@@ -37,6 +39,8 @@
 #include "graphics/blit.h"
 #include "graphics/font.h"
 #include "graphics/fontman.h"
+#include "graphics/managed_surface.h"
+#include "graphics/svg.h"
 #include "graphics/scaler.h"
 #include "graphics/scaler/aspect.h"
 #include "graphics/surface.h"
@@ -194,7 +198,8 @@ SurfaceSdlGraphicsManager::SurfaceSdlGraphicsManager(SdlEventSource *sdlEventSou
 	_scalerPlugins(ScalerMan.getPlugins()), _scalerPlugin(nullptr), _scaler(nullptr),
 	_needRestoreAfterOverlay(false), _isInOverlayPalette(false), _isDoubleBuf(false), _prevForceRedraw(false), _numPrevDirtyRects(0),
 	_prevCursorNeedsRedraw(false),
-	_mouseKeyColor(0), _disableMouseKeyColor(false) {
+	_mouseKeyColor(0), _disableMouseKeyColor(false)
+	{
 
 	// allocate palette storage
 	_currentPalette = (SDL_Color *)calloc(256, sizeof(SDL_Color));
@@ -1973,6 +1978,28 @@ void SurfaceSdlGraphicsManager::clearFocusRectangle() {
 #pragma mark -
 #pragma mark --- Overlays ---
 #pragma mark -
+
+void SurfaceSdlGraphicsManager::showOverlay(bool inGUI) {
+	WindowedGraphicsManager::showOverlay(inGUI);
+	OSystem_SDL *sdlSystem = dynamic_cast<OSystem_SDL *>(g_system);
+	if (sdlSystem) {
+		// The GUI overlay can only be shown after the theme has loaded (which
+		// creates the virtual-fs cache dir), so it is now safe to load the
+		// on-screen control assets. Mirrors the OpenGL graphics manager.
+		if (inGUI) {
+			sdlSystem->setTouchUiReady();
+		}
+		sdlSystem->applyTouchSettings();
+	}
+}
+
+void SurfaceSdlGraphicsManager::hideOverlay() {
+	WindowedGraphicsManager::hideOverlay();
+	OSystem_SDL *sdlSystem = dynamic_cast<OSystem_SDL *>(g_system);
+	if (sdlSystem) {
+		sdlSystem->applyTouchSettings();
+	}
+}
 
 void SurfaceSdlGraphicsManager::clearOverlay() {
 	Common::StackLock lock(_graphicsMutex);	// Lock the mutex until this function ends

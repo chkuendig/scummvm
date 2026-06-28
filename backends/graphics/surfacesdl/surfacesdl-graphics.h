@@ -111,6 +111,8 @@ public:
 	void clearFocusRectangle() override;
 
 	Graphics::PixelFormat getOverlayFormat() const override { return _overlayFormat; }
+	void showOverlay(bool inGUI) override;
+	void hideOverlay() override;
 	void clearOverlay() override;
 	void grabOverlay(Graphics::Surface &surface) const override;
 	void copyRectToOverlay(const void *buf, int pitch, int x, int y, int w, int h) override;

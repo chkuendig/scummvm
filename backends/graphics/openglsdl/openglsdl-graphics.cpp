@@ -20,10 +20,15 @@
  */
 
 #include "backends/graphics/openglsdl/openglsdl-graphics.h"
+#include "backends/graphics/opengl/pipelines/pipeline.h"
 #include "backends/graphics/opengl/texture.h"
 #include "backends/events/sdl/sdl-events.h"
 #include "backends/platform/sdl/sdl.h"
+#include "graphics/blit.h"
+#include "graphics/managed_surface.h"
+#include "graphics/svg.h"
 #include "graphics/scaler/aspect.h"
+#include "common/memstream.h"
 #ifdef USE_SCALERS
 #include "graphics/scalerplugin.h"
 #endif
@@ -229,6 +234,14 @@ OpenGLSdlGraphicsManager::~OpenGLSdlGraphicsManager() {
 }
 
 void OpenGLSdlGraphicsManager::deinitOpenGLContext() {
+	// Free the touch-toggle GL surface while the context is still current.
+	// It is recreated lazily in drawTouchToggle() once a context exists again.
+	if (_touchToggleSurface) {
+		_touchToggleSurface->destroy();
+		delete _touchToggleSurface;
+		_touchToggleSurface = nullptr;
+	}
+
 #if SDL_VERSION_ATLEAST(2, 0, 0)
 	if (!_glContext) {
 		return;
@@ -397,6 +410,20 @@ void OpenGLSdlGraphicsManager::updateScreen() {
 		_forceRedraw = true;
 	}
 #endif
+
+	// Re-apply the per-context touch preset when a game switches between 2D and
+	// 3D (the overlay show/hide hooks fire before the engine's 3D renderer is
+	// set up, so we also need to react to the change here).
+	{
+		bool is3d = isRendering3D();
+		if (is3d != _touchWasRendering3D) {
+			_touchWasRendering3D = is3d;
+			OSystem_SDL *sdlSystem = dynamic_cast<OSystem_SDL *>(g_system);
+			if (sdlSystem) {
+				sdlSystem->applyTouchSettings();
+			}
+		}
+	}
 
 	OpenGLGraphicsManager::updateScreen();
 }
@@ -580,6 +607,9 @@ void OpenGLSdlGraphicsManager::refreshScreen() {
 	renderImGui();
 #endif
 
+	// Last minute draw of the on-screen mode-toggle button, on top of everything.
+	drawTouchToggle();
+
 #if SDL_VERSION_ATLEAST(2, 0, 0)
 	SDL_GL_SwapWindow(_window->getSDLWindow());
 #else
@@ -600,6 +630,102 @@ void OpenGLSdlGraphicsManager::saveScreenshot() {
 
 bool OpenGLSdlGraphicsManager::saveScreenshot(const Common::Path &filename) const {
 	return OpenGLGraphicsManager::saveScreenshot(filename);
+}
+
+bool OpenGLSdlGraphicsManager::isRendering3D() const {
+#if defined(USE_OPENGL_GAME) || defined(USE_OPENGL_SHADERS)
+	return _renderer3d != nullptr;
+#else
+	return false;
+#endif
+}
+
+// iOS-style mode icons (mouse / touchpad / gamepad), embedded as SVG so they
+// rasterize from memory with no asset/VFS dependency. Each has a semi-transparent
+// dark rounded background (composited by the rasterizer) + a light-grey glyph.
+// The glyph paths are taken from the Android backend's ic_action_* drawables.
+static const char *touchModeIconSvg(OSystem_SDL::TouchMode mode) {
+	switch (mode) {
+	case Common::kTouchModeTouchpad:
+		return "<svg viewBox=\"0 0 48 48\" xmlns=\"http://www.w3.org/2000/svg\">"
+		       "<rect x=\"1\" y=\"1\" width=\"46\" height=\"46\" rx=\"11\" fill=\"#000000\" fill-opacity=\"0.38\"/>"
+		       "<g fill=\"#ededed\">"
+		       "<path d=\"M37.78,29.5l-8.18,-4.08c-0.56,-0.28 -1.16,-0.42 -1.78,-0.42H26.0v-12.0C26.0,11.34 24.66,10.0 23.0,10.0S20.0,11.34 20.0,13.0v21.48L13.5,33.0c-0.66,-0.14 -1.36,0.06 -1.84,0.56L10.0,35.24l9.08,9.58C19.84,45.58 21.36,46.0 22.42,46.0h12.32c2.0,0.0 3.68,-1.46 3.96,-3.44l1.26,-8.92C40.2,31.94 39.32,30.28 37.78,29.5z\"/>"
+		       "<path d=\"M40.26,7.74C37.38,4.34 31.2,2.0 24.0,2.0S10.62,4.34 7.74,7.74L4.0,4.0v10.0h10.0L9.86,9.86c2.0,-2.58 7.4,-4.86 14.14,-4.86s12.14,2.28 14.14,4.86L34.0,14.0h10.0V4.0L40.26,7.74z\"/>"
+		       "</g></svg>";
+	case Common::kTouchModeGamepad:
+		return "<svg viewBox=\"0 0 48 48\" xmlns=\"http://www.w3.org/2000/svg\">"
+		       "<rect x=\"1\" y=\"1\" width=\"46\" height=\"46\" rx=\"11\" fill=\"#000000\" fill-opacity=\"0.38\"/>"
+		       "<path fill=\"#ededed\" d=\"M42,12L6,12c-2.2,0 -4,1.8 -4,4v16c0,2.2 1.8,4 4,4h36c2.2,0 4,-1.8 4,-4L46,16c0,-2.2 -1.8,-4 -4,-4zM22,26L16,26v6L12,32v-6L6,26v-4h6L12,16h4v6h6v4zM31,30c-1.66,0 -3,-1.34 -3,-3s1.34,-3 3,-3 3,1.34 3,3 -1.34,3 -3,3zM39,24c-1.66,0 -3,-1.34 -3,-3S37.34,18 39,18s3,1.34 3,3 -1.34,3 -3,3z\"/>"
+		       "</svg>";
+	default: // mouse
+		return "<svg viewBox=\"0 0 48 48\" xmlns=\"http://www.w3.org/2000/svg\">"
+		       "<rect x=\"1\" y=\"1\" width=\"46\" height=\"46\" rx=\"11\" fill=\"#000000\" fill-opacity=\"0.38\"/>"
+		       "<path fill=\"#ededed\" d=\"M26,2.14L26,18h14c0,-8.16 -6.1,-14.88 -14,-15.86zM8,30c0,8.84 7.16,16 16,16s16,-7.16 16,-16v-8L8,22v8zM22,2.14C14.1,3.12 8,9.84 8,18h14L22,2.14z\"/>"
+		       "</svg>";
+	}
+}
+
+void OpenGLSdlGraphicsManager::drawTouchToggle() {
+	OSystem_SDL *sdlSystem = dynamic_cast<OSystem_SDL *>(g_system);
+	if (!sdlSystem || !sdlSystem->isTouchToggleVisible()) {
+		return;
+	}
+
+	Common::Rect r = sdlSystem->getTouchToggleRect(getWindowWidth(), getWindowHeight());
+	OSystem_SDL::TouchMode mode = sdlSystem->getTouchMode();
+
+	// (Re)build the icon when the mode changes or the size differs.
+	const bool sizeMismatch = !_touchToggleSurface ||
+			_touchToggleSurface->getWidth() != (uint)r.width() ||
+			_touchToggleSurface->getHeight() != (uint)r.height();
+	if (sizeMismatch || _touchToggleRenderedMode != (int)mode) {
+		if (!_touchToggleSurface) {
+			_touchToggleSurface = createSurface(_defaultFormatAlpha);
+		}
+		_touchToggleSurface->allocate(r.width(), r.height());
+		Graphics::Surface *dst = _touchToggleSurface->getSurface();
+
+		// Rasterize the embedded SVG (bg + glyph) straight into the button.
+		const char *svg = touchModeIconSvg(mode);
+		Common::MemoryReadStream stream((const byte *)svg, strlen(svg));
+		Graphics::SVGBitmap icon(&stream, r.width(), r.height());
+		Graphics::crossBlit((byte *)dst->getPixels(), (const byte *)icon.getPixels(),
+				dst->pitch, icon.pitch, r.width(), r.height(), dst->format, icon.format);
+
+		_touchToggleSurface->updateGLTexture();
+		_touchToggleRenderedMode = (int)mode;
+	}
+
+	_targetBuffer->enableBlend(OpenGL::Framebuffer::kBlendModeTraditionalTransparency);
+	OpenGL::Pipeline *pipeline = getPipeline();
+	pipeline->activate();
+	// Draw fully opaque white so the toggle isn't tinted by leftover state when
+	// the (alpha-modulating) gamepad overlay above wasn't drawn this frame.
+	pipeline->setColor(1.0f, 1.0f, 1.0f, 1.0f);
+	pipeline->drawTexture(_touchToggleSurface->getGLTexture(), r.left, r.top, r.width(), r.height());
+}
+
+void OpenGLSdlGraphicsManager::showOverlay(bool inGUI) {
+	OpenGLGraphicsManager::showOverlay(inGUI);
+	OSystem_SDL *sdlSystem = dynamic_cast<OSystem_SDL *>(g_system);
+	if (sdlSystem) {
+		// The GUI overlay can only be shown after the theme has loaded (which
+		// creates the virtual-fs cache dir), so it is now safe to load the
+		// on-screen control assets.
+		if (inGUI) {
+			sdlSystem->setTouchUiReady();
+		}
+		sdlSystem->applyTouchSettings();
+	}
+}
+
+void OpenGLSdlGraphicsManager::hideOverlay() {
+	OpenGLGraphicsManager::hideOverlay();
+	OSystem_SDL *sdlSystem = dynamic_cast<OSystem_SDL *>(g_system);
+	if (sdlSystem) {
+		sdlSystem->applyTouchSettings();
+	}
 }
 
 bool OpenGLSdlGraphicsManager::setupMode(uint width, uint height) {

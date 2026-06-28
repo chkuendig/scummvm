@@ -43,6 +43,12 @@ public:
 
 	float getHiDPIScreenFactor() const override;
 
+	/** True if the currently running game uses the 3D renderer. */
+	bool isRendering3D() const;
+
+	void showOverlay(bool inGUI) override;
+	void hideOverlay() override;
+
 	// EventObserver API
 	bool notifyEvent(const Common::Event &event) override;
 
@@ -74,6 +80,15 @@ private:
 	bool setupMode(uint width, uint height);
 
 	void deinitOpenGLContext();
+
+	// On-screen mode-toggle button: a small labelled, colour-coded pill drawn
+	// with the GUI font (no loose-file asset, so it is safe during early init).
+	OpenGL::Surface *_touchToggleSurface = nullptr;
+	int _touchToggleRenderedMode = -1;
+	void drawTouchToggle();
+	// Tracks the 3D-renderer state so the per-context touch preset can be
+	// re-applied when a game switches between 2D and 3D.
+	bool _touchWasRendering3D = false;
 
 #if SDL_VERSION_ATLEAST(2, 0, 0)
 	int _glContextProfileMask, _glContextMajor, _glContextMinor;
