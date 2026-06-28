@@ -29,6 +29,23 @@
 
 #ifdef HPL1_USE_OPENGL
 
+#if USE_FORCED_GLES2
+// GLES2 has no occlusion queries; the engine still creates a cOcclusionQueryOGL
+// but its results are ignored on this path. Stub out the GL symbols so the
+// rest of the file compiles.
+#define glGenQueries(n, ids) do { (void)(n); (void)(ids); } while(0)
+#define glDeleteQueries(n, ids) do { (void)(n); (void)(ids); } while(0)
+#define glBeginQuery(target, id) do { (void)(target); (void)(id); } while(0)
+#define glEndQuery(target) do { (void)(target); } while(0)
+#define glGetQueryObjectiv(id, pname, params) do { \
+	(void)(id); (void)(pname); \
+	if (params) *(params) = 1; \
+} while(0)
+#define GL_SAMPLES_PASSED 0x8914
+#define GL_QUERY_RESULT 0x8866
+#define GL_QUERY_RESULT_AVAILABLE 0x8867
+#endif
+
 namespace hpl {
 
 //////////////////////////////////////////////////////////////////////////

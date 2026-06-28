@@ -40,6 +40,11 @@
 
 namespace hpl {
 
+class cCamera3D; // Forward declaration
+#if USE_FORCED_GLES2
+class cLowLevelGraphicsGLES;
+#endif
+
 class cCGProgram : public iGpuProgram {
 public:
 	cCGProgram(const tString &vertex, const tString &fragment);
@@ -63,12 +68,43 @@ public:
 	bool SetMatrixf(const tString &asName, eGpuProgramMatrix mType,
 					eGpuProgramMatrixOp mOp);
 
+	// Static methods for managing camera context (OpenGL ES compatibility)
+	static void SetCurrentCamera(cCamera3D *apCamera) { s_pCurrentCamera = apCamera; }
+	static cCamera3D* GetCurrentCamera() { return s_pCurrentCamera; }
+
+#if USE_FORCED_GLES2
+	// GLES2 has no glGetFloatv(GL_MODELVIEW_MATRIX). cCGProgram::SetMatrixf
+	// (ViewProjection, Identity) reads the matrix stack from the LowLevel
+	// renderer instead — set this once from cLowLevelGraphicsGLES::Init.
+	static void SetCurrentLowLevel(cLowLevelGraphicsGLES *apLowLevel) { s_pLowLevel = apLowLevel; }
+#endif
+
+#if USE_FORCED_GLES2
+	// On GLES2 the framebuffer/Rect texture has no native non-normalized
+	// sampler; cCGProgram polyfills texture2DRect() to texture2D() with
+	// normalized UVs and needs to know the framebuffer size. Set this when
+	// the screen / virtual size changes; cCGProgram::Bind() pushes the
+	// reciprocal as a uniform to the active shader.
+	static void SetCurrentFramebufferSize(int aWidth, int aHeight) {
+		s_framebufferWidth = aWidth;
+		s_framebufferHeight = aHeight;
+	}
+#endif
+
 private:
 	OpenGL::Shader *_shader;
 
 	tString msName;
 	tString msFile;
 	tString msEntry;
+
+	// Static camera context for OpenGL ES compatibility
+	static cCamera3D *s_pCurrentCamera;
+#if USE_FORCED_GLES2
+	static cLowLevelGraphicsGLES *s_pLowLevel;
+	static int s_framebufferWidth;
+	static int s_framebufferHeight;
+#endif
 };
 
 } // namespace hpl

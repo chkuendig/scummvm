@@ -29,13 +29,16 @@
 #define HPL_LOWLEVELGRAPHICS_SDL_H
 
 #include "common/ptr.h"
+#include "common/stack.h"
 #include "graphics/pixelformat.h"
 #include "graphics/surface.h"
 #include "hpl1/engine/graphics/LowLevelGraphics.h"
 #include "hpl1/engine/math/MathTypes.h"
 #include "hpl1/opengl.h"
 
+
 #ifdef HPL1_USE_OPENGL
+#if !USE_FORCED_GLES2
 
 namespace hpl {
 
@@ -307,9 +310,11 @@ private:
 
 	// Vtx helper
 	void SetVtxBatchStates(tVtxBatchFlag flags);
+
 };
 
 } // namespace hpl
 
+#endif // !USE_FORCED_GLES2
 #endif // HPL1_USE_OPENGL
 #endif // HPL_LOWLEVELGRAPHICS_SDL_H

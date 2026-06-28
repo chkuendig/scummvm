@@ -365,6 +365,16 @@ void cRendererPostEffects::RenderDepthOfField() {
 	mpLowLevelGraphics->SetTexture(0, pScreenTexture);
 	mpLowLevelGraphics->SetTexture(1, mpDofBlurTexture);
 
+	// Bind _depthOfFieldProgram once for both passes — the per-pixel-depth
+	// pass below and the skybox uniform-blur pass right after share the same
+	// shader. The `skyMode` uniform switches between the two: 1.0 forces a
+	// uniform `maxBlur` over the whole quad, 0.0 uses the depth-driven
+	// per-pixel computation.
+	_depthOfFieldProgram->Bind();
+	_depthOfFieldProgram->SetVec3f("planes", cVector3f(mfDofNearPlane, mfDofFocalPlane, mfDofFarPlane));
+	_depthOfFieldProgram->SetFloat("maxBlur", mfDofMaxBlur);
+	_depthOfFieldProgram->SetVec2f("screenSize", mvScreenSize);
+
 	// Render entire screen textur to screen, this to cover up what has been done by the
 	// blur filter, should have support for frame_buffer_object so this can be skipped.
 	if (mpRenderer3D->GetSkyBoxActive()) {
@@ -381,12 +391,19 @@ void cRendererPostEffects::RenderDepthOfField() {
 		mvTexRectVtx[2] = cVertex(cVector3f(vVirtSize.x, vVirtSize.y, 40), cVector2f(mvScreenSize.x, 0), cColor(1, 1.0f));
 		mvTexRectVtx[3] = cVertex(cVector3f(0, vVirtSize.y, 40), cVector2f(0, 0), cColor(1, 1.0f));
 
+		// Desktop fixed-function path: program a combiner that interpolates
+		// the screen rect texture and the blur texture by a constant DoF
+		// strength. The shader path achieves the same lerp via skyMode=1.
 		mpLowLevelGraphics->SetActiveTextureUnit(1);
 		mpLowLevelGraphics->SetTextureEnv(eTextureParam_ColorSource0, eTextureSource_Texture);
 		mpLowLevelGraphics->SetTextureEnv(eTextureParam_ColorSource1, eTextureSource_Previous);
 		mpLowLevelGraphics->SetTextureEnv(eTextureParam_ColorSource2, eTextureSource_Constant);
 		mpLowLevelGraphics->SetTextureEnv(eTextureParam_ColorFunc, eTextureFunc_Interpolate);
 		mpLowLevelGraphics->SetTextureConstantColor(cColor(mfDofMaxBlur, mfDofMaxBlur));
+
+		_depthOfFieldProgram->SetFloat("skyMode", 1.0f);
+		_depthOfFieldProgram->SetMatrixf("worldViewProj", eGpuProgramMatrix_ViewProjection,
+										 eGpuProgramMatrixOp_Identity);
 
 		mpLowLevelGraphics->DrawQuadMultiTex(mvTexRectVtx, vUvVec);
 
@@ -402,11 +419,8 @@ void cRendererPostEffects::RenderDepthOfField() {
 	mpLowLevelGraphics->SetDepthTestActive(true);
 	mpLowLevelGraphics->SetBlendActive(false);
 
-	// Setup
-	_depthOfFieldProgram->Bind();
-	_depthOfFieldProgram->SetVec3f("planes", cVector3f(mfDofNearPlane, mfDofFocalPlane, mfDofFarPlane));
-	_depthOfFieldProgram->SetFloat("maxBlur", mfDofMaxBlur);
-	_depthOfFieldProgram->SetVec2f("screenSize", mvScreenSize);
+	// Per-mesh DoF: use the depth-driven blur factor.
+	_depthOfFieldProgram->SetFloat("skyMode", 0.0f);
 
 	//////////////////
 	// Render objects
