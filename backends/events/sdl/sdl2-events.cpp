@@ -685,6 +685,17 @@ bool SdlEventSource::pollEvent(Common::Event &event) {
 				if (handleTouchToggle(action, ev.tfinger.x, ev.tfinger.y)) {
 					continue;
 				}
+				// In gamepad mode (no physical controller — applyTouchSettings
+				// falls back otherwise), drive the on-screen gamepad and consume
+				// the finger, like the Android backend does from JNI.
+				OSystem_SDL *sdlSystem = dynamic_cast<OSystem_SDL *>(g_system);
+				if (sdlSystem && sdlSystem->getTouchMode() == Common::kTouchModeGamepad &&
+				    sdlSystem->getTouchControls().isInitialized()) {
+					Common::Point size = getTouchscreenSizePixels();
+					sdlSystem->getTouchControls().update((TouchAction)action,
+						(int)(ev.tfinger.fingerId & 0x7fffffff), (int)(ev.tfinger.x * size.x), (int)(ev.tfinger.y * size.y));
+					continue;
+				}
 			}
 			// front (0) or back (1) panel
 			SDL_TouchID port = ev.tfinger.touchId;
@@ -999,6 +1010,12 @@ bool SdlEventSource::handleJoystickAdded(const SDL_JoyDeviceEvent &device, Commo
 	closeJoystick();
 	openJoystick(joystick_num);
 
+	// The on-screen gamepad is only a fallback when no physical controller is
+	// connected, so re-evaluate the touch preset now that one was plugged in.
+	if (OSystem_SDL *sdlSystem = dynamic_cast<OSystem_SDL *>(g_system)) {
+		sdlSystem->applyTouchSettings();
+	}
+
 	event.type = Common::EVENT_INPUT_CHANGED;
 	return true;
 }
@@ -1024,6 +1041,12 @@ bool SdlEventSource::handleJoystickRemoved(const SDL_JoyDeviceEvent &device, Com
 	debug(5, "SdlEventSource: Newly removed joystick with instance id '%d' matches currently used joystick, closing current joystick", device.which);
 
 	closeJoystick();
+
+	// A physical controller went away; the on-screen gamepad fallback may now
+	// apply again, so re-evaluate the touch preset.
+	if (OSystem_SDL *sdlSystem = dynamic_cast<OSystem_SDL *>(g_system)) {
+		sdlSystem->applyTouchSettings();
+	}
 
 	event.type = Common::EVENT_INPUT_CHANGED;
 	return true;

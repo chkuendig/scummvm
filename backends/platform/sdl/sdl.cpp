@@ -300,6 +300,7 @@ OSystem_SDL::TouchContext OSystem_SDL::currentTouchContext() {
 }
 
 void OSystem_SDL::applyTouchSettings() {
+	const TouchMode oldMode = _touchMode;
 	const TouchContext context = currentTouchContext();
 
 	Common::String key;
@@ -326,16 +327,43 @@ void OSystem_SDL::applyTouchSettings() {
 	// The manual toggle (cycleTouchMode) is transient: the next applyTouchSettings
 	// re-derives the mode from the per-context preset, so a toggle only holds until
 	// the next overlay show/hide or screen change (matches the iOS behaviour).
+
+	// The on-screen gamepad is only useful as a fallback: if a physical
+	// controller is connected (incl. one exposed via the Web Gamepad API),
+	// fall back to the touchpad so we don't show a redundant overlay.
+	if (_touchMode == Common::kTouchModeGamepad && _eventSource && _eventSource->isJoystickConnected()) {
+		_touchMode = Common::kTouchModeTouchpad;
+	}
+
+	// If we just left the on-screen gamepad while a finger might still be held,
+	// release any virtual buttons so they don't get stuck down.
+	if (oldMode == Common::kTouchModeGamepad && _touchMode != Common::kTouchModeGamepad) {
+		_touchControls.update(kActionCancel, 0, 0, 0);
+	}
 }
 
 void OSystem_SDL::cycleTouchMode() {
-	// Toggle between the direct pointer and the touchpad emulation.
-	_touchMode = (_touchMode == Common::kTouchModeTouchpad) ? Common::kTouchModeMouse : Common::kTouchModeTouchpad;
+	const TouchMode oldMode = _touchMode;
+	// The on-screen gamepad is not offered by the toggle in the menus context, nor
+	// when a physical controller is connected - cycle straight past it in that case.
+	const bool gamepadAvailable = (currentTouchContext() != kTouchContextMenus) &&
+			!(_eventSource && _eventSource->isJoystickConnected());
+	_touchMode = (TouchMode)((_touchMode + 1) % Common::kTouchModeCount);
+	if (_touchMode == Common::kTouchModeGamepad && !gamepadAvailable)
+		_touchMode = (TouchMode)((_touchMode + 1) % Common::kTouchModeCount);
+
+	// Leaving the on-screen gamepad: release any held virtual buttons.
+	if (oldMode == Common::kTouchModeGamepad && _touchMode != Common::kTouchModeGamepad) {
+		_touchControls.update(kActionCancel, 0, 0, 0);
+	}
 #ifdef USE_OSD
 	Common::U32String name;
 	switch (_touchMode) {
 	case Common::kTouchModeTouchpad:
 		name = _("Touchpad emulation");
+		break;
+	case Common::kTouchModeGamepad:
+		name = _("On-screen gamepad");
 		break;
 	default:
 		name = _("Direct mouse");
@@ -347,8 +375,11 @@ void OSystem_SDL::cycleTouchMode() {
 
 bool OSystem_SDL::isTouchToggleVisible() const {
 	// The on-screen toggle is only rendered (and hit-tested) by overlay-capable
-	// renderers (OpenGL). SurfaceSDL is settings-only and never draws it.
-	return _touchUiReady && hasTouchscreen() && ConfMan.getBool(ONSCREEN_CONTROL_KEY);
+	// renderers, which are exactly the ones that initialize the touch controls
+	// (OpenGL). SurfaceSDL is settings-only and never initializes them, so this
+	// keeps it from exposing a phantom invisible toggle in the top-right corner.
+	return _touchUiReady && hasTouchscreen() && ConfMan.getBool(ONSCREEN_CONTROL_KEY) &&
+	       _touchControls.isInitialized();
 }
 
 Common::Rect OSystem_SDL::getTouchToggleRect(int screenW, int screenH) const {
@@ -489,6 +520,16 @@ void OSystem_SDL::initBackend() {
 	ConfMan.registerDefault(TOUCH_MODE_3D_GAMES_KEY, "gamepad");
 	ConfMan.registerDefault(ONSCREEN_CONTROL_KEY, true);
 
+#ifdef USE_OPENGL
+	// Hand our touch controls to the OpenGL graphics manager so it can render
+	// them. The GL surface itself is created lazily once a context exists.
+	// (The SurfaceSDL graphics manager reaches the controls on its own through
+	// OSystem_SDL::getTouchControls(), so it needs no equivalent hookup here.)
+	OpenGLSdlGraphicsManager *glManager = dynamic_cast<OpenGLSdlGraphicsManager *>(_graphicsManager);
+	if (glManager) {
+		glManager->setTouchControls(&_touchControls);
+	}
+#endif
 	applyTouchSettings();
 
 	_inited = true;
@@ -706,6 +747,10 @@ void OSystem_SDL::engineDone() {
 	_eventSource->setEngineRunning(false);
 }
 
+void OSystem_SDL::pushEvent(const Common::Event &ev) {
+	_eventSource->addEvent(ev);
+}
+
 void OSystem_SDL::initSDL() {
 	// Check if SDL has not been initialized
 	if (!_initedSDL) {
@@ -802,7 +847,13 @@ Common::HardwareInputSet *OSystem_SDL::getHardwareInputSet() {
 	inputSet->addHardwareInputSet(new MouseHardwareInputSet(defaultMouseButtons));
 	inputSet->addHardwareInputSet(new KeyboardHardwareInputSet(defaultKeys, defaultModifiers));
 
-	if (_eventSource->isJoystickConnected()) {
+	bool wantJoystickInputs = _eventSource->isJoystickConnected();
+	// The on-screen gamepad is a virtual joystick source, so its synthetic
+	// JOY_* events also need the joystick hardware-input set registered for the
+	// keymapper to resolve them (e.g. to navigate the GUI) even when no physical
+	// controller is connected.
+	wantJoystickInputs = wantJoystickInputs || hasTouchscreen();
+	if (wantJoystickInputs) {
 		inputSet->addHardwareInputSet(new JoystickHardwareInputSet(defaultJoystickButtons, defaultJoystickAxes));
 	}
 
