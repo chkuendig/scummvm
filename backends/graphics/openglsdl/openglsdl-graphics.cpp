@@ -234,8 +234,16 @@ OpenGLSdlGraphicsManager::~OpenGLSdlGraphicsManager() {
 }
 
 void OpenGLSdlGraphicsManager::deinitOpenGLContext() {
-	// Free the touch-toggle GL surface while the context is still current.
-	// It is recreated lazily in drawTouchToggle() once a context exists again.
+	// Free the touch controls GL surface while the context is still current.
+	// It is recreated lazily in updateScreen() once a context exists again.
+	if (_touchControls) {
+		_touchControls->setDrawer(nullptr, 0, 0);
+	}
+	if (_touchControlsSurface) {
+		_touchControlsSurface->destroy();
+		delete _touchControlsSurface;
+		_touchControlsSurface = nullptr;
+	}
 	if (_touchToggleSurface) {
 		_touchToggleSurface->destroy();
 		delete _touchToggleSurface;
@@ -411,10 +419,24 @@ void OpenGLSdlGraphicsManager::updateScreen() {
 	}
 #endif
 
+	// Lazily load the gamepad asset, but only once the GUI is up (isTouchUiReady)
+	// and a touchscreen is present: on Emscripten loading a loose /data/ file
+	// before the GUI theme has set up the virtual-fs cache crashes. The
+	// _touchControlsIniting guard stops the blocking SVG load (which pumps the
+	// main loop on Emscripten) from re-entering updateScreen().
+	if (_touchControls && !_touchControls->isInitialized() && !_touchControlsIniting) {
+		OSystem_SDL *sdlSystem = dynamic_cast<OSystem_SDL *>(g_system);
+		if (sdlSystem && sdlSystem->isTouchUiReady() && sdlSystem->hasTouchscreen()) {
+			_touchControlsIniting = true;
+			_touchControls->init(getHiDPIScreenFactor());
+			_touchControlsIniting = false;
+		}
+	}
+
 	// Re-apply the per-context touch preset when a game switches between 2D and
 	// 3D (the overlay show/hide hooks fire before the engine's 3D renderer is
 	// set up, so we also need to react to the change here).
-	{
+	if (_touchControls) {
 		bool is3d = isRendering3D();
 		if (is3d != _touchWasRendering3D) {
 			_touchWasRendering3D = is3d;
@@ -423,6 +445,19 @@ void OpenGLSdlGraphicsManager::updateScreen() {
 				sdlSystem->applyTouchSettings();
 			}
 		}
+	}
+
+	// Update and (lazily) set up the on-screen touch controls. This must run
+	// before the base updateScreen() so beforeDraw() can request a redraw when
+	// the controls are fading out.
+	if (_touchControls && _touchControls->isInitialized()) {
+		if (!_touchControlsSurface) {
+			_touchControlsSurface = createSurface(_defaultFormatAlpha);
+		}
+		// Keep the drawer and screen dimensions in sync (cheap; the surface
+		// upload is a no-op once the dimensions match).
+		_touchControls->setDrawer(this, getWindowWidth(), getWindowHeight());
+		_touchControls->beforeDraw();
 	}
 
 	OpenGLGraphicsManager::updateScreen();
@@ -607,7 +642,10 @@ void OpenGLSdlGraphicsManager::refreshScreen() {
 	renderImGui();
 #endif
 
-	// Last minute draw of the on-screen mode-toggle button, on top of everything.
+	// Last minute draw of the on-screen touch controls, on top of everything.
+	if (_touchControls && _touchControlsSurface) {
+		_touchControls->draw();
+	}
 	drawTouchToggle();
 
 #if SDL_VERSION_ATLEAST(2, 0, 0)
@@ -638,6 +676,47 @@ bool OpenGLSdlGraphicsManager::isRendering3D() const {
 #else
 	return false;
 #endif
+}
+
+void OpenGLSdlGraphicsManager::touchControlInitSurface(const Graphics::ManagedSurface &surf) {
+	if (!_touchControlsSurface) {
+		return;
+	}
+	if (_touchControlsSurface->getWidth() == (uint)surf.w && _touchControlsSurface->getHeight() == (uint)surf.h) {
+		return;
+	}
+
+	_touchControlsSurface->allocate(surf.w, surf.h);
+	Graphics::Surface *dst = _touchControlsSurface->getSurface();
+
+	Graphics::crossBlit(
+			(byte *)dst->getPixels(), (const byte *)surf.getPixels(),
+			dst->pitch, surf.pitch,
+			surf.w, surf.h,
+			dst->format, surf.format);
+	_touchControlsSurface->updateGLTexture();
+}
+
+void OpenGLSdlGraphicsManager::touchControlDraw(uint8 alpha, int16 x, int16 y, int16 w, int16 h, const Common::Rect &clip) {
+	if (!_touchControlsSurface) {
+		return;
+	}
+	_targetBuffer->enableBlend(OpenGL::Framebuffer::kBlendModeTraditionalTransparency);
+	OpenGL::Pipeline *pipeline = getPipeline();
+	pipeline->activate();
+	if (alpha != 255) {
+		pipeline->setColor(1.0f, 1.0f, 1.0f, alpha / 255.0f);
+	}
+	pipeline->drawTexture(_touchControlsSurface->getGLTexture(),
+	                      x, y, w, h, clip);
+	if (alpha != 255) {
+		pipeline->setColor(1.0f, 1.0f, 1.0f, 1.0f);
+	}
+}
+
+void OpenGLSdlGraphicsManager::touchControlNotifyChanged() {
+	// Make sure we redraw the screen
+	_forceRedraw = true;
 }
 
 // iOS-style mode icons (mouse / touchpad / gamepad), embedded as SVG so they
