@@ -24,7 +24,9 @@
 #if defined(SDL_BACKEND)
 #include "backends/graphics/surfacesdl/surfacesdl-graphics.h"
 #include "backends/events/sdl/sdl-events.h"
+#include "backends/platform/sdl/sdl.h"
 #include "common/config-manager.h"
+#include "common/memstream.h"
 #include "common/mutex.h"
 #include "common/textconsole.h"
 #include "common/translation.h"
@@ -37,6 +39,8 @@
 #include "graphics/blit.h"
 #include "graphics/font.h"
 #include "graphics/fontman.h"
+#include "graphics/managed_surface.h"
+#include "graphics/svg.h"
 #include "graphics/scaler.h"
 #include "graphics/scaler/aspect.h"
 #include "graphics/surface.h"
@@ -193,7 +197,13 @@ SurfaceSdlGraphicsManager::SurfaceSdlGraphicsManager(SdlEventSource *sdlEventSou
 	_scalerPlugins(ScalerMan.getPlugins()), _scalerPlugin(nullptr), _scaler(nullptr),
 	_needRestoreAfterOverlay(false), _isInOverlayPalette(false), _isDoubleBuf(false), _prevForceRedraw(false), _numPrevDirtyRects(0),
 	_prevCursorNeedsRedraw(false),
-	_mouseKeyColor(0), _disableMouseKeyColor(false) {
+	_mouseKeyColor(0), _disableMouseKeyColor(false),
+	_touchControlsSurface(nullptr), _touchControlsIniting(false),
+	_touchToggleSurface(nullptr), _touchToggleRenderedMode(-1)
+#if SDL_VERSION_ATLEAST(2, 0, 0)
+	, _touchControlsTexture(nullptr), _touchToggleTexture(nullptr)
+#endif
+	{
 
 	// allocate palette storage
 	_currentPalette = (SDL_Color *)calloc(256, sizeof(SDL_Color));
@@ -240,6 +250,7 @@ SurfaceSdlGraphicsManager::SurfaceSdlGraphicsManager(SdlEventSource *sdlEventSou
 }
 
 SurfaceSdlGraphicsManager::~SurfaceSdlGraphicsManager() {
+	freeTouchControls();
 	unloadGFXMode();
 	delete _scaler;
 	delete _mouseScaler;
@@ -1336,6 +1347,11 @@ void SurfaceSdlGraphicsManager::internUpdateScreen() {
 	if (_isDoubleBuf && _numDirtyRects)
 		_forceRedraw = true;
 
+	// Update and (lazily) set up the on-screen touch controls. This must run
+	// before the _forceRedraw decision below so beforeDraw() can request a
+	// redraw while the controls are fading out.
+	updateTouchControls();
+
 #if defined(USE_IMGUI) && (defined(USE_IMGUI_SDLRENDERER2) || defined(USE_IMGUI_SDLRENDERER3))
 	if (_imGuiCallbacks.render) {
 		_forceRedraw = true;
@@ -1563,10 +1579,21 @@ void SurfaceSdlGraphicsManager::internUpdateScreen() {
 		}
 #endif
 
+#if !SDL_VERSION_ATLEAST(2, 0, 0)
+		// SDL1 has no renderer: composite the on-screen touch controls (gamepad
+		// overlay + mode-toggle) directly onto _hwScreen before it is flipped.
+		drawTouchControls();
+#endif
+
 		// Finally, blit all our changes to the screen
 		if (!_displayDisabled) {
 			updateScreen(_dirtyRectList, actualDirtyRects);
 #if SDL_VERSION_ATLEAST(2, 0, 0)
+			// updateScreen() (SDL_UpdateRects) just cleared the renderer and drew
+			// the game/overlay texture. Composite the on-screen touch controls in
+			// window/drawable-pixel space on top of it, before SDL_RenderPresent
+			// below, so draw-space matches the input hit-test space.
+			drawTouchControls();
 			doPresent = true;
 #endif
 		}
@@ -1593,6 +1620,321 @@ void SurfaceSdlGraphicsManager::internUpdateScreen() {
 	if (_isDoubleBuf)
 		SDL_Flip(_hwScreen);
 #endif
+}
+
+// iOS-style mode icons (mouse / touchpad / gamepad), embedded as SVG so they
+// rasterize from memory with no asset/VFS dependency. Kept in sync with the
+// OpenGL graphics manager so both renderers show the same toggle icon.
+static const char *surfaceTouchModeIconSvg(OSystem_SDL::TouchMode mode) {
+	switch (mode) {
+	case OSystem_SDL::TOUCH_MODE_TOUCHPAD:
+		return "<svg viewBox=\"0 0 48 48\" xmlns=\"http://www.w3.org/2000/svg\">"
+		       "<rect x=\"1\" y=\"1\" width=\"46\" height=\"46\" rx=\"11\" fill=\"#000000\" fill-opacity=\"0.38\"/>"
+		       "<g fill=\"#ededed\">"
+		       "<path d=\"M37.78,29.5l-8.18,-4.08c-0.56,-0.28 -1.16,-0.42 -1.78,-0.42H26.0v-12.0C26.0,11.34 24.66,10.0 23.0,10.0S20.0,11.34 20.0,13.0v21.48L13.5,33.0c-0.66,-0.14 -1.36,0.06 -1.84,0.56L10.0,35.24l9.08,9.58C19.84,45.58 21.36,46.0 22.42,46.0h12.32c2.0,0.0 3.68,-1.46 3.96,-3.44l1.26,-8.92C40.2,31.94 39.32,30.28 37.78,29.5z\"/>"
+		       "<path d=\"M40.26,7.74C37.38,4.34 31.2,2.0 24.0,2.0S10.62,4.34 7.74,7.74L4.0,4.0v10.0h10.0L9.86,9.86c2.0,-2.58 7.4,-4.86 14.14,-4.86s12.14,2.28 14.14,4.86L34.0,14.0h10.0V4.0L40.26,7.74z\"/>"
+		       "</g></svg>";
+	case OSystem_SDL::TOUCH_MODE_GAMEPAD:
+		return "<svg viewBox=\"0 0 48 48\" xmlns=\"http://www.w3.org/2000/svg\">"
+		       "<rect x=\"1\" y=\"1\" width=\"46\" height=\"46\" rx=\"11\" fill=\"#000000\" fill-opacity=\"0.38\"/>"
+		       "<path fill=\"#ededed\" d=\"M42,12L6,12c-2.2,0 -4,1.8 -4,4v16c0,2.2 1.8,4 4,4h36c2.2,0 4,-1.8 4,-4L46,16c0,-2.2 -1.8,-4 -4,-4zM22,26L16,26v6L12,32v-6L6,26v-4h6L12,16h4v6h6v4zM31,30c-1.66,0 -3,-1.34 -3,-3s1.34,-3 3,-3 3,1.34 3,3 -1.34,3 -3,3zM39,24c-1.66,0 -3,-1.34 -3,-3S37.34,18 39,18s3,1.34 3,3 -1.34,3 -3,3z\"/>"
+		       "</svg>";
+	default: // mouse
+		return "<svg viewBox=\"0 0 48 48\" xmlns=\"http://www.w3.org/2000/svg\">"
+		       "<rect x=\"1\" y=\"1\" width=\"46\" height=\"46\" rx=\"11\" fill=\"#000000\" fill-opacity=\"0.38\"/>"
+		       "<path fill=\"#ededed\" d=\"M26,2.14L26,18h14c0,-8.16 -6.1,-14.88 -14,-15.86zM8,30c0,8.84 7.16,16 16,16s16,-7.16 16,-16v-8L8,22v8zM22,2.14C14.1,3.12 8,9.84 8,18h14L22,2.14z\"/>"
+		       "</svg>";
+	}
+}
+
+// Allocate a 32-bit RGBA SDL surface set up for alpha-blended blitting.
+static SDL_Surface *createTouchSurface(int width, int height) {
+	SDL_Surface *surface;
+#if SDL_VERSION_ATLEAST(3, 0, 0)
+	surface = SDL_CreateSurface(width, height, SDL_PIXELFORMAT_RGBA32);
+#elif SDL_VERSION_ATLEAST(2, 0, 0)
+	surface = SDL_CreateRGBSurfaceWithFormat(0, width, height, 32, SDL_PIXELFORMAT_RGBA32);
+#else
+	surface = SDL_CreateRGBSurface(SDL_SWSURFACE, width, height, 32,
+		0x000000FF, 0x0000FF00, 0x00FF0000, 0xFF000000);
+#endif
+	return surface;
+}
+
+void SurfaceSdlGraphicsManager::touchControlInitSurface(const Graphics::ManagedSurface &surf) {
+	if (_touchControlsSurface &&
+	    _touchControlsSurface->w == surf.w && _touchControlsSurface->h == surf.h) {
+		return;
+	}
+	if (_touchControlsSurface) {
+		destroySurface(_touchControlsSurface);
+		_touchControlsSurface = nullptr;
+	}
+#if SDL_VERSION_ATLEAST(2, 0, 0)
+	// The cached renderer texture no longer matches; drop it so touchControlDraw
+	// rebuilds it from the new surface.
+	if (_touchControlsTexture) {
+		SDL_DestroyTexture(_touchControlsTexture);
+		_touchControlsTexture = nullptr;
+	}
+#endif
+
+	_touchControlsSurface = createTouchSurface(surf.w, surf.h);
+	if (!_touchControlsSurface) {
+		return;
+	}
+
+	if (!lockSurface(_touchControlsSurface)) {
+		return;
+	}
+	Graphics::Surface dst;
+	dst.init(_touchControlsSurface->w, _touchControlsSurface->h, _touchControlsSurface->pitch,
+		_touchControlsSurface->pixels, convertSDLPixelFormat(_touchControlsSurface->format));
+	Graphics::crossBlit((byte *)dst.getPixels(), (const byte *)surf.getPixels(),
+		dst.pitch, surf.pitch, surf.w, surf.h, dst.format, surf.format);
+	SDL_UnlockSurface(_touchControlsSurface);
+
+	// Honor the source's per-pixel alpha when blitted onto _hwScreen.
+#if SDL_VERSION_ATLEAST(2, 0, 0)
+	SDL_SetSurfaceBlendMode(_touchControlsSurface, SDL_BLENDMODE_BLEND);
+#else
+	SDL_SetAlpha(_touchControlsSurface, SDL_SRCALPHA, SDL_ALPHA_OPAQUE);
+#endif
+}
+
+void SurfaceSdlGraphicsManager::touchControlNotifyChanged() {
+	// Make sure we redraw the screen (and re-upload it) on the next frame.
+	_forceRedraw = true;
+}
+
+void SurfaceSdlGraphicsManager::touchControlDraw(uint8 alpha, int16 x, int16 y, int16 w, int16 h, const Common::Rect &clip) {
+	SDL_Rect srcRect;
+	srcRect.x = clip.left;
+	srcRect.y = clip.top;
+	srcRect.w = clip.width();
+	srcRect.h = clip.height();
+
+	// x/y/w/h are in window/drawable-pixel space (see updateTouchControls).
+	SDL_Rect dstRect;
+	dstRect.x = x;
+	dstRect.y = y;
+	dstRect.w = w;
+	dstRect.h = h;
+
+#if SDL_VERSION_ATLEAST(2, 0, 0)
+	// Renderer path: composite at the window layer (draw-space == input-space).
+	if (!_touchControlsSurface || !_renderer) {
+		return;
+	}
+	// Lazily build the texture from the (static) control surface.
+	if (!_touchControlsTexture) {
+		_touchControlsTexture = SDL_CreateTextureFromSurface(_renderer, _touchControlsSurface);
+		if (!_touchControlsTexture) {
+			return;
+		}
+		SDL_SetTextureBlendMode(_touchControlsTexture, SDL_BLENDMODE_BLEND);
+	}
+	SDL_SetTextureAlphaMod(_touchControlsTexture, alpha);
+#if SDL_VERSION_ATLEAST(3, 0, 0)
+	SDL_FRect fsrc, fdst;
+	SDL_RectToFRect(&srcRect, &fsrc);
+	SDL_RectToFRect(&dstRect, &fdst);
+	SDL_RenderTexture(_renderer, _touchControlsTexture, &fsrc, &fdst);
+#else
+	SDL_RenderCopy(_renderer, _touchControlsTexture, &srcRect, &dstRect);
+#endif
+#else
+	// Legacy SDL1 path: no renderer, so blit straight onto _hwScreen. Here the
+	// coordinate space is the hardware-surface size, which can diverge from the
+	// input hit-test space under scalers/aspect correction; accepted limitation
+	// for this path (the renderer path above is correct).
+	if (!_touchControlsSurface || !_hwScreen) {
+		return;
+	}
+	SDL_SetAlpha(_touchControlsSurface, SDL_SRCALPHA, alpha);
+	blitSurface(_touchControlsSurface, &srcRect, _hwScreen, &dstRect);
+#endif
+}
+
+void SurfaceSdlGraphicsManager::updateTouchControls() {
+	if (!_hwScreen) {
+		return;
+	}
+	OSystem_SDL *sdlSystem = dynamic_cast<OSystem_SDL *>(g_system);
+	if (!sdlSystem) {
+		return;
+	}
+	TouchControls &touchControls = sdlSystem->getTouchControls();
+
+	// Lazily load the gamepad asset, but only once the GUI is up and a
+	// touchscreen is present (mirrors the OpenGL graphics manager). The
+	// _touchControlsIniting guard stops the blocking SVG load (which pumps the
+	// main loop on Emscripten) from re-entering internUpdateScreen().
+	if (!touchControls.isInitialized() && !_touchControlsIniting) {
+		if (sdlSystem->isTouchUiReady() && sdlSystem->hasTouchscreen()) {
+			_touchControlsIniting = true;
+			touchControls.init(getHiDPIScreenFactor());
+			_touchControlsIniting = false;
+		}
+	}
+
+	if (touchControls.isInitialized()) {
+		// Bind this drawer using the window/drawable pixel size as the controls'
+		// coordinate space. This is the exact space the touch input is hit-tested
+		// in (getTouchscreenSizePixels()), so on-screen positions line up with
+		// touches regardless of scaler/aspect-correction/HiDPI/letterboxing.
+		// (On the SDL2/SDL3 renderer path the controls are composited at the
+		// window layer; on SDL1 getWindowWidth()/Height() equals _hwScreen's.)
+		touchControls.setDrawer(this, getWindowWidth(), getWindowHeight());
+		touchControls.beforeDraw();
+	}
+}
+
+void SurfaceSdlGraphicsManager::drawTouchControls() {
+	OSystem_SDL *sdlSystem = dynamic_cast<OSystem_SDL *>(g_system);
+	if (!sdlSystem) {
+		return;
+	}
+#if SDL_VERSION_ATLEAST(2, 0, 0)
+	if (!_renderer) {
+		return;
+	}
+#else
+	if (!_hwScreen) {
+		return;
+	}
+#endif
+
+	if (sdlSystem->getTouchControls().isInitialized() && _touchControlsSurface) {
+		sdlSystem->getTouchControls().draw();
+	}
+	drawTouchToggle();
+}
+
+void SurfaceSdlGraphicsManager::drawTouchToggle() {
+	OSystem_SDL *sdlSystem = dynamic_cast<OSystem_SDL *>(g_system);
+	if (!sdlSystem || !sdlSystem->isTouchToggleVisible()) {
+		return;
+	}
+
+	// The toggle lives in window/drawable-pixel space, matching the input
+	// hit-test (handleTouchToggle uses getTouchscreenSizePixels()).
+#if SDL_VERSION_ATLEAST(2, 0, 0)
+	if (!_renderer) {
+		return;
+	}
+	const int winW = getWindowWidth();
+	const int winH = getWindowHeight();
+#else
+	if (!_hwScreen) {
+		return;
+	}
+	const int winW = _hwScreen->w;
+	const int winH = _hwScreen->h;
+#endif
+	Common::Rect r = sdlSystem->getTouchToggleRect(winW, winH);
+	OSystem_SDL::TouchMode mode = sdlSystem->getTouchMode();
+
+	// (Re)build the icon when the mode changes or the size differs.
+	const bool sizeMismatch = !_touchToggleSurface ||
+			_touchToggleSurface->w != r.width() ||
+			_touchToggleSurface->h != r.height();
+	if (sizeMismatch || _touchToggleRenderedMode != (int)mode) {
+		if (_touchToggleSurface) {
+			destroySurface(_touchToggleSurface);
+			_touchToggleSurface = nullptr;
+		}
+#if SDL_VERSION_ATLEAST(2, 0, 0)
+		if (_touchToggleTexture) {
+			SDL_DestroyTexture(_touchToggleTexture);
+			_touchToggleTexture = nullptr;
+		}
+#endif
+		_touchToggleSurface = createTouchSurface(r.width(), r.height());
+		if (!_touchToggleSurface) {
+			return;
+		}
+		if (!lockSurface(_touchToggleSurface)) {
+			return;
+		}
+		Graphics::Surface dst;
+		dst.init(_touchToggleSurface->w, _touchToggleSurface->h, _touchToggleSurface->pitch,
+			_touchToggleSurface->pixels, convertSDLPixelFormat(_touchToggleSurface->format));
+
+		// Rasterize the embedded SVG (bg + glyph) straight into the button.
+		const char *svg = surfaceTouchModeIconSvg(mode);
+		Common::MemoryReadStream stream((const byte *)svg, strlen(svg));
+		Graphics::SVGBitmap icon(&stream, r.width(), r.height());
+		Graphics::crossBlit((byte *)dst.getPixels(), (const byte *)icon.getPixels(),
+			dst.pitch, icon.pitch, r.width(), r.height(), dst.format, icon.format);
+		SDL_UnlockSurface(_touchToggleSurface);
+
+#if SDL_VERSION_ATLEAST(2, 0, 0)
+		SDL_SetSurfaceBlendMode(_touchToggleSurface, SDL_BLENDMODE_BLEND);
+#else
+		SDL_SetAlpha(_touchToggleSurface, SDL_SRCALPHA, SDL_ALPHA_OPAQUE);
+#endif
+		_touchToggleRenderedMode = (int)mode;
+	}
+
+	SDL_Rect dstRect;
+	dstRect.x = r.left;
+	dstRect.y = r.top;
+	dstRect.w = r.width();
+	dstRect.h = r.height();
+
+#if SDL_VERSION_ATLEAST(2, 0, 0)
+	// Renderer path: composite the toggle at the window layer.
+	if (!_touchToggleTexture) {
+		_touchToggleTexture = SDL_CreateTextureFromSurface(_renderer, _touchToggleSurface);
+		if (!_touchToggleTexture) {
+			return;
+		}
+		SDL_SetTextureBlendMode(_touchToggleTexture, SDL_BLENDMODE_BLEND);
+	}
+	// Draw fully opaque so the toggle isn't tinted by a prior alpha-modulated
+	// gamepad draw this frame.
+	SDL_SetTextureAlphaMod(_touchToggleTexture, SDL_ALPHA_OPAQUE);
+#if SDL_VERSION_ATLEAST(3, 0, 0)
+	SDL_FRect fdst;
+	SDL_RectToFRect(&dstRect, &fdst);
+	SDL_RenderTexture(_renderer, _touchToggleTexture, nullptr, &fdst);
+#else
+	SDL_RenderCopy(_renderer, _touchToggleTexture, nullptr, &dstRect);
+#endif
+#else
+	// Legacy SDL1 path: opaque blit onto _hwScreen.
+	SDL_SetAlpha(_touchToggleSurface, SDL_SRCALPHA, SDL_ALPHA_OPAQUE);
+	blitSurface(_touchToggleSurface, nullptr, _hwScreen, &dstRect);
+#endif
+}
+
+void SurfaceSdlGraphicsManager::freeTouchControls() {
+	// Detach from the shared (OSystem-owned) controls so they don't keep a
+	// dangling drawer pointer once our surfaces are gone.
+	OSystem_SDL *sdlSystem = dynamic_cast<OSystem_SDL *>(g_system);
+	if (sdlSystem) {
+		sdlSystem->getTouchControls().setDrawer(nullptr, 0, 0);
+	}
+	if (_touchControlsSurface) {
+		destroySurface(_touchControlsSurface);
+		_touchControlsSurface = nullptr;
+	}
+	if (_touchToggleSurface) {
+		destroySurface(_touchToggleSurface);
+		_touchToggleSurface = nullptr;
+	}
+#if SDL_VERSION_ATLEAST(2, 0, 0)
+	if (_touchControlsTexture) {
+		SDL_DestroyTexture(_touchControlsTexture);
+		_touchControlsTexture = nullptr;
+	}
+	if (_touchToggleTexture) {
+		SDL_DestroyTexture(_touchToggleTexture);
+		_touchToggleTexture = nullptr;
+	}
+#endif
+	_touchToggleRenderedMode = -1;
 }
 
 bool SurfaceSdlGraphicsManager::saveScreenshot(const Common::Path &filename) const {
@@ -1972,6 +2314,28 @@ void SurfaceSdlGraphicsManager::clearFocusRectangle() {
 #pragma mark -
 #pragma mark --- Overlays ---
 #pragma mark -
+
+void SurfaceSdlGraphicsManager::showOverlay(bool inGUI) {
+	WindowedGraphicsManager::showOverlay(inGUI);
+	OSystem_SDL *sdlSystem = dynamic_cast<OSystem_SDL *>(g_system);
+	if (sdlSystem) {
+		// The GUI overlay can only be shown after the theme has loaded (which
+		// creates the virtual-fs cache dir), so it is now safe to load the
+		// on-screen control assets. Mirrors the OpenGL graphics manager.
+		if (inGUI) {
+			sdlSystem->setTouchUiReady();
+		}
+		sdlSystem->applyTouchSettings();
+	}
+}
+
+void SurfaceSdlGraphicsManager::hideOverlay() {
+	WindowedGraphicsManager::hideOverlay();
+	OSystem_SDL *sdlSystem = dynamic_cast<OSystem_SDL *>(g_system);
+	if (sdlSystem) {
+		sdlSystem->applyTouchSettings();
+	}
+}
 
 void SurfaceSdlGraphicsManager::clearOverlay() {
 	Common::StackLock lock(_graphicsMutex);	// Lock the mutex until this function ends
