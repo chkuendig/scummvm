@@ -54,13 +54,59 @@ bool SdlEventSource::processMouseEvent(Common::Event &event, int x, int y, int r
 
 #if SDL_VERSION_ATLEAST(2, 0, 0)
 Common::Point SdlEventSource::getTouchscreenSize() {
-	int windowWidth, windowHeight;
-	SDL_GetWindowSize((dynamic_cast<SdlGraphicsManager*>(_graphicsManager))->getWindow()->getSDLWindow(), &windowWidth, &windowHeight);
+	int windowWidth = 0, windowHeight = 0;
+	SdlGraphicsManager *gfx = dynamic_cast<SdlGraphicsManager *>(_graphicsManager);
+	SDL_Window *win = (gfx && gfx->getWindow()) ? gfx->getWindow()->getSDLWindow() : nullptr;
+	if (!win) {
+		return Common::Point(0, 0);
+	}
+	SDL_GetWindowSize(win, &windowWidth, &windowHeight);
 	return Common::Point(windowWidth, windowHeight);
 }
 
+Common::Point SdlEventSource::getTouchscreenSizePixels() {
+	// On-screen controls are drawn in drawable pixels; hit-test in the same
+	// space (differs from logical window size on HiDPI / browser canvases).
+	SdlGraphicsManager *gfx = dynamic_cast<SdlGraphicsManager *>(_graphicsManager);
+	SDL_Window *win = (gfx && gfx->getWindow()) ? gfx->getWindow()->getSDLWindow() : nullptr;
+	if (!win) {
+		return Common::Point(0, 0);
+	}
+	int w = 0, h = 0;
+#if SDL_VERSION_ATLEAST(3, 0, 0)
+	SDL_GetWindowSizeInPixels(win, &w, &h);
+#else
+	SDL_GL_GetDrawableSize(win, &w, &h);
+#endif
+	return Common::Point(w, h);
+}
+
 bool SdlEventSource::isTouchPortTouchpadMode(SDL_TouchID port) {
-       return g_system->getFeatureState(OSystem::kFeatureTouchpadMode);
+	OSystem_SDL *sdlSystem = dynamic_cast<OSystem_SDL *>(g_system);
+	if (sdlSystem) {
+		return sdlSystem->getTouchMode() == OSystem_SDL::TOUCH_MODE_TOUCHPAD;
+	}
+	return g_system->getFeatureState(OSystem::kFeatureTouchpadMode);
+}
+
+bool SdlEventSource::handleTouchToggle(int action, float normX, float normY) {
+	// Act on finger-down only; the matching motion/up are harmless no-ops in the
+	// normal finger path because the finger was never registered there.
+	if (action != TouchControls::kActionDown) {
+		return false;
+	}
+	OSystem_SDL *sdlSystem = dynamic_cast<OSystem_SDL *>(g_system);
+	if (!sdlSystem || !sdlSystem->isTouchToggleVisible()) {
+		return false;
+	}
+	Common::Point size = getTouchscreenSizePixels();
+	int x = (int)(normX * size.x);
+	int y = (int)(normY * size.y);
+	if (!sdlSystem->getTouchToggleRect(size.x, size.y).contains(x, y)) {
+		return false;
+	}
+	sdlSystem->cycleTouchMode();
+	return true;
 }
 
 bool SdlEventSource::isTouchPortActive(SDL_TouchID port) {
@@ -68,8 +114,12 @@ bool SdlEventSource::isTouchPortActive(SDL_TouchID port) {
 }
 
 void SdlEventSource::convertTouchXYToGameXY(float touchX, float touchY, int *gameX, int *gameY) {
-	int windowWidth, windowHeight;
-	SDL_GetWindowSize((dynamic_cast<SdlGraphicsManager*>(_graphicsManager))->getWindow()->getSDLWindow(), &windowWidth, &windowHeight);
+	int windowWidth = 0, windowHeight = 0;
+	SdlGraphicsManager *gfx = dynamic_cast<SdlGraphicsManager *>(_graphicsManager);
+	SDL_Window *win = (gfx && gfx->getWindow()) ? gfx->getWindow()->getSDLWindow() : nullptr;
+	if (win) {
+		SDL_GetWindowSize(win, &windowWidth, &windowHeight);
+	}
 
 	*gameX = windowWidth * touchX;
 	*gameY = windowHeight * touchY;
