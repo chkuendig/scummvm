@@ -654,6 +654,25 @@ bool SdlEventSource::pollEvent(Common::Event &event) {
 		// right mouse click: second finger short tap while first finger is still down
 		// pointer motion: single finger drag
 		if (ev.type == SDL_EVENT_FINGER_DOWN || ev.type == SDL_EVENT_FINGER_UP || ev.type == SDL_EVENT_FINGER_MOTION) {
+			{
+				int action = (ev.type == SDL_EVENT_FINGER_DOWN) ? TouchControls::kActionDown :
+				             (ev.type == SDL_EVENT_FINGER_UP) ? TouchControls::kActionUp : TouchControls::kActionMove;
+				// On-screen mode-toggle button takes precedence over everything.
+				if (handleTouchToggle(action, ev.tfinger.x, ev.tfinger.y)) {
+					continue;
+				}
+				// In gamepad mode (no physical controller — applyTouchSettings
+				// falls back otherwise), drive the on-screen gamepad and consume
+				// the finger, like the Android backend does from JNI.
+				OSystem_SDL *sdlSystem = dynamic_cast<OSystem_SDL *>(g_system);
+				if (sdlSystem && sdlSystem->getTouchMode() == OSystem_SDL::TOUCH_MODE_GAMEPAD &&
+				    sdlSystem->getTouchControls().isInitialized()) {
+					Common::Point size = getTouchscreenSizePixels();
+					sdlSystem->getTouchControls().update((TouchControls::Action)action,
+						(int)ev.tfinger.fingerID, (int)(ev.tfinger.x * size.x), (int)(ev.tfinger.y * size.y));
+					continue;
+				}
+			}
 			// front (0) or back (1) panel
 			SDL_TouchID port = ev.tfinger.touchID;
 			// touchpad_mouse_mode off: use only front panel for direct touch control of pointer

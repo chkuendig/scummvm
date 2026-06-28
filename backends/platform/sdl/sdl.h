@@ -29,8 +29,10 @@
 #include "backends/events/sdl/sdl-events.h"
 #include "backends/log/log.h"
 #include "backends/platform/sdl/sdl-window.h"
+#include "backends/platform/sdl/touchcontrols.h"
 
 #include "common/array.h"
+#include "common/rect.h"
 
 #ifdef USE_OPENGL
 #define USE_MULTIPLE_RENDERERS
@@ -58,6 +60,37 @@ public:
 	bool hasFeature(Feature f) override;
 	void setFeatureState(Feature f, bool enable) override;
 	bool getFeatureState(Feature f) override;
+
+	/**
+	 * True if the system has a real touchscreen. Base SDL trusts SDL's touch
+	 * device list; Emscripten overrides this because browsers mis-report touch.
+	 */
+	virtual bool hasTouchscreen() const;
+
+	/** On-screen touch controls (gamepad overlay), rendered by the active SDL graphics manager. */
+	enum TouchMode {
+		TOUCH_MODE_TOUCHPAD = 0,
+		TOUCH_MODE_MOUSE = 1,
+		TOUCH_MODE_GAMEPAD = 2,
+		TOUCH_MODE_MAX = 3
+	};
+
+	TouchControls &getTouchControls() { return _touchControls; }
+	TouchMode getTouchMode() const { return _touchMode; }
+	/**
+	 * Marks the GUI/launcher as up and running: past this point it is safe to
+	 * load loose /data/ files, so we defer loading the gamepad asset until here.
+	 */
+	void setTouchUiReady() { _touchUiReady = true; }
+	bool isTouchUiReady() const { return _touchUiReady; }
+	/** Cycle to the next touch mode (used by the on-screen toggle button). */
+	void cycleTouchMode();
+	/** Recompute the active touch mode from the per-context presets. */
+	void applyTouchSettings();
+	/** True if the on-screen mode-toggle button should be shown/hit-tested. */
+	bool isTouchToggleVisible() const;
+	/** Rectangle of the on-screen mode-toggle button, in the given screen size. */
+	Common::Rect getTouchToggleRect(int screenW, int screenH) const;
 
 	// Override functions from ModularBackend and OSystem
 	void initBackend() override;
@@ -143,6 +176,11 @@ protected:
 	SdlWindow *_window;
 
 	SdlGraphicsManager::State _gfxManagerState;
+
+	// On-screen touch controls (owned here; rendered by the active SDL graphics manager).
+	TouchControls _touchControls;
+	TouchMode _touchMode;
+	bool _touchUiReady = false;
 
 #if defined(USE_OPENGL_GAME) || defined(USE_OPENGL_SHADERS)
 	// Graphics capabilities
