@@ -282,6 +282,14 @@ void OSystem_SDL::applyTouchSettings() {
 		mode = ConfMan.get("touch_mode_menus");
 	} else {
 		bool is3d = false;
+#ifdef USE_OPENGL
+		// Only the OpenGL graphics manager can render 3D games; SurfaceSDL is
+		// always 2D, so this stays guarded behind the OpenGL-specific API.
+		OpenGLSdlGraphicsManager *glManager = dynamic_cast<OpenGLSdlGraphicsManager *>(_graphicsManager);
+		if (glManager) {
+			is3d = glManager->isRendering3D();
+		}
+#endif
 		mode = is3d ? ConfMan.get("touch_mode_3d_games") : ConfMan.get("touch_mode_2d_games");
 	}
 
@@ -462,6 +470,16 @@ void OSystem_SDL::initBackend() {
 	ConfMan.registerDefault("touch_mode_3d_games", "gamepad");
 	ConfMan.registerDefault("onscreen_control", true);
 
+#ifdef USE_OPENGL
+	// Hand our touch controls to the OpenGL graphics manager so it can render
+	// them. The GL surface itself is created lazily once a context exists.
+	// (The SurfaceSDL graphics manager reaches the controls on its own through
+	// OSystem_SDL::getTouchControls(), so it needs no equivalent hookup here.)
+	OpenGLSdlGraphicsManager *glManager = dynamic_cast<OpenGLSdlGraphicsManager *>(_graphicsManager);
+	if (glManager) {
+		glManager->setTouchControls(&_touchControls);
+	}
+#endif
 	applyTouchSettings();
 
 	_inited = true;
