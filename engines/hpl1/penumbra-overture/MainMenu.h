@@ -84,6 +84,11 @@ public:
 
 	const cRect2f &GetRect() { return mRect; }
 
+	// Focus navigation (keyboard/controller): only "activatable" widgets
+	// (buttons + the load list) participate; pure text/image widgets do not.
+	virtual bool IsFocusable() { return false; }
+	virtual bool IsList() { return false; }
+
 	virtual void Reset() {}
 
 	virtual void OnActivate() {}
@@ -125,6 +130,8 @@ public:
 
 	void OnDraw();
 
+	bool IsFocusable() override { return true; }
+
 	virtual void OnMouseDown(eMButton aButton);
 	virtual void OnMouseUp(eMButton aButton){};
 
@@ -156,6 +163,8 @@ public:
 	void OnUpdate(float afTimeStep);
 	void OnMouseOver(bool abOver);
 	void OnDraw();
+
+	bool IsFocusable() override { return true; }
 
 	virtual void OnMouseDown(eMButton aButton);
 	virtual void OnMouseUp(eMButton aButton){};
@@ -245,6 +254,12 @@ public:
 
 	void OnMouseDown(eMButton aButton);
 	void OnMouseUp(eMButton aButton);
+
+	bool IsFocusable() override { return true; }
+	bool IsList() override { return true; }
+
+	// Move the highlighted slot (keyboard/controller nav) and keep it visible.
+	void MoveSelection(int alDir);
 
 	void AddEntry(const tWString &asText);
 
@@ -399,6 +414,14 @@ private:
 
 	void AddWidgetToState(eMainMenuState aState, cMainMenuWidget *apWidget);
 
+	// --- Keyboard / controller focus navigation (main menu + load screens) ---
+	bool IsNavigableState() const;
+	void SetFocus(cMainMenuWidget *apWidget);
+	void DefaultFocus();
+	void MoveFocus(int alDir);
+	void ActivateFocused();
+	void UpdateNavInput();
+
 	cInit *mpInit;
 	cGraphicsDrawer *mpDrawer;
 
@@ -450,6 +473,11 @@ private:
 
 	bool mvKeyPressed[Common::KEYCODE_LAST];
 	bool mvMousePressed[eMButton_LastEnum];
+
+	// Focus navigation state
+	cMainMenuWidget *mpFocusedWidget;
+	cVector2f mvNavLastMousePos;
+	bool mvNavKeyPressed[Common::KEYCODE_LAST];
 };
 
 //---------------------------------------------
