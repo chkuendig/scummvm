@@ -2,7 +2,8 @@ MODULE := backends/platform/sdl
 
 MODULE_OBJS := \
 	sdl.o \
-	sdl-window.o
+	sdl-window.o \
+	touchcontrols.o
 
 ifdef KOLIBRIOS
 MODULE_OBJS += \
