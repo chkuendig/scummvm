@@ -61,6 +61,11 @@ public:
 	Common::Path getDefaultIconsPath() override;
 #ifdef USE_OPENGL
 	GraphicsManagerType getDefaultGraphicsManager() const override;
+	/**
+	 * SDL mis-reports touch in the browser (touchpads register touch devices,
+	 * touchscreens also look like a mouse). Use navigator.maxTouchPoints instead.
+	 */
+	bool hasTouchscreen() const override;
 #endif
 	Common::MutexInternal *createMutex() override;
 	void exportFile(const Common::Path &filename);
