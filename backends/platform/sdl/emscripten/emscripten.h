@@ -61,6 +61,13 @@ public:
 	Common::Path getDefaultIconsPath() override;
 #ifdef USE_OPENGL
 	GraphicsManagerType getDefaultGraphicsManager() const override;
+	/**
+	 * SDL mis-reports touch on the browser: a desktop touchpad registers an SDL
+	 * touch device, and a real touchscreen also looks like it has a mouse
+	 * (browsers synthesize mouse events from touch). Use the browser's actual
+	 * touch capability (navigator.maxTouchPoints) instead.
+	 */
+	bool hasTouchscreen() const override;
 #endif
 	Common::MutexInternal *createMutex() override;
 	void exportFile(const Common::Path &filename);

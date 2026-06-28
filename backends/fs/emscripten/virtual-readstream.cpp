@@ -96,7 +96,11 @@ bool VirtualReadStream::isFullFileDownloaded() const {
 	POSIXFilesystemNode fullFile(_baseCachePath);
 	if (!fullFile.exists())
 		return false;
-	int64 size = (PosixIoStream::makeFromPath(_baseCachePath, StdioStream::WriteMode_Read))->size();
+	Common::SeekableReadStream *full = PosixIoStream::makeFromPath(_baseCachePath, StdioStream::WriteMode_Read);
+	if (!full)
+		return false;
+	int64 size = full->size();
+	delete full;
 	return size == (int64)_size;
 }
 
@@ -124,8 +128,17 @@ void VirtualReadStream::ensureChunkDownloaded(uint32 chunkIndex) {
 			g_system->getTimeAndDate(curTime);
 			debug(5, "VirtualReadStream: Downloaded chunk %u for file %s at %02d:%02d", chunkIndex + 1, _displayName.c_str(), curTime.tm_min, curTime.tm_sec);
 			Common::String chunkPath = getChunkPath(chunkIndex);
-			POSIXFilesystemNode chunkFile(chunkPath);
-			uint64 actualSize = (PosixIoStream::makeFromPath(chunkPath, StdioStream::WriteMode_Read))->size();
+			Common::SeekableReadStream *downloaded = PosixIoStream::makeFromPath(chunkPath, StdioStream::WriteMode_Read);
+			if (!downloaded) {
+				// The chunk file could not be opened after downloading (e.g. the
+				// local cache write failed because the cache directory does not
+				// exist yet). Degrade gracefully rather than dereferencing null:
+				// leave the chunk unmarked so read() returns the bytes it has.
+				warning("VirtualReadStream: chunk %u unavailable after download for %s", chunkIndex + 1, _baseCachePath.c_str());
+				return;
+			}
+			uint64 actualSize = downloaded->size();
+			delete downloaded;
 
 			if (actualSize == chunkLength) {
 				_downloadedChunks[chunkIndex] = true;
