@@ -143,6 +143,15 @@ bool OSystem_Emscripten::displayLogFile() {
 OSystem_SDL::GraphicsManagerType OSystem_Emscripten::getDefaultGraphicsManager() const {
 	return GraphicsManagerOpenGL;
 }
+
+bool OSystem_Emscripten::hasTouchscreen() const {
+	// SDL's touch/mouse detection is unreliable in the browser: a desktop
+	// touchpad registers an SDL touch device (while navigator.maxTouchPoints is
+	// 0), and on a real touchscreen the browser synthesizes mouse events from
+	// touch so SDL also reports a mouse. The browser's maxTouchPoints is the
+	// authoritative touch-capability signal.
+	return EM_ASM_INT({ return (navigator.maxTouchPoints || 0) > 0 ? 1 : 0; }) != 0;
+}
 #endif
 
 void OSystem_Emscripten::exportFile(const Common::Path &filename) {

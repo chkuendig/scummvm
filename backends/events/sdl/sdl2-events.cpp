@@ -670,6 +670,21 @@ bool SdlEventSource::pollEvent(Common::Event &event) {
 		// right mouse click: second finger short tap while first finger is still down
 		// pointer motion: single finger drag
 		if (ev.type == SDL_FINGERDOWN || ev.type == SDL_FINGERUP || ev.type == SDL_FINGERMOTION) {
+#ifdef USE_OPENGL
+			{
+				int action = (ev.type == SDL_FINGERDOWN) ? TouchControls::JACTION_DOWN :
+				             (ev.type == SDL_FINGERUP) ? TouchControls::JACTION_UP : TouchControls::JACTION_MOVE;
+				// On-screen mode-toggle button takes precedence over everything.
+				if (handleTouchToggle(action, ev.tfinger.x, ev.tfinger.y)) {
+					continue;
+				}
+				// In gamepad mode, route the finger to the on-screen gamepad and
+				// consume it (no mouse emulation).
+				if (handleTouchControlsGamepad(action, (int)ev.tfinger.fingerId, ev.tfinger.x, ev.tfinger.y)) {
+					continue;
+				}
+			}
+#endif
 			// front (0) or back (1) panel
 			SDL_TouchID port = ev.tfinger.touchId;
 			// touchpad_mouse_mode off: use only front panel for direct touch control of pointer
