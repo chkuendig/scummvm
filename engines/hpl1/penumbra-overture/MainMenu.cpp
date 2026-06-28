@@ -565,6 +565,31 @@ const tWString &cMainMenuWidget_List::GetSelectedEntry() {
 
 //-----------------------------------------------------------------------
 
+void cMainMenuWidget_List::MoveSelection(int alDir) {
+	if (mvEntries.empty())
+		return;
+
+	if (mlSelected < 0)
+		mlSelected = 0;
+	else
+		mlSelected += alDir;
+
+	if (mlSelected < 0)
+		mlSelected = 0;
+	if (mlSelected >= (int)mvEntries.size())
+		mlSelected = (int)mvEntries.size() - 1;
+
+	// Keep the selected row visible.
+	if (mlSelected < mlFirstRow)
+		mlFirstRow = mlSelected;
+	if (mlSelected >= mlFirstRow + mlMaxRows)
+		mlFirstRow = mlSelected - mlMaxRows + 1;
+	if (mlFirstRow < 0)
+		mlFirstRow = 0;
+}
+
+//-----------------------------------------------------------------------
+
 //////////////////////////////////////////////////////////////////////////
 // NEW GAME
 //////////////////////////////////////////////////////////////////////////
@@ -1647,6 +1672,12 @@ void cMainMenu::Reset() {
 
 	mbGameActive = false;
 
+	// Focus navigation:
+	mpFocusedWidget = NULL;
+	mvNavLastMousePos = mvMousePos;
+	for (int i = 0; i < Common::KEYCODE_LAST; ++i)
+		mvNavKeyPressed[i] = false;
+
 	// Effects:
 	mfRainDropCount = 0;
 }
@@ -1853,22 +1884,48 @@ void cMainMenu::Update(float afTimeStep) {
 	}
 
 	////////////////////////////////
+	// Keyboard / controller focus navigation
+	UpdateNavInput();
+
+	////////////////////////////////
+	// If the mouse actually moved, sync the focus to the hovered widget so
+	// the cursor and the keyboard/controller focus stay consistent.
+	bool bMouseMoved = (mvMousePos.x != mvNavLastMousePos.x ||
+						mvMousePos.y != mvNavLastMousePos.y);
+	mvNavLastMousePos = mvMousePos;
+
+	if (bMouseMoved && IsNavigableState()) {
+		tMainMenuWidgetListIt itHover = mlstWidgets.begin();
+		for (; itHover != mlstWidgets.end(); ++itHover) {
+			cMainMenuWidget *pWidget = *itHover;
+			if (pWidget->IsActive() && pWidget->IsFocusable() &&
+				cMath::PointBoxCollision(mvMousePos, pWidget->GetRect())) {
+				SetFocus(pWidget);
+			}
+		}
+	}
+
+	////////////////////////////////
 	// Update buttons
 	msButtonTip = _W("");
+	bool bNav = IsNavigableState();
 	tMainMenuWidgetListIt it = mlstWidgets.begin();
 	for (; it != mlstWidgets.end(); ++it) {
 		cMainMenuWidget *pWidget = *it;
 
-		if (pWidget->IsActive())
-			pWidget->OnUpdate(afTimeStep);
+		if (!pWidget->IsActive())
+			continue;
 
-		if (cMath::PointBoxCollision(mvMousePos, pWidget->GetRect())) {
-			if (pWidget->IsActive())
-				pWidget->OnMouseOver(true);
-		} else {
-			if (pWidget->IsActive())
-				pWidget->OnMouseOver(false);
-		}
+		pWidget->OnUpdate(afTimeStep);
+
+		bool bOver = cMath::PointBoxCollision(mvMousePos, pWidget->GetRect());
+
+		// Highlight the widget the mouse is over, and also the focused
+		// widget so keyboard/controller navigation is visible.
+		if (bOver || (bNav && pWidget == mpFocusedWidget))
+			pWidget->OnMouseOver(true);
+		else
+			pWidget->OnMouseOver(false);
 	}
 }
 
@@ -1903,19 +1960,37 @@ void cMainMenu::OnMouseDown(eMButton aButton) {
 	if (mpCurrentActionText)
 		return;
 
+	// Right mouse button acts as "Back" on the navigable menus. This is also
+	// what the on-screen pad's B button maps to.
+	if (aButton == eMButton_Right && IsNavigableState()) {
+		Exit();
+		mbMouseIsDown = true;
+		return;
+	}
+
 	////////////////////////////////
 	// Update buttons
+	bool bHit = false;
 	tMainMenuWidgetListIt it = mlstWidgets.begin();
 	for (; it != mlstWidgets.end(); ++it) {
 		cMainMenuWidget *pWidget = *it;
 
 		if (cMath::PointBoxCollision(mvMousePos, pWidget->GetRect())) {
 			if (pWidget->IsActive()) {
+				if (pWidget->IsFocusable())
+					SetFocus(pWidget);
 				pWidget->OnMouseDown(aButton);
+				bHit = true;
 				break;
 			}
 		}
 	}
+
+	// A left click that didn't land on a widget activates the focused widget.
+	// The on-screen pad's A button maps to a left click, and the hardware
+	// cursor does not follow the D-pad focus, so honour the focus here.
+	if (!bHit && aButton == eMButton_Left && IsNavigableState())
+		ActivateFocused();
 
 	mbMouseIsDown = true;
 }
@@ -2103,6 +2178,180 @@ void cMainMenu::SetState(eMainMenuState aState) {
 		cMainMenuWidget *pWidget = *it;
 		pWidget->SetActive(true);
 	}
+
+	// Default the keyboard/controller focus for the new state.
+	DefaultFocus();
+}
+
+//-----------------------------------------------------------------------
+
+//////////////////////////////////////////////////////////////////////////
+// KEYBOARD / CONTROLLER FOCUS NAVIGATION
+//////////////////////////////////////////////////////////////////////////
+
+//-----------------------------------------------------------------------
+
+bool cMainMenu::IsNavigableState() const {
+	switch (mState) {
+	case eMainMenuState_Start:
+	case eMainMenuState_NewGame:
+	case eMainMenuState_Continue:
+	case eMainMenuState_Exit:
+	case eMainMenuState_FirstStart:
+	case eMainMenuState_LoadGameSpot:
+	case eMainMenuState_LoadGameAuto:
+	case eMainMenuState_LoadGameFavorite:
+		return true;
+	default:
+		return false;
+	}
+}
+
+//-----------------------------------------------------------------------
+
+void cMainMenu::SetFocus(cMainMenuWidget *apWidget) {
+	if (apWidget == mpFocusedWidget)
+		return;
+
+	if (mpFocusedWidget && mpFocusedWidget->IsActive())
+		mpFocusedWidget->OnMouseOver(false);
+
+	mpFocusedWidget = apWidget;
+
+	if (mpFocusedWidget)
+		mpFocusedWidget->OnMouseOver(true);
+}
+
+//-----------------------------------------------------------------------
+
+void cMainMenu::DefaultFocus() {
+	mpFocusedWidget = NULL;
+
+	if (!IsNavigableState())
+		return;
+
+	// On the load screens, focus the save list directly: Up/Down moves the
+	// selected slot, A loads it, B/Esc leaves the screen.
+	bool bLoadScreen = (mState == eMainMenuState_LoadGameSpot ||
+						mState == eMainMenuState_LoadGameAuto ||
+						mState == eMainMenuState_LoadGameFavorite);
+
+	cMainMenuWidget *pFirst = NULL;
+	tMainMenuWidgetListIt it = mvState[mState].begin();
+	for (; it != mvState[mState].end(); ++it) {
+		cMainMenuWidget *pWidget = *it;
+		if (!pWidget->IsFocusable())
+			continue;
+		if (bLoadScreen && pWidget->IsList()) {
+			SetFocus(pWidget);
+			return;
+		}
+		if (!pFirst)
+			pFirst = pWidget;
+	}
+
+	SetFocus(pFirst);
+}
+
+//-----------------------------------------------------------------------
+
+void cMainMenu::MoveFocus(int alDir) {
+	if (!IsNavigableState())
+		return;
+
+	// If the save list is focused, Up/Down moves the highlighted slot rather
+	// than cycling between widgets.
+	if (mpFocusedWidget && mpFocusedWidget->IsActive() && mpFocusedWidget->IsList()) {
+		static_cast<cMainMenuWidget_List *>(mpFocusedWidget)->MoveSelection(alDir);
+		return;
+	}
+
+	// Build the ordered list of focusable widgets in the current state.
+	Common::Array<cMainMenuWidget *> focusable;
+	tMainMenuWidgetListIt it = mvState[mState].begin();
+	for (; it != mvState[mState].end(); ++it) {
+		cMainMenuWidget *pWidget = *it;
+		if (pWidget->IsActive() && pWidget->IsFocusable())
+			focusable.push_back(pWidget);
+	}
+
+	if (focusable.empty())
+		return;
+
+	int lIdx = -1;
+	for (size_t i = 0; i < focusable.size(); ++i) {
+		if (focusable[i] == mpFocusedWidget) {
+			lIdx = (int)i;
+			break;
+		}
+	}
+
+	if (lIdx < 0) {
+		lIdx = 0;
+	} else {
+		lIdx += alDir;
+		if (lIdx < 0)
+			lIdx = (int)focusable.size() - 1;
+		if (lIdx >= (int)focusable.size())
+			lIdx = 0;
+	}
+
+	SetFocus(focusable[lIdx]);
+}
+
+//-----------------------------------------------------------------------
+
+void cMainMenu::ActivateFocused() {
+	if (!mpFocusedWidget || !mpFocusedWidget->IsActive())
+		return;
+
+	if (mpFocusedWidget->IsList()) {
+		// Load the highlighted save: mirror the list's double-click load path.
+		mpFocusedWidget->OnDoubleClick(eMButton_Left);
+	} else {
+		mpFocusedWidget->OnMouseDown(eMButton_Left);
+		mpFocusedWidget->OnMouseUp(eMButton_Left);
+	}
+}
+
+//-----------------------------------------------------------------------
+
+void cMainMenu::UpdateNavInput() {
+	if (!IsNavigableState())
+		return;
+
+	cInput *pInput = mpInit->mpGame->GetInput();
+
+	// Edge-triggered key test (true only on the frame the key goes down).
+	auto becamePressed = [&](Common::KeyCode aKey) -> bool {
+		bool bDown = pInput->GetKeyboard()->KeyIsDown(aKey);
+		bool bWas = mvNavKeyPressed[aKey];
+		mvNavKeyPressed[aKey] = bDown;
+		return bDown && !bWas;
+	};
+
+	// Up / Down: arrow keys plus the Forward/Backward movement keys (w/s),
+	// which is what the on-screen pad's D-pad maps to.
+	bool bUp = becamePressed(Common::KEYCODE_UP);
+	bUp = becamePressed(Common::KEYCODE_w) || bUp;
+	bool bDown = becamePressed(Common::KEYCODE_DOWN);
+	bDown = becamePressed(Common::KEYCODE_s) || bDown;
+
+	// Confirm: Enter / Keypad-Enter / Space. (A from the pad arrives as a
+	// left mouse click and is handled in OnMouseDown.)
+	bool bConfirm = becamePressed(Common::KEYCODE_RETURN);
+	bConfirm = becamePressed(Common::KEYCODE_KP_ENTER) || bConfirm;
+	bConfirm = becamePressed(Common::KEYCODE_SPACE) || bConfirm;
+
+	if (bUp)
+		MoveFocus(-1);
+	if (bDown)
+		MoveFocus(1);
+	if (bConfirm)
+		ActivateFocused();
+
+	// Back (Esc / pad B) is already routed via the ButtonHandler "Escape"
+	// action and the right mouse button in OnMouseDown.
 }
 
 //-----------------------------------------------------------------------
@@ -2212,6 +2461,7 @@ void cMainMenu::CreateWidgets() {
 	///////////////////////////////
 	// Erase all previous
 	STLDeleteAll(mlstWidgets);
+	mpFocusedWidget = NULL;
 	for (size_t i = 0; i < eMainMenuState_LastEnum; ++i)
 		mvState[i].clear();
 
