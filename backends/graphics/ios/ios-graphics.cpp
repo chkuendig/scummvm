@@ -84,6 +84,8 @@ void iOSGraphicsManager::showOverlay(bool inGUI) {
 	} else if (_overlayInGUI) {
 		// Restore touch mode active before overlay was shown
 		dynamic_cast<OSystem_iOS7 *>(g_system)->setCurrentTouchMode(static_cast<TouchMode>(_old_touch_mode));
+		// Resync the toggle icon and native virtual controller to the restored mode.
+		dynamic_cast<OSystem_iOS7 *>(g_system)->updateTouchMode();
 	}
 
 	OpenGL::OpenGLGraphicsManager::showOverlay(inGUI);
@@ -93,6 +95,8 @@ void iOSGraphicsManager::hideOverlay() {
 	if (_overlayInGUI) {
 		// Restore touch mode active before overlay was shown
 		dynamic_cast<OSystem_iOS7 *>(g_system)->setCurrentTouchMode(static_cast<TouchMode>(_old_touch_mode));
+		// Resync the toggle icon and native virtual controller to the restored mode.
+		dynamic_cast<OSystem_iOS7 *>(g_system)->updateTouchMode();
 	}
 
 	OpenGL::OpenGLGraphicsManager::hideOverlay();

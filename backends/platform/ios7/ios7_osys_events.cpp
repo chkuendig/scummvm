@@ -243,16 +243,26 @@ void  OSystem_iOS7::handleEvent_orientationChanged(int orientation) {
 }
 
 void OSystem_iOS7::handleEvent_touchModeChanged() {
+	// The on-screen gamepad is only offered by the toggle in-game (not in the
+	// menus/overlay) and only when no physical controller is connected. In those
+	// cases the cycle is direct <-> touchpad only (mirrors the SDL backend).
+	const bool overlayShown = _graphicsManager && _graphicsManager->isOverlayVisible();
+	const bool gamepadAvailable = !overlayShown && !iOS7_isControllerConnected();
+
 	switch (_currentTouchMode) {
 	case kTouchModeDirect:
 		_currentTouchMode = kTouchModeTouchpad;
 		break;
 	case kTouchModeTouchpad:
+		_currentTouchMode = gamepadAvailable ? kTouchModeGamepad : kTouchModeDirect;
+		break;
+	case kTouchModeGamepad:
 	default:
 		_currentTouchMode = kTouchModeDirect;
 		break;
 	}
 
+	// updateTouchMode() (dis)connects the native virtual controller to match.
 	updateTouchMode();
 }
 

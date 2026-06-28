@@ -67,6 +67,7 @@ enum DirectionalInput {
 enum TouchMode {
 	kTouchModeDirect,
 	kTouchModeTouchpad,
+	kTouchModeGamepad,
 };
 
 enum UIViewSwipeDirection {
@@ -107,6 +108,9 @@ void iOS7_main(int argc, char **argv);
 Common::String iOS7_getDocumentsDir();
 Common::String iOS7_getAppBundleDir();
 TouchMode iOS7_getCurrentTouchMode();
+// True when a physical game controller (i.e. not the on-screen virtual one) is
+// currently connected. Used to demote the on-screen gamepad touch mode.
+bool iOS7_isControllerConnected();
 void iOS7_setSafeAreaInsets(int l, int r, int t, int b);
 
 #endif
