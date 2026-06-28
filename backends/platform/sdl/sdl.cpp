@@ -104,7 +104,11 @@ OSystem_SDL::OSystem_SDL()
 	_logger(nullptr),
 	_eventSource(nullptr),
 	_eventSourceWrapper(nullptr),
-	_window(nullptr) {
+	_window(nullptr)
+#ifdef USE_OPENGL
+	, _touchMode(TOUCH_MODE_MOUSE)
+#endif
+	{
 #if defined(USE_SCUMMVMDLC)
 	_dlcStore = new DLC::ScummVMCloud::ScummVMCloud();
 #endif
@@ -228,15 +232,12 @@ bool OSystem_SDL::hasFeature(Feature f) {
 #if defined(USE_SCUMMVMDLC)
 	if (f == kFeatureDLC) return true;
 #endif
-#if SDL_VERSION_ATLEAST(3, 0, 0)
-	if (f == kFeatureTouchpadMode) {
-		int count = 0;
-		SDL_free(SDL_GetTouchDevices(&count));
-		return count > 0;
-	}
-#elif SDL_VERSION_ATLEAST(2, 0, 0)
-	if (f == kFeatureTouchpadMode) {
-		return SDL_GetNumTouchDevices() > 0;
+#if SDL_VERSION_ATLEAST(2, 0, 0)
+	// Both features gate the in-GUI touch options on hasTouchscreen() so the
+	// Emscripten override (navigator.maxTouchPoints) keeps them hidden on a
+	// mouse-only desktop browser.
+	if (f == kFeatureTouchscreen || f == kFeatureTouchpadMode) {
+		return hasTouchscreen();
 	}
 #endif
 	return ModularGraphicsBackend::hasFeature(f);
@@ -265,8 +266,80 @@ bool OSystem_SDL::getFeatureState(Feature f) {
 	}
 }
 
+bool OSystem_SDL::hasTouchscreen() const {
+#if SDL_VERSION_ATLEAST(3, 0, 0)
+	int count = 0;
+	SDL_free(SDL_GetTouchDevices(&count));
+	return count > 0;
+#elif SDL_VERSION_ATLEAST(2, 0, 0)
+	return SDL_GetNumTouchDevices() > 0;
+#else
+	return false;
+#endif
+}
+
+#ifdef USE_OPENGL
+void OSystem_SDL::applyTouchSettings() {
+	Common::String mode;
+	if (isOverlayVisible()) {
+		mode = ConfMan.get("touch_mode_menus");
+	} else {
+		bool is3d = false;
+		OpenGLSdlGraphicsManager *glManager = dynamic_cast<OpenGLSdlGraphicsManager *>(_graphicsManager);
+		if (glManager) {
+			is3d = glManager->isRendering3D();
+		}
+		mode = is3d ? ConfMan.get("touch_mode_3d_games") : ConfMan.get("touch_mode_2d_games");
+	}
+
+	if (mode == "touchpad") {
+		_touchMode = TOUCH_MODE_TOUCHPAD;
+	} else if (mode == "gamepad") {
+		_touchMode = TOUCH_MODE_GAMEPAD;
+	} else {
+		_touchMode = TOUCH_MODE_MOUSE;
+	}
+
+	// The on-screen gamepad is only useful as a fallback: if a physical
+	// controller is connected (incl. one exposed via the Web Gamepad API),
+	// fall back to the touchpad so we don't show a redundant overlay.
+	if (_touchMode == TOUCH_MODE_GAMEPAD && _eventSource && _eventSource->isJoystickConnected()) {
+		_touchMode = TOUCH_MODE_TOUCHPAD;
+	}
+}
+
+void OSystem_SDL::cycleTouchMode() {
+	_touchMode = (TouchMode)((_touchMode + 1) % TOUCH_MODE_MAX);
+#ifdef USE_OSD
+	Common::U32String name;
+	switch (_touchMode) {
+	case TOUCH_MODE_TOUCHPAD:
+		name = _("Touchpad emulation");
+		break;
+	case TOUCH_MODE_GAMEPAD:
+		name = _("On-screen gamepad");
+		break;
+	default:
+		name = _("Direct mouse");
+		break;
+	}
+	displayMessageOnOSD(name);
+#endif
+}
+
+bool OSystem_SDL::isTouchToggleVisible() const {
+	return _touchUiReady && hasTouchscreen() && ConfMan.getBool("onscreen_control");
+}
+
+Common::Rect OSystem_SDL::getTouchToggleRect(int screenW, int screenH) const {
+	// A small square icon button in the top-right corner (iOS-style).
+	int s = CLIP(MIN(screenW, screenH) / 8, 40, 96);
+	int margin = s / 3;
+	return Common::Rect(screenW - s - margin, margin, screenW - margin, margin + s);
+}
+#endif
+
 void OSystem_SDL::initBackend() {
-	// Check if backend has not been initialized
 	assert(!_inited);
 
 	if (!_logger)
@@ -389,6 +462,23 @@ void OSystem_SDL::initBackend() {
 
 	ConfMan.registerDefault("iconspath", this->getDefaultIconsPath());
 	ConfMan.registerDefault("dlcspath", this->getDefaultDLCsPath());
+
+#ifdef USE_OPENGL
+	// On-screen touch controls: per-context mode presets (shared with the
+	// Android/iOS backends so behaviour and the options widget match).
+	ConfMan.registerDefault("touch_mode_menus", "mouse");
+	ConfMan.registerDefault("touch_mode_2d_games", "touchpad");
+	ConfMan.registerDefault("touch_mode_3d_games", "gamepad");
+	ConfMan.registerDefault("onscreen_control", true);
+
+	// Hand our touch controls to the OpenGL graphics manager so it can render
+	// them. The GL surface itself is created lazily once a context exists.
+	OpenGLSdlGraphicsManager *glManager = dynamic_cast<OpenGLSdlGraphicsManager *>(_graphicsManager);
+	if (glManager) {
+		glManager->setTouchControls(&_touchControls);
+	}
+	applyTouchSettings();
+#endif
 
 	_inited = true;
 
@@ -581,6 +671,12 @@ void OSystem_SDL::engineInit() {
 #endif
 
 	_eventSource->setEngineRunning(true);
+
+#ifdef USE_OPENGL
+	// A game is running: the GUI/data is fully up, so it is safe to load the
+	// on-screen control assets (loose /data/ files) if needed.
+	setTouchUiReady();
+#endif
 }
 
 void OSystem_SDL::engineDone() {
@@ -697,7 +793,15 @@ Common::HardwareInputSet *OSystem_SDL::getHardwareInputSet() {
 	inputSet->addHardwareInputSet(new MouseHardwareInputSet(defaultMouseButtons));
 	inputSet->addHardwareInputSet(new KeyboardHardwareInputSet(defaultKeys, defaultModifiers));
 
-	if (_eventSource->isJoystickConnected()) {
+	bool wantJoystickInputs = _eventSource->isJoystickConnected();
+#ifdef USE_OPENGL
+	// The on-screen gamepad is a virtual joystick source, so its synthetic
+	// JOY_* events also need the joystick hardware-input set registered for the
+	// keymapper to resolve them (e.g. to navigate the GUI) even when no physical
+	// controller is connected.
+	wantJoystickInputs = wantJoystickInputs || hasTouchscreen();
+#endif
+	if (wantJoystickInputs) {
 		inputSet->addHardwareInputSet(new JoystickHardwareInputSet(defaultJoystickButtons, defaultJoystickAxes));
 	}
 
