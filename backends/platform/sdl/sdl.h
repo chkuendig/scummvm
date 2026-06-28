@@ -31,6 +31,8 @@
 #include "backends/platform/sdl/sdl-window.h"
 
 #include "common/array.h"
+#include "common/rect.h"
+#include "common/touch-mode.h"
 
 #ifdef USE_OPENGL
 #define USE_MULTIPLE_RENDERERS
@@ -58,6 +60,35 @@ public:
 	bool hasFeature(Feature f) override;
 	void setFeatureState(Feature f, bool enable) override;
 	bool getFeatureState(Feature f) override;
+
+	/**
+	 * True if the system has a real touchscreen. Base SDL trusts SDL's touch
+	 * device list; Emscripten overrides this because browsers mis-report touch.
+	 */
+	virtual bool hasTouchscreen() const;
+
+	/**
+	 * On-screen touch controls (gamepad overlay), rendered by the active SDL
+	 * graphics manager. The mode values are shared with the GUI and the other
+	 * backends via common/touch-mode.h.
+	 */
+	typedef Common::TouchMode TouchMode;
+
+	TouchMode getTouchMode() const { return _touchMode; }
+	/**
+	 * Marks the GUI/launcher as up and running: past this point it is safe to
+	 * load loose /data/ files, so we defer loading the gamepad asset until here.
+	 */
+	void setTouchUiReady() { _touchUiReady = true; }
+	bool isTouchUiReady() const { return _touchUiReady; }
+	/** Cycle to the next touch mode (used by the on-screen toggle button). */
+	void cycleTouchMode();
+	/** Recompute the active touch mode from the per-context presets. */
+	void applyTouchSettings();
+	/** True if the on-screen mode-toggle button should be shown/hit-tested. */
+	bool isTouchToggleVisible() const;
+	/** Rectangle of the on-screen mode-toggle button, in the given screen size. */
+	Common::Rect getTouchToggleRect(int screenW, int screenH) const;
 
 	// Override functions from ModularBackend and OSystem
 	void initBackend() override;
@@ -143,6 +174,21 @@ protected:
 	SdlWindow *_window;
 
 	SdlGraphicsManager::State _gfxManagerState;
+
+	// On-screen touch mode (direct pointer / touchpad), rendered by the active SDL graphics manager.
+	TouchMode _touchMode;
+	bool _touchUiReady = false;
+
+	// The touch presets are keyed per context (GUI/menus, 2D game, 3D game).
+	// applyTouchSettings() re-reads the preset on every overlay show/hide and
+	// screen change; the on-screen toggle (cycleTouchMode) is transient and only
+	// holds until the next such re-application.
+	enum TouchContext {
+		kTouchContextMenus = 0,
+		kTouchContext2d = 1,
+		kTouchContext3d = 2
+	};
+	TouchContext currentTouchContext();
 
 #if defined(USE_OPENGL_GAME) || defined(USE_OPENGL_SHADERS)
 	// Graphics capabilities

@@ -26,6 +26,7 @@
 #include "backends/graphics/sdl/sdl-graphics.h"
 
 #include "common/events.h"
+#include "common/queue.h"
 
 // Type names which changed between SDL 1.2 and SDL 2.
 #if !SDL_VERSION_ATLEAST(2, 0, 0)
@@ -61,7 +62,17 @@ public:
 	/** Sets whether a game is currently running */
 	void setEngineRunning(bool value);
 
+	/**
+	 * Enqueue a synthetic event (e.g. from the on-screen touch controls) so it
+	 * is returned by pollEvent() and routed through the keymapper like any other
+	 * input event.
+	 */
+	void addEvent(const Common::Event &ev) { _eventQueue.push(ev); }
+
 protected:
+	/** Queue of synthetic events to be returned by pollEvent(). */
+	Common::Queue<Common::Event> _eventQueue;
+
 	/** Scroll lock state - since SDL doesn't track it */
 	bool _scrollLock;
 
@@ -151,6 +162,25 @@ protected:
 	virtual bool isTouchPortActive(SDL_TouchID port);
 	virtual Common::Point getTouchscreenSize();
 	virtual void convertTouchXYToGameXY(float touchX, float touchY, int *gameX, int *gameY);
+	/** Drawable/framebuffer size in pixels (for touch-controls hit-testing). */
+	Common::Point getTouchscreenSizePixels();
+	/**
+	 * Hit-test a touch finger against the on-screen mode-toggle button.
+	 * @p action is a TouchAction value. Returns true if consumed.
+	 *
+	 * A short tap cycles the touch mode; a long press (>= kTouchToggleLongPressMs)
+	 * opens the virtual keyboard, mirroring the iOS backend.
+	 */
+	bool handleTouchToggle(int action, float normX, float normY);
+
+	/** Long-press threshold (ms) on the touch toggle to open the vkeybd. */
+	static const uint32 kTouchToggleLongPressMs = 500;
+
+	/** getMillis() time the touch toggle was pressed down (0 if not pressed). */
+	uint32 _touchToggleDownTime = 0;
+
+	/** Whether a finger-down landed on the touch toggle and is still held. */
+	bool _touchTogglePressed = false;
 #endif
 
 	//@}
