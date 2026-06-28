@@ -60,6 +60,8 @@
 #include "graphics/cursorman.h"
 #include "graphics/renderer.h"
 
+#include "engines/engine.h"	// for g_engine (read-only) in currentTouchContext()
+
 #include <time.h>	// for getTimeAndDate()
 
 #ifdef USE_DETECTLANG
@@ -104,7 +106,9 @@ OSystem_SDL::OSystem_SDL()
 	_logger(nullptr),
 	_eventSource(nullptr),
 	_eventSourceWrapper(nullptr),
-	_window(nullptr) {
+	_window(nullptr)
+	, _touchMode(Common::kTouchModeMouse)
+	{
 #if defined(USE_SCUMMVMDLC)
 	_dlcStore = new DLC::ScummVMCloud::ScummVMCloud();
 #endif
@@ -228,15 +232,12 @@ bool OSystem_SDL::hasFeature(Feature f) {
 #if defined(USE_SCUMMVMDLC)
 	if (f == kFeatureDLC) return true;
 #endif
-#if SDL_VERSION_ATLEAST(3, 0, 0)
-	if (f == kFeatureTouchpadMode) {
-		int count = 0;
-		SDL_free(SDL_GetTouchDevices(&count));
-		return count > 0;
-	}
-#elif SDL_VERSION_ATLEAST(2, 0, 0)
-	if (f == kFeatureTouchpadMode) {
-		return SDL_GetNumTouchDevices() > 0;
+#if SDL_VERSION_ATLEAST(2, 0, 0)
+	// Both features gate the in-GUI touch options on hasTouchscreen() so the
+	// Emscripten override (navigator.maxTouchPoints) keeps them hidden on a
+	// mouse-only desktop browser.
+	if (f == kFeatureTouchscreen || f == kFeatureTouchpadMode) {
+		return hasTouchscreen();
 	}
 #endif
 	return ModularGraphicsBackend::hasFeature(f);
@@ -265,8 +266,99 @@ bool OSystem_SDL::getFeatureState(Feature f) {
 	}
 }
 
+bool OSystem_SDL::hasTouchscreen() const {
+#if SDL_VERSION_ATLEAST(3, 0, 0)
+	int count = 0;
+	SDL_free(SDL_GetTouchDevices(&count));
+	return count > 0;
+#elif SDL_VERSION_ATLEAST(2, 0, 0)
+	return SDL_GetNumTouchDevices() > 0;
+#else
+	return false;
+#endif
+}
+
+OSystem_SDL::TouchContext OSystem_SDL::currentTouchContext() {
+	// The overlay is shown both by the launcher and by the in-game GMM/dialogs.
+	// Only treat it as the "menus" context when no game engine is running (i.e.
+	// the launcher). While a game is running, keep reporting the game's 2d/3d
+	// render context so opening the GMM over the game doesn't flip the touch
+	// preset (and make the on-screen gamepad disappear).
+	if (isOverlayVisible() && g_engine == nullptr) {
+		return kTouchContextMenus;
+	}
+	bool is3d = false;
+#ifdef USE_OPENGL
+	// Only the OpenGL graphics manager can render 3D games; SurfaceSDL is
+	// always 2D, so this stays guarded behind the OpenGL-specific API.
+	OpenGLSdlGraphicsManager *glManager = dynamic_cast<OpenGLSdlGraphicsManager *>(_graphicsManager);
+	if (glManager) {
+		is3d = glManager->isRendering3D();
+	}
+#endif
+	return is3d ? kTouchContext3d : kTouchContext2d;
+}
+
+void OSystem_SDL::applyTouchSettings() {
+	const TouchContext context = currentTouchContext();
+
+	Common::String key;
+	switch (context) {
+	case kTouchContextMenus:
+		key = TOUCH_MODE_MENUS_KEY;
+		break;
+	case kTouchContext3d:
+		key = TOUCH_MODE_3D_GAMES_KEY;
+		break;
+	default:
+		key = TOUCH_MODE_2D_GAMES_KEY;
+		break;
+	}
+
+	_touchMode = Common::parseTouchMode(ConfMan.get(key), Common::kTouchModeMouse);
+
+	// The on-screen gamepad is only available in games, never in menus. Guard
+	// against legacy or hand-edited configs that request it for the menus context.
+	if (context == kTouchContextMenus && _touchMode == Common::kTouchModeGamepad) {
+		_touchMode = Common::kTouchModeMouse;
+	}
+
+	// The manual toggle (cycleTouchMode) is transient: the next applyTouchSettings
+	// re-derives the mode from the per-context preset, so a toggle only holds until
+	// the next overlay show/hide or screen change (matches the iOS behaviour).
+}
+
+void OSystem_SDL::cycleTouchMode() {
+	// Toggle between the direct pointer and the touchpad emulation.
+	_touchMode = (_touchMode == Common::kTouchModeTouchpad) ? Common::kTouchModeMouse : Common::kTouchModeTouchpad;
+#ifdef USE_OSD
+	Common::U32String name;
+	switch (_touchMode) {
+	case Common::kTouchModeTouchpad:
+		name = _("Touchpad emulation");
+		break;
+	default:
+		name = _("Direct mouse");
+		break;
+	}
+	displayMessageOnOSD(name);
+#endif
+}
+
+bool OSystem_SDL::isTouchToggleVisible() const {
+	// The on-screen toggle is only rendered (and hit-tested) by overlay-capable
+	// renderers (OpenGL). SurfaceSDL is settings-only and never draws it.
+	return _touchUiReady && hasTouchscreen() && ConfMan.getBool(ONSCREEN_CONTROL_KEY);
+}
+
+Common::Rect OSystem_SDL::getTouchToggleRect(int screenW, int screenH) const {
+	// A small square icon button in the top-right corner (iOS-style).
+	int s = CLIP(MIN(screenW, screenH) / 8, 40, 96);
+	int margin = s / 3;
+	return Common::Rect(screenW - s - margin, margin, screenW - margin, margin + s);
+}
+
 void OSystem_SDL::initBackend() {
-	// Check if backend has not been initialized
 	assert(!_inited);
 
 	if (!_logger)
@@ -389,6 +481,15 @@ void OSystem_SDL::initBackend() {
 
 	ConfMan.registerDefault("iconspath", this->getDefaultIconsPath());
 	ConfMan.registerDefault("dlcspath", this->getDefaultDLCsPath());
+
+	// On-screen touch controls: per-context mode presets (shared with the
+	// Android/iOS backends so behaviour and the options widget match).
+	ConfMan.registerDefault(TOUCH_MODE_MENUS_KEY, "mouse");
+	ConfMan.registerDefault(TOUCH_MODE_2D_GAMES_KEY, "touchpad");
+	ConfMan.registerDefault(TOUCH_MODE_3D_GAMES_KEY, "gamepad");
+	ConfMan.registerDefault(ONSCREEN_CONTROL_KEY, true);
+
+	applyTouchSettings();
 
 	_inited = true;
 
@@ -581,6 +682,10 @@ void OSystem_SDL::engineInit() {
 #endif
 
 	_eventSource->setEngineRunning(true);
+
+	// A game is running: the GUI/data is fully up, so it is safe to load the
+	// on-screen control assets (loose /data/ files) if needed.
+	setTouchUiReady();
 }
 
 void OSystem_SDL::engineDone() {

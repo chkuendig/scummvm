@@ -25,6 +25,7 @@
 
 #include "backends/events/sdl/sdl-events.h"
 #include "backends/platform/sdl/sdl.h"
+#include "backends/platform/sdl/touch-action.h"
 #include "backends/graphics/graphics.h"
 #include "common/config-manager.h"
 #include "common/textconsole.h"
@@ -54,13 +55,82 @@ bool SdlEventSource::processMouseEvent(Common::Event &event, int x, int y, int r
 
 #if SDL_VERSION_ATLEAST(2, 0, 0)
 Common::Point SdlEventSource::getTouchscreenSize() {
-	int windowWidth, windowHeight;
-	SDL_GetWindowSize((dynamic_cast<SdlGraphicsManager*>(_graphicsManager))->getWindow()->getSDLWindow(), &windowWidth, &windowHeight);
+	int windowWidth = 0, windowHeight = 0;
+	SdlGraphicsManager *gfx = dynamic_cast<SdlGraphicsManager *>(_graphicsManager);
+	SDL_Window *win = (gfx && gfx->getWindow()) ? gfx->getWindow()->getSDLWindow() : nullptr;
+	if (!win) {
+		return Common::Point(0, 0);
+	}
+	SDL_GetWindowSize(win, &windowWidth, &windowHeight);
 	return Common::Point(windowWidth, windowHeight);
 }
 
+Common::Point SdlEventSource::getTouchscreenSizePixels() {
+	// On-screen controls are drawn in drawable pixels; hit-test in the same
+	// space (differs from logical window size on HiDPI / browser canvases).
+	SdlGraphicsManager *gfx = dynamic_cast<SdlGraphicsManager *>(_graphicsManager);
+	SDL_Window *win = (gfx && gfx->getWindow()) ? gfx->getWindow()->getSDLWindow() : nullptr;
+	if (!win) {
+		return Common::Point(0, 0);
+	}
+	int w = 0, h = 0;
+#if SDL_VERSION_ATLEAST(3, 0, 0)
+	SDL_GetWindowSizeInPixels(win, &w, &h);
+#else
+	SDL_GL_GetDrawableSize(win, &w, &h);
+#endif
+	return Common::Point(w, h);
+}
+
 bool SdlEventSource::isTouchPortTouchpadMode(SDL_TouchID port) {
-       return g_system->getFeatureState(OSystem::kFeatureTouchpadMode);
+	OSystem_SDL *sdlSystem = dynamic_cast<OSystem_SDL *>(g_system);
+	if (sdlSystem) {
+		return sdlSystem->getTouchMode() == Common::kTouchModeTouchpad;
+	}
+	return g_system->getFeatureState(OSystem::kFeatureTouchpadMode);
+}
+
+bool SdlEventSource::handleTouchToggle(int action, float normX, float normY) {
+	OSystem_SDL *sdlSystem = dynamic_cast<OSystem_SDL *>(g_system);
+
+	// A finger-up completes a press that started on the toggle. Process it
+	// regardless of the current finger position (the press started on the
+	// toggle): a short tap cycles the touch mode, a long press opens the
+	// rendered virtual keyboard (mirrors the iOS controller-icon long-press).
+	if (action == kActionUp) {
+		if (!_touchTogglePressed) {
+			return false;
+		}
+		_touchTogglePressed = false;
+		uint32 held = g_system->getMillis() - _touchToggleDownTime;
+		if (held >= kTouchToggleLongPressMs) {
+			Common::Event ev;
+			ev.type = Common::EVENT_VIRTUAL_KEYBOARD;
+			addEvent(ev);
+		} else if (sdlSystem) {
+			sdlSystem->cycleTouchMode();
+		}
+		return true;
+	}
+
+	// Only act on finger-down for the remaining hit-test; intermediate motion is
+	// a harmless no-op while the press is tracked.
+	if (action != kActionDown) {
+		return false;
+	}
+	if (!sdlSystem || !sdlSystem->isTouchToggleVisible()) {
+		return false;
+	}
+	Common::Point size = getTouchscreenSizePixels();
+	int x = (int)(normX * size.x);
+	int y = (int)(normY * size.y);
+	if (!sdlSystem->getTouchToggleRect(size.x, size.y).contains(x, y)) {
+		return false;
+	}
+	// Start tracking the press; the action (cycle vs. vkeybd) is decided on up.
+	_touchToggleDownTime = g_system->getMillis();
+	_touchTogglePressed = true;
+	return true;
 }
 
 bool SdlEventSource::isTouchPortActive(SDL_TouchID port) {
@@ -68,8 +138,12 @@ bool SdlEventSource::isTouchPortActive(SDL_TouchID port) {
 }
 
 void SdlEventSource::convertTouchXYToGameXY(float touchX, float touchY, int *gameX, int *gameY) {
-	int windowWidth, windowHeight;
-	SDL_GetWindowSize((dynamic_cast<SdlGraphicsManager*>(_graphicsManager))->getWindow()->getSDLWindow(), &windowWidth, &windowHeight);
+	int windowWidth = 0, windowHeight = 0;
+	SdlGraphicsManager *gfx = dynamic_cast<SdlGraphicsManager *>(_graphicsManager);
+	SDL_Window *win = (gfx && gfx->getWindow()) ? gfx->getWindow()->getSDLWindow() : nullptr;
+	if (win) {
+		SDL_GetWindowSize(win, &windowWidth, &windowHeight);
+	}
 
 	*gameX = windowWidth * touchX;
 	*gameY = windowHeight * touchY;

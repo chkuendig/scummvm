@@ -25,6 +25,7 @@
 
 #include "backends/events/sdl/sdl-events.h"
 #include "backends/platform/sdl/sdl.h"
+#include "backends/platform/sdl/touch-action.h"
 #include "backends/graphics/graphics.h"
 #include "common/config-manager.h"
 #include "common/textconsole.h"
@@ -614,6 +615,13 @@ void SdlEventSource::preprocessFingerMotion(SDL_Event *event) {
 }
 
 bool SdlEventSource::pollEvent(Common::Event &event) {
+	// Drain synthetic events (e.g. from the on-screen touch controls) first so
+	// they are routed through the keymapper like any other input event.
+	if (!_eventQueue.empty()) {
+		event = _eventQueue.pop();
+		return true;
+	}
+
 	finishSimulatedMouseClicks();
 
 	// In case we still need to send a key up event for a key down from a
@@ -654,6 +662,14 @@ bool SdlEventSource::pollEvent(Common::Event &event) {
 		// right mouse click: second finger short tap while first finger is still down
 		// pointer motion: single finger drag
 		if (ev.type == SDL_EVENT_FINGER_DOWN || ev.type == SDL_EVENT_FINGER_UP || ev.type == SDL_EVENT_FINGER_MOTION) {
+			{
+				int action = (ev.type == SDL_EVENT_FINGER_DOWN) ? kActionDown :
+				             (ev.type == SDL_EVENT_FINGER_UP) ? kActionUp : kActionMove;
+				// On-screen mode-toggle button takes precedence over everything.
+				if (handleTouchToggle(action, ev.tfinger.x, ev.tfinger.y)) {
+					continue;
+				}
+			}
 			// front (0) or back (1) panel
 			SDL_TouchID port = ev.tfinger.touchID;
 			// touchpad_mouse_mode off: use only front panel for direct touch control of pointer
