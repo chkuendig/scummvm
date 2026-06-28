@@ -26,6 +26,7 @@
  */
 
 #include "hpl1/engine/sound/SoundHandler.h"
+#include "common/array.h"
 #include "hpl1/engine/math/Math.h"
 #include "hpl1/engine/resources/Resources.h"
 #include "hpl1/engine/resources/SoundManager.h"
@@ -476,24 +477,28 @@ void cSoundHandler::Update(float afTimeStep) {
 			mfVolume = mfNewVolume;
 	}
 
+	// Defer-erase: UpdateEntry can invoke iSoundCallback hooks (e.g.
+	// OnPriorityRelease) that mutate mlstWorldSounds / mlstGuiSounds
+	// themselves, invalidating the iterator we're holding here. Collect
+	// the to-remove iterators during the pass and erase after the loop.
+	// Reproduced earlier as a per-frame wasm OOB on emscripten (the
+	// invalidated iterator's _node pointer landed outside wasm memory).
 	tSoundEntryListIt it;
-	it = mlstGuiSounds.begin();
-	while (it != mlstGuiSounds.end()) {
-		if (UpdateEntry(&(*it), afTimeStep, eSoundDest_Gui) == false) {
-			it = mlstGuiSounds.erase(it);
-		} else {
-			++it;
-		}
+	Common::Array<tSoundEntryListIt> vToRemove;
+	for (it = mlstGuiSounds.begin(); it != mlstGuiSounds.end(); ++it) {
+		if (UpdateEntry(&(*it), afTimeStep, eSoundDest_Gui) == false)
+			vToRemove.push_back(it);
 	}
+	for (uint i = 0; i < vToRemove.size(); ++i)
+		mlstGuiSounds.erase(vToRemove[i]);
 
-	it = mlstWorldSounds.begin();
-	while (it != mlstWorldSounds.end()) {
-		if (UpdateEntry(&(*it), afTimeStep, eSoundDest_World) == false) {
-			it = mlstWorldSounds.erase(it);
-		} else {
-			++it;
-		}
+	vToRemove.clear();
+	for (it = mlstWorldSounds.begin(); it != mlstWorldSounds.end(); ++it) {
+		if (UpdateEntry(&(*it), afTimeStep, eSoundDest_World) == false)
+			vToRemove.push_back(it);
 	}
+	for (uint i = 0; i < vToRemove.size(); ++i)
+		mlstWorldSounds.erase(vToRemove[i]);
 
 	mlCount++;
 }

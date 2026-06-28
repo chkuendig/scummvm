@@ -49,6 +49,10 @@
 #include "hpl1/engine/scene/World3D.h"
 #include "hpl1/engine/system/low_level_system.h"
 
+#ifdef HPL1_USE_OPENGL
+#include "hpl1/engine/impl/CGProgram.h"
+#endif
+
 namespace hpl {
 
 //////////////////////////////////////////////////////////////////////////
@@ -433,6 +437,11 @@ void cRenderer3D::RenderWorld(cWorld3D *apWorld, cCamera3D *apCamera, float afFr
 	RenderDebug(apCamera);
 
 	mpLowLevelGraphics->SetDepthWriteActive(true);
+
+#ifdef HPL1_USE_OPENGL
+	// Clear camera context after rendering
+	cCGProgram::SetCurrentCamera(nullptr);
+#endif
 }
 
 //-----------------------------------------------------------------------
@@ -548,6 +557,11 @@ void cRenderer3D::BeginRendering(cCamera3D *apCamera) {
 	mpLowLevelGraphics->SetColor(cColor(1, 1, 1, 1));
 
 	mRenderSettings.mpCamera = apCamera;
+
+#ifdef HPL1_USE_OPENGL
+	// Set camera context for OpenGL ES compatibility
+	cCGProgram::SetCurrentCamera(apCamera);
+#endif
 
 	for (int i = 0; i < MAX_TEXTUREUNITS; ++i)
 		mpLowLevelGraphics->SetTexture(i, NULL);
