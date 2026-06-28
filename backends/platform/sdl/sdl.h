@@ -29,6 +29,7 @@
 #include "backends/events/sdl/sdl-events.h"
 #include "backends/log/log.h"
 #include "backends/platform/sdl/sdl-window.h"
+#include "backends/platform/sdl/touchcontrols.h"
 
 #include "common/array.h"
 #include "common/rect.h"
@@ -74,6 +75,7 @@ public:
 	 */
 	typedef Common::TouchMode TouchMode;
 
+	TouchControls &getTouchControls() { return _touchControls; }
 	TouchMode getTouchMode() const { return _touchMode; }
 	/**
 	 * Marks the GUI/launcher as up and running: past this point it is safe to
@@ -116,6 +118,12 @@ public:
 #if SDL_VERSION_ATLEAST(2, 0, 14)
 	bool openUrl(const Common::String &url) override;
 #endif
+
+	/**
+	 * Inject a synthetic event into the SDL event source so it is routed
+	 * through the keymapper (used by the on-screen touch controls).
+	 */
+	void pushEvent(const Common::Event &ev);
 
 	void setWindowCaption(const Common::U32String &caption) override;
 	void addSysArchivesToSearchSet(Common::SearchSet &s, int priority = 0) override;
@@ -175,7 +183,8 @@ protected:
 
 	SdlGraphicsManager::State _gfxManagerState;
 
-	// On-screen touch mode (direct pointer / touchpad), rendered by the active SDL graphics manager.
+	// On-screen touch controls (owned here; rendered by the active SDL graphics manager).
+	TouchControls _touchControls;
 	TouchMode _touchMode;
 	bool _touchUiReady = false;
 
