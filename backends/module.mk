@@ -112,6 +112,7 @@ MODULE_OBJS += \
 	mixer/emscriptensdl/emscriptensdl-mixer.o \
 	networking/http/emscripten/connectionmanager-emscripten.o \
 	networking/http/emscripten/networkreadstream-emscripten.o \
+	printing/emscripten/emscripten-printman.o \
 	timer/emscripten/emscripten-timer.o
 ifdef USE_CLOUD
 MODULE_OBJS += \
