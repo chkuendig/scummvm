@@ -88,7 +88,10 @@ cMaterial_Alpha::~cMaterial_Alpha() {
 iGpuProgram *cMaterial_Alpha::getGpuProgram(eMaterialRenderType aType, int alPass, iLight3D *apLight) {
 	if (mpRenderSettings->mbFogActive)
 		return _fogShader;
-	return nullptr;
+	// Backends with no fixed-function pipeline (GLES2) return their default
+	// textured + vertex-color shader so the trans pass renders; desktop GL
+	// returns nullptr and the renderer falls back to fixed-function blending.
+	return mpLowLevelGraphics->GetSimpleShader();
 }
 
 iMaterialProgramSetup *cMaterial_Alpha::getGpuProgramSetup(const eMaterialRenderType aType, const int alPass, iLight3D *apLight) {
