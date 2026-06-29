@@ -90,12 +90,33 @@ bool SdlEventSource::isTouchPortTouchpadMode(SDL_TouchID port) {
 }
 
 bool SdlEventSource::handleTouchToggle(int action, float normX, float normY) {
-	// Act on finger-down only; the matching motion/up are harmless no-ops in the
-	// normal finger path because the finger was never registered there.
+	OSystem_SDL *sdlSystem = dynamic_cast<OSystem_SDL *>(g_system);
+
+	// A finger-up completes a press that started on the toggle. Process it
+	// regardless of the current finger position (the press started on the
+	// toggle): a short tap cycles the touch mode, a long press opens the
+	// rendered virtual keyboard (mirrors the iOS controller-icon long-press).
+	if (action == TouchControls::kActionUp) {
+		if (!_touchTogglePressed) {
+			return false;
+		}
+		_touchTogglePressed = false;
+		uint32 held = g_system->getMillis() - _touchToggleDownTime;
+		if (held >= kTouchToggleLongPressMs) {
+			Common::Event ev;
+			ev.type = Common::EVENT_VIRTUAL_KEYBOARD;
+			addEvent(ev);
+		} else if (sdlSystem) {
+			sdlSystem->cycleTouchMode();
+		}
+		return true;
+	}
+
+	// Only act on finger-down for the remaining hit-test; intermediate motion is
+	// a harmless no-op while the press is tracked.
 	if (action != TouchControls::kActionDown) {
 		return false;
 	}
-	OSystem_SDL *sdlSystem = dynamic_cast<OSystem_SDL *>(g_system);
 	if (!sdlSystem || !sdlSystem->isTouchToggleVisible()) {
 		return false;
 	}
@@ -105,7 +126,9 @@ bool SdlEventSource::handleTouchToggle(int action, float normX, float normY) {
 	if (!sdlSystem->getTouchToggleRect(size.x, size.y).contains(x, y)) {
 		return false;
 	}
-	sdlSystem->cycleTouchMode();
+	// Start tracking the press; the action (cycle vs. vkeybd) is decided on up.
+	_touchToggleDownTime = g_system->getMillis();
+	_touchTogglePressed = true;
 	return true;
 }
 
