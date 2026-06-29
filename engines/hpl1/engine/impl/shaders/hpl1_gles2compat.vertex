@@ -1,0 +1,22 @@
+// HPL1 vertex-shader compatibility preamble — prepended by CGProgram.cpp
+// on the GLES2 path before each user-authored .vertex file. Replaces the
+// fixed-function `gl_Vertex`/`gl_Color`/etc. names with explicit attribute
+// declarations that map to cLowLevelGraphicsGLES's vertex layout.
+#define gl_Vertex _hpl1_pos
+#define gl_Color _hpl1_color
+#define gl_Normal _hpl1_normal
+#define gl_MultiTexCoord0 _hpl1_uv
+#define gl_MultiTexCoord1 _hpl1_tangent
+#if defined(GL_ES) || __VERSION__ < 130
+  attribute vec4 _hpl1_pos;
+  attribute vec4 _hpl1_color;
+  attribute vec3 _hpl1_normal;
+  attribute vec4 _hpl1_uv;
+  attribute vec4 _hpl1_tangent;
+#else
+  in vec4 _hpl1_pos;
+  in vec4 _hpl1_color;
+  in vec3 _hpl1_normal;
+  in vec4 _hpl1_uv;
+  in vec4 _hpl1_tangent;
+#endif
