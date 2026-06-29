@@ -20,8 +20,18 @@
  */
 
 // On-screen touch gamepad controls for the SDL backend (used by Emscripten).
-// Self-contained port of the Android on-screen gamepad (no JNI; synthetic
-// joystick events go through the generic event manager; missing asset is non-fatal).
+//
+// This mirrors the iOS GCVirtualController layout (see
+// backends/platform/ios7/ios7_gamepad_controller.mm): a configurable
+// directional input (analog left thumbstick or D-pad), the A/B/X/Y face
+// buttons and - in the full layout - a right thumbstick (camera look) plus
+// L1/R1 shoulder buttons. The layout, opacity and directional mode are taken
+// from the shared gamepad_controller_* ConfMan settings so the behaviour is
+// consistent with the iOS backend.
+//
+// Synthetic joystick events (buttons and analog axes) are pushed through the
+// generic event manager; the gamepad.svg asset is reused for the glyphs and a
+// missing asset is non-fatal.
 
 #ifndef BACKENDS_PLATFORM_SDL_TOUCHCONTROLS_H_
 #define BACKENDS_PLATFORM_SDL_TOUCHCONTROLS_H_
@@ -52,6 +62,15 @@ public:
 		kActionCancel = 3
 	};
 
+	// Directional input mode. The integer values intentionally match the iOS
+	// DirectionalInput enum (backends/platform/ios7/ios7_common.h) so the
+	// shared "gamepad_controller_directional_input" setting selects the same
+	// behaviour on both backends.
+	enum DirectionalInput {
+		kDirectionalInputThumbstick = 0,
+		kDirectionalInputDpad = 1
+	};
+
 	TouchControls();
 	~TouchControls();
 
@@ -78,6 +97,17 @@ private:
 
 	unsigned int _zombieCount;
 
+	// Layout / appearance, refreshed every frame from ConfMan (see
+	// refreshConfig()). They mirror the iOS GCVirtualController settings.
+	bool _minimalLayout;          // true -> directional + A/B/X/Y only
+	bool _directionalThumbstick;  // true -> left thumbstick, false -> D-pad
+	uint8 _baseAlpha;             // resting opacity (gamepad_controller_opacity)
+	void refreshConfig();
+
+	// Home (resting) centre of a control, in fixed-point screen pixels.
+	int homeX(int percent) const { return (int)_screen_width * percent / 100; }
+	int homeY(int percent) const { return (int)_screen_height * percent / 100; }
+
 	enum State {
 		kFunctionInactive = 0,
 		kFunctionActive = 1,
@@ -87,7 +117,9 @@ private:
 	struct Function {
 		virtual bool isInside(int, int) = 0;
 		virtual void touch(int, int, Action) = 0;
-		virtual void draw(uint8 alpha) = 0;
+		// baseAlpha: resting opacity of the glyph; hlAlpha: opacity of the
+		// pressed-state highlight (0 when not pressed / fully faded out).
+		virtual void draw(uint8 baseAlpha, uint8 hlAlpha) = 0;
 		virtual void resetState() {}
 
 		Function(const TouchControls *parent_) :
@@ -118,17 +150,21 @@ private:
 
 	enum FunctionId {
 		kFunctionNone = -1,
-		kFunctionLeft = 0,
-		kFunctionRight = 1,
-		kFunctionCenter = 2,
-		kFunctionCount = 3
+		kFunctionDirectional = 0, // left thumbstick or D-pad (always present)
+		kFunctionButtons     = 1, // A/B/X/Y face buttons (always present)
+		kFunctionRightStick  = 2, // right thumbstick / look (full layout only)
+		kFunctionShoulderL   = 3, // L1 shoulder (full layout only)
+		kFunctionShoulderR   = 4, // R1 shoulder (full layout only)
+		kFunctionCount       = 5
 	};
 	FunctionId getFunctionId(int x, int y);
+	bool isFunctionPresent(FunctionId id) const;
 
 	Function *_functions[kFunctionCount];
 
 	static void buttonDown(Common::JoystickButton jb);
 	static void buttonUp(Common::JoystickButton jb);
+	static void axisMotion(Common::JoystickAxis axis, int16 value);
 
 	/**
 	 * Draws a part of the joystick surface on the screen
@@ -143,41 +179,77 @@ private:
 
 
 	// Functions implementations
-	struct FunctionLeft : Function {
-		FunctionLeft(const TouchControls *parent) :
-			Function(parent), mask(0) {}
-		void resetState() override { mask = 0; }
+
+	// Directional input: analog left thumbstick (emits LEFT_STICK axes) or a
+	// 4-way D-pad (emits JOYSTICK_BUTTON_DPAD_*), selected at runtime by
+	// parent->_directionalThumbstick. The glyph (D-pad cell of gamepad.svg) is
+	// reused for both modes; in thumbstick mode the arrows light up to give
+	// directional feedback while analog axes are emitted.
+	struct FunctionDirectional : Function {
+		FunctionDirectional(const TouchControls *parent) :
+			Function(parent), mask(0), axisX(0), axisY(0) {}
+		void resetState() override { mask = 0; axisX = axisY = 0; }
 
 		bool isInside(int, int) override;
 		void touch(int, int, Action) override;
-		void draw(uint8 alpha) override;
+		void draw(uint8 baseAlpha, uint8 hlAlpha) override;
+
+		// Drawn glyph helpers (shared with FunctionRightStick via parent).
+		void drawStick(uint8 baseAlpha, uint8 hlAlpha, int cx, int cy, uint32 dirMask);
+
+		uint32 mask;     // last D-pad / display direction mask
+		int16 axisX, axisY;
+	private:
+		void touchDpad(int dX, int dY, Action action);
+		void touchThumb(int dX, int dY, Action action,
+				Common::JoystickAxis ax, Common::JoystickAxis ay);
+		void maskToDpadButtons(uint32 oldMask, uint32 newMask);
+		uint32 directionMask(int dX, int dY) const;
+	};
+
+	// Right thumbstick (full layout): emits RIGHT_STICK axes. Reuses the same
+	// stick glyph as the directional control.
+	struct FunctionRightStick : Function {
+		FunctionRightStick(const TouchControls *parent) :
+			Function(parent), mask(0), axisX(0), axisY(0) {}
+		void resetState() override { mask = 0; axisX = axisY = 0; }
+
+		bool isInside(int, int) override;
+		void touch(int, int, Action) override;
+		void draw(uint8 baseAlpha, uint8 hlAlpha) override;
 
 		uint32 mask;
-		void maskToLeftButtons(uint32 oldMask, uint32 newMask);
+		int16 axisX, axisY;
 	};
 
-	struct FunctionRight : Function {
-		FunctionRight(const TouchControls *parent) :
+	// A/B/X/Y face buttons, picked by direction from the cluster centre
+	// (unchanged behaviour from the original right-hand cluster).
+	struct FunctionButtons : Function {
+		FunctionButtons(const TouchControls *parent) :
 			Function(parent), button(0) {}
 		void resetState() override { button = 0; }
 
 		bool isInside(int, int) override;
 		void touch(int, int, Action) override;
-		void draw(uint8 alpha) override;
+		void draw(uint8 baseAlpha, uint8 hlAlpha) override;
 
 		uint32 button;
 	};
 
-	struct FunctionCenter : Function {
-		FunctionCenter(const TouchControls *parent) :
-			Function(parent), button(0) {}
-		void resetState() override { button = 0; }
+	// L1 / R1 shoulder buttons (full layout): fixed hotspots in the top
+	// corners. The glyph reuses the labelled circles of gamepad.svg.
+	struct FunctionShoulder : Function {
+		FunctionShoulder(const TouchControls *parent, Common::JoystickButton jb, bool right) :
+			Function(parent), _jb(jb), _right(right), pressed(false) {}
+		void resetState() override { pressed = false; }
 
 		bool isInside(int, int) override;
 		void touch(int, int, Action) override;
-		void draw(uint8 alpha) override;
+		void draw(uint8 baseAlpha, uint8 hlAlpha) override;
 
-		uint32 button;
+		Common::JoystickButton _jb;
+		bool _right;
+		bool pressed;
 	};
 };
 
