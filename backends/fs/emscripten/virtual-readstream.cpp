@@ -398,6 +398,10 @@ void VirtualReadStream::updateDownloadProgress(uint64 currentBytes, uint64 total
 	// Copy to overlay
 	int x = Std::max(0, (_graphicsManager->getOverlayWidth() - wRect) / 2); // Center horizontally
 	int y = Std::max(10, _graphicsManager->getOverlayHeight() - 2 * lRect); // Bottom with spacing equal to height (40px from bottom)
+	// A blocking download keeps the launcher event loop from repainting the
+	// overlay, so clear it first; otherwise a previous (completed) bar persists
+	// and the two stack up.
+	_graphicsManager->clearOverlay();
 	_graphicsManager->copyRectToOverlay(tempSurface.getPixels(), tempSurface.pitch, x, y, wRect, lRect);
 	_graphicsManager->updateScreen();
 

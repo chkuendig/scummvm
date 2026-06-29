@@ -900,7 +900,16 @@ bool OpenGLSdlGraphicsManager::setupMode(uint width, uint height) {
 		SDL_GL_SetAttribute(SDL_GL_RED_SIZE, it->rBits());
 		SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE, it->gBits());
 		SDL_GL_SetAttribute(SDL_GL_BLUE_SIZE, it->bBits());
+#ifdef EMSCRIPTEN
+		// Request an opaque WebGL drawing buffer (no alpha channel). The browser
+		// composites the premultiplied-alpha canvas over the page using the
+		// buffer's alpha; semi-transparent overlay/OSD draws would otherwise
+		// lower that alpha and let the HTML page bleed through (orange tint /
+		// garbage behind the progress bar and OSD messages).
+		SDL_GL_SetAttribute(SDL_GL_ALPHA_SIZE, 0);
+#else
 		SDL_GL_SetAttribute(SDL_GL_ALPHA_SIZE, it->aBits());
+#endif
 		if (_glContextType != OpenGL::kContextGLES) {
 			// Always request 24-bits depth buffer and stencil buffer even in 2D to avoid extraneous context switches
 			SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
