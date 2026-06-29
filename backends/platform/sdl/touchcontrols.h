@@ -155,7 +155,8 @@ private:
 		kFunctionRightStick  = 2, // right thumbstick / look (full layout only)
 		kFunctionShoulderL   = 3, // L1 shoulder (full layout only)
 		kFunctionShoulderR   = 4, // R1 shoulder (full layout only)
-		kFunctionCount       = 5
+		kFunctionStart       = 5, // Start/menu button (always present)
+		kFunctionCount       = 6
 	};
 	FunctionId getFunctionId(int x, int y);
 	bool isFunctionPresent(FunctionId id) const;
@@ -249,6 +250,24 @@ private:
 
 		Common::JoystickButton _jb;
 		bool _right;
+		bool pressed;
+	};
+
+	// Start / menu button: a small fixed hotspot at the top centre, present in
+	// both the full and minimal layouts. Emits JOYSTICK_BUTTON_START (mapped to
+	// Esc / menu / skip by the engine keymaps). Unlike the iOS GCVirtualController
+	// - which cannot expose Start - the custom SDL pad draws this itself, giving
+	// touch users a one-tap menu/skip button. The glyph reuses a labelled circle
+	// of gamepad.svg (the menu "lens" of column 2).
+	struct FunctionStart : Function {
+		FunctionStart(const TouchControls *parent) :
+			Function(parent), pressed(false) {}
+		void resetState() override { pressed = false; }
+
+		bool isInside(int, int) override;
+		void touch(int, int, Action) override;
+		void draw(uint8 baseAlpha, uint8 hlAlpha) override;
+
 		bool pressed;
 	};
 };

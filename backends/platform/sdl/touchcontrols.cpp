@@ -63,6 +63,14 @@
 // Hit radius around a shoulder glyph (SVG pixels).
 #define SHOULDER_HIT        40
 
+// Start/menu glyph reuses the lower labelled circle of column 2 (the silver
+// menu "lens"), a 48x48 region centred on the glyph at SVG (320, 100).
+#define START_GLYPH         48
+#define START_CLIP          296, 76, 344, 124
+// Hit radius around the Start glyph (SVG pixels); kept smaller/subtler than the
+// face buttons and shoulders.
+#define START_HIT           30
+
 // Analog stick geometry (SVG pixels). The base circle is 62; the usable
 // radius maps |offset| == STICK_RADIUS to a full-scale axis value.
 #define STICK_RADIUS        50
@@ -88,6 +96,9 @@
 #define SHOULDER_L_X_PCT      7
 #define SHOULDER_R_X_PCT     93
 #define SHOULDER_Y_PCT       14
+// Start/menu button: top centre, present in both layouts.
+#define START_HOME_X_PCT     50
+#define START_HOME_Y_PCT      7
 
 // Horizontal regions used to assign a finger to a control when it is not on a
 // button/shoulder hotspot. Left region -> directional, right region -> A/B/X/Y,
@@ -130,6 +141,7 @@ TouchControls::TouchControls() :
 	_functions[kFunctionRightStick]  = new FunctionRightStick(this);
 	_functions[kFunctionShoulderL]   = new FunctionShoulder(this, Common::JOYSTICK_BUTTON_LEFT_SHOULDER, false);
 	_functions[kFunctionShoulderR]   = new FunctionShoulder(this, Common::JOYSTICK_BUTTON_RIGHT_SHOULDER, true);
+	_functions[kFunctionStart]       = new FunctionStart(this);
 }
 
 void TouchControls::init(float scale) {
@@ -207,6 +219,7 @@ bool TouchControls::isFunctionPresent(FunctionId id) const {
 	switch (id) {
 	case kFunctionDirectional:
 	case kFunctionButtons:
+	case kFunctionStart:
 		return true;
 	case kFunctionRightStick:
 	case kFunctionShoulderL:
@@ -234,6 +247,11 @@ TouchControls::FunctionId TouchControls::getFunctionId(int x, int y) {
 
 	// Priority: button/shoulder hotspots first, then the horizontal regions
 	// (directional, then right thumbstick, then A/B/X/Y).
+	// The Start hotspot (top centre) is present in both layouts, so it is
+	// tested first, before the full-layout-only shoulder hotspots.
+	if (_functions[kFunctionStart]->isInside(x, y)) {
+		return kFunctionStart;
+	}
 	if (!_minimalLayout) {
 		if (_functions[kFunctionShoulderL]->isInside(x, y)) {
 			return kFunctionShoulderL;
@@ -819,6 +837,44 @@ void TouchControls::FunctionShoulder::draw(uint8 baseAlpha, uint8 hlAlpha) {
 	int cy = parent->homeY(SHOULDER_Y_PCT);
 
 	Common::Rect clip = _right ? Common::Rect(SHOULDER_R_CLIP) : Common::Rect(SHOULDER_L_CLIP);
+	parent->drawSurface(baseAlpha, cx, cy, -clip.width() / 2, -clip.height() / 2, clip);
+	if (hlAlpha) {
+		// Brighten the glyph while pressed.
+		parent->drawSurface(hlAlpha, cx, cy, -clip.width() / 2, -clip.height() / 2, clip);
+	}
+}
+
+// ===========================================================================
+// Start / menu button (top centre, both layouts)
+// ===========================================================================
+
+bool TouchControls::FunctionStart::isInside(int x, int y) {
+	int cx = parent->homeX(START_HOME_X_PCT);
+	int cy = parent->homeY(START_HOME_Y_PCT);
+	int dX = x - cx;
+	int dY = y - cy;
+	unsigned int sqNorm = (unsigned int)(dX * dX) + (unsigned int)(dY * dY);
+	return sqNorm <= FUNC_SVG_SQ_SCALED(START_HIT);
+}
+
+void TouchControls::FunctionStart::touch(int dX, int dY, Action action) {
+	// Digital, like the face buttons: pressed while a finger is down.
+	bool wantPressed = (action != kActionCancel && action != kActionUp);
+	if (wantPressed != pressed) {
+		pressed = wantPressed;
+		if (pressed) {
+			buttonDown(Common::JOYSTICK_BUTTON_START);
+		} else {
+			buttonUp(Common::JOYSTICK_BUTTON_START);
+		}
+	}
+}
+
+void TouchControls::FunctionStart::draw(uint8 baseAlpha, uint8 hlAlpha) {
+	int cx = parent->homeX(START_HOME_X_PCT);
+	int cy = parent->homeY(START_HOME_Y_PCT);
+
+	Common::Rect clip(START_CLIP);
 	parent->drawSurface(baseAlpha, cx, cy, -clip.width() / 2, -clip.height() / 2, clip);
 	if (hlAlpha) {
 		// Brighten the glyph while pressed.
