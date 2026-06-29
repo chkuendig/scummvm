@@ -3773,6 +3773,7 @@ if test -n "$_host"; then
 			;;
 		wasm*-emscripten)
 			_backend="emscripten"
+			_vkeybd=yes # No hardware keyboard in the browser; use the rendered virtual keyboard
 			_enet=no    # Disable ENet (no sockets in the browser)
 			_sdlnet=no  # Disable SDL_Net (no sockets in the browser)
 			_libcurl=no # Emscripten backend uses Fetch API not libcurl
