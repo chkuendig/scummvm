@@ -188,6 +188,21 @@ protected:
 	TouchMode _touchMode;
 	bool _touchUiReady = false;
 
+	// The touch presets are keyed per context (GUI/menus, 2D game, 3D game).
+	// applyTouchSettings() re-reads the preset on every overlay show/hide and
+	// screen change; a manual cycleTouchMode() choice is remembered here so it
+	// survives those re-applications until the context itself changes (otherwise
+	// the user's on-screen gamepad would silently revert to "mouse").
+	enum TouchContext {
+		kTouchContextMenus = 0,
+		kTouchContext2d = 1,
+		kTouchContext3d = 2
+	};
+	TouchContext currentTouchContext();
+	bool _touchModeManual = false;
+	TouchMode _touchModeManualValue = TOUCH_MODE_MOUSE;
+	TouchContext _touchModeManualContext = kTouchContextMenus;
+
 #if defined(USE_OPENGL_GAME) || defined(USE_OPENGL_SHADERS)
 	// Graphics capabilities
 	void detectOpenGLFeaturesSupport();

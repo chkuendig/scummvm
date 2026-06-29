@@ -276,22 +276,37 @@ bool OSystem_SDL::hasTouchscreen() const {
 #endif
 }
 
+OSystem_SDL::TouchContext OSystem_SDL::currentTouchContext() {
+	if (isOverlayVisible()) {
+		return kTouchContextMenus;
+	}
+	bool is3d = false;
+#ifdef USE_OPENGL
+	// Only the OpenGL graphics manager can render 3D games; SurfaceSDL is
+	// always 2D, so this stays guarded behind the OpenGL-specific API.
+	OpenGLSdlGraphicsManager *glManager = dynamic_cast<OpenGLSdlGraphicsManager *>(_graphicsManager);
+	if (glManager) {
+		is3d = glManager->isRendering3D();
+	}
+#endif
+	return is3d ? kTouchContext3d : kTouchContext2d;
+}
+
 void OSystem_SDL::applyTouchSettings() {
 	const TouchMode oldMode = _touchMode;
+	const TouchContext context = currentTouchContext();
+
 	Common::String mode;
-	if (isOverlayVisible()) {
+	switch (context) {
+	case kTouchContextMenus:
 		mode = ConfMan.get("touch_mode_menus");
-	} else {
-		bool is3d = false;
-#ifdef USE_OPENGL
-		// Only the OpenGL graphics manager can render 3D games; SurfaceSDL is
-		// always 2D, so this stays guarded behind the OpenGL-specific API.
-		OpenGLSdlGraphicsManager *glManager = dynamic_cast<OpenGLSdlGraphicsManager *>(_graphicsManager);
-		if (glManager) {
-			is3d = glManager->isRendering3D();
-		}
-#endif
-		mode = is3d ? ConfMan.get("touch_mode_3d_games") : ConfMan.get("touch_mode_2d_games");
+		break;
+	case kTouchContext3d:
+		mode = ConfMan.get("touch_mode_3d_games");
+		break;
+	default:
+		mode = ConfMan.get("touch_mode_2d_games");
+		break;
 	}
 
 	if (mode == "touchpad") {
@@ -300,6 +315,17 @@ void OSystem_SDL::applyTouchSettings() {
 		_touchMode = TOUCH_MODE_GAMEPAD;
 	} else {
 		_touchMode = TOUCH_MODE_MOUSE;
+	}
+
+	// A manual cycleTouchMode() choice overrides the per-context preset until the
+	// context itself changes. Without this, the frequent re-applications (every
+	// overlay show/hide and screen change) would silently revert the user's
+	// on-screen gamepad back to the "mouse" menus preset, so the D-pad would stop
+	// emitting events and could no longer navigate the launcher or the GMM.
+	if (_touchModeManual && _touchModeManualContext == context) {
+		_touchMode = _touchModeManualValue;
+	} else {
+		_touchModeManual = false;
 	}
 
 	// The on-screen gamepad is only useful as a fallback: if a physical
@@ -319,6 +345,13 @@ void OSystem_SDL::applyTouchSettings() {
 void OSystem_SDL::cycleTouchMode() {
 	const TouchMode oldMode = _touchMode;
 	_touchMode = (TouchMode)((_touchMode + 1) % TOUCH_MODE_MAX);
+
+	// Remember this manual choice so applyTouchSettings() keeps it for the current
+	// context instead of reverting to the per-context preset on the next overlay
+	// show/hide or screen change (see applyTouchSettings).
+	_touchModeManual = true;
+	_touchModeManualValue = _touchMode;
+	_touchModeManualContext = currentTouchContext();
 
 	// Leaving the on-screen gamepad: release any held virtual buttons.
 	if (oldMode == TOUCH_MODE_GAMEPAD && _touchMode != TOUCH_MODE_GAMEPAD) {
