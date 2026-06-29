@@ -651,8 +651,15 @@ void TouchControls::drawSurface(uint8 alpha, int x, int y, int offX, int offY, c
 	// math (e.g. -clip.width()/2) keeps centring the scaled glyph.
 	int w = clip_.width() * sizePct / 100;
 	int h = clip_.height() * sizePct / 100;
-	int dx = SCALED_PIXELS(x) + SVG_PIXELS(offX) * sizePct / 100;
-	int dy = SCALED_PIXELS(y) + SVG_PIXELS(offY) * sizePct / 100;
+	// The SVG-px offsets are usually negative (centring, e.g. -clip.width()/2).
+	// _scale is unsigned, so the offset must be scaled with explicit signed
+	// arithmetic: a negative value multiplied by the unsigned _scale wraps to a
+	// huge positive number, and dividing that here (rather than letting it cancel
+	// in a later add) would push the glyph millions of pixels off-screen.
+	int offXpx = SVG_UNSCALED(offX) * (int)_scale / SCALE_FACTOR_FXP;
+	int offYpx = SVG_UNSCALED(offY) * (int)_scale / SCALE_FACTOR_FXP;
+	int dx = SCALED_PIXELS(x) + offXpx * sizePct / 100;
+	int dy = SCALED_PIXELS(y) + offYpx * sizePct / 100;
 	_drawer->touchControlDraw(alpha, dx, dy, w, h, clip_);
 }
 
