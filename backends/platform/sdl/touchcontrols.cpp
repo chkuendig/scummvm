@@ -20,6 +20,7 @@
  */
 
 #include "backends/platform/sdl/touchcontrols.h"
+#include "backends/platform/sdl/sdl.h"
 
 #include "common/file.h"
 #include "common/system.h"
@@ -337,7 +338,7 @@ void TouchControls::buttonDown(Common::JoystickButton jb) {
 	Common::Event ev;
 	ev.type = Common::EVENT_JOYBUTTON_DOWN;
 	ev.joystick.button = jb;
-	g_system->getEventManager()->pushEvent(ev);
+	dynamic_cast<OSystem_SDL *>(g_system)->pushEvent(ev);
 }
 
 void TouchControls::buttonUp(Common::JoystickButton jb) {
@@ -348,7 +349,7 @@ void TouchControls::buttonUp(Common::JoystickButton jb) {
 	Common::Event ev;
 	ev.type = Common::EVENT_JOYBUTTON_UP;
 	ev.joystick.button = jb;
-	g_system->getEventManager()->pushEvent(ev);
+	dynamic_cast<OSystem_SDL *>(g_system)->pushEvent(ev);
 }
 
 void TouchControls::drawSurface(uint8 alpha, int x, int y, int offX, int offY, const Common::Rect &clip) const {

@@ -26,6 +26,7 @@
 #include "backends/graphics/sdl/sdl-graphics.h"
 
 #include "common/events.h"
+#include "common/queue.h"
 
 // Type names which changed between SDL 1.2 and SDL 2.
 #if !SDL_VERSION_ATLEAST(2, 0, 0)
@@ -61,7 +62,17 @@ public:
 	/** Sets whether a game is currently running */
 	void setEngineRunning(bool value);
 
+	/**
+	 * Enqueue a synthetic event (e.g. from the on-screen touch controls) so it
+	 * is returned by pollEvent() and routed through the keymapper like any other
+	 * input event.
+	 */
+	void addEvent(const Common::Event &ev) { _eventQueue.push(ev); }
+
 protected:
+	/** Queue of synthetic events to be returned by pollEvent(). */
+	Common::Queue<Common::Event> _eventQueue;
+
 	/** Scroll lock state - since SDL doesn't track it */
 	bool _scrollLock;
 
