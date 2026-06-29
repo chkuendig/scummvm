@@ -117,7 +117,6 @@ Common::Array<Common::Keymap *> Hpl1MetaEngine::initKeymaps(const char *target) 
 	act = createKeyBoardAction("LEAN_RIGHT", _("Lean right"), "e", Common::KEYCODE_e);
 	movement->addAction(act);
 	act = createKeyBoardAction("RUN", _("Run"), "LSHIFT", Common::KEYCODE_LSHIFT);
-	act->addDefaultInputMapping("JOY_LEFT_STICK");
 	movement->addAction(act);
 	act = createKeyBoardAction("JUMP", _("Jump"), "SPACE", Common::KEYCODE_SPACE);
 	act->addDefaultInputMapping("JOY_X");
@@ -133,13 +132,10 @@ Common::Array<Common::Keymap *> Hpl1MetaEngine::initKeymaps(const char *target) 
 
 	Keymap *actions = new Keymap(Keymap::kKeymapTypeGame, "HPL1_ACTIONS", "Actions");
 	act = createKeyBoardAction("INTERACTMODE", _("Interact mode"), "r", Common::KEYCODE_r);
-	act->addDefaultInputMapping("JOY_LEFT_SHOULDER");
 	actions->addAction(act);
 	act = createMouseAction("LOOK_MODE", _("Look mode"), "MOUSE_MIDDLE", Common::EVENT_MBUTTONDOWN);
-	act->addDefaultInputMapping("JOY_RIGHT_STICK");
 	actions->addAction(act);
 	act = createKeyBoardAction("HOLSTER", _("Holster"), "x", Common::KEYCODE_x);
-	act->addDefaultInputMapping("JOY_RIGHT_SHOULDER");
 	actions->addAction(act);
 	act = createMouseAction("EXAMINE", _("Examine"), "MOUSE_LEFT", Common::EVENT_LBUTTONDOWN);
 	act->addDefaultInputMapping("JOY_A");
@@ -150,12 +146,13 @@ Common::Array<Common::Keymap *> Hpl1MetaEngine::initKeymaps(const char *target) 
 
 	Keymap *misc = new Keymap(Keymap::kKeymapTypeGame, "HPL1_MISC", "Misc");
 	act = createKeyBoardAction("INVENTORY", _("Inventory"), "TAB", Common::KEYCODE_TAB);
-	act->addDefaultInputMapping("JOY_BACK");
+	act->addDefaultInputMapping("JOY_RIGHT_SHOULDER");
 	misc->addAction(act);
 	act = createKeyBoardAction("NOTEBOOK", _("Notebook"), "n", Common::KEYCODE_n);
 	misc->addAction(act);
 	misc->addAction(createKeyBoardAction("PERSONAL_NOTES", _("Personal notes"), "p", Common::KEYCODE_p));
 	act = createKeyBoardAction("FLASHLIGHT", _("Flashlight"), "f", Common::KEYCODE_f);
+	act->addDefaultInputMapping("JOY_LEFT_SHOULDER");
 	misc->addAction(act);
 	misc->addAction(createKeyBoardAction("GLOWSTICK", _("Glowstick"), "g", Common::KEYCODE_f));
 	// Esc opens the in-game menu and skips the intro/cutscenes; it is read by the
