@@ -1080,6 +1080,7 @@ SdlGraphicsManager *OSystem_SDL::createGraphicsManager(SdlEventSource *sdlEventS
 		return new SurfaceSdlGraphicsManager(sdlEventSource, window);
 #ifdef USE_OPENGL
 	case GraphicsManagerOpenGL:
+#if defined(USE_OPENGL_GAME) || defined(USE_OPENGL_SHADERS)
 		if(_oglType > OpenGL::kContextNone) {
 			debug(1, "creating OpenGL graphics manager");
 			return new OpenGLSdlGraphicsManager(sdlEventSource, window);
@@ -1087,6 +1088,12 @@ SdlGraphicsManager *OSystem_SDL::createGraphicsManager(SdlEventSource *sdlEventS
 			warning("OpenGL graphics manager requested, but OpenGL is not supported!");
 			return nullptr;
 		}
+#else
+		// _oglType is only tracked when OpenGL game/shader support is built in;
+		// otherwise (e.g. an OpenGL-only engine like HPL1) just create it.
+		debug(1, "creating OpenGL graphics manager");
+		return new OpenGLSdlGraphicsManager(sdlEventSource, window);
+#endif
 #endif
 	default:
 		assert(0);
