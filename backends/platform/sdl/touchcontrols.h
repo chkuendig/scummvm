@@ -21,22 +21,29 @@
 
 // On-screen touch gamepad controls for the SDL backend (used by Emscripten).
 //
-// This mirrors the iOS GCVirtualController layout (see
-// backends/platform/ios7/ios7_gamepad_controller.mm): a configurable
-// directional input (analog left thumbstick or D-pad), the A/B/X/Y face
-// buttons and - in the full layout - a right thumbstick (camera look) plus
-// L1/R1 shoulder buttons. The layout, opacity and directional mode are taken
-// from the shared gamepad_controller_* ConfMan settings so the behaviour is
-// consistent with the iOS backend.
+// This implements the standard AAA touch-FPS layout in landscape:
+//   - a FLOATING left thumbstick (move) in the bottom-left, recentred under the
+//     finger and rendered as a translucent base ring + a filled knob; it emits
+//     the LEFT_STICK analog axes;
+//   - DRAG-TO-LOOK on the right half of the screen (the camera): an invisible
+//     region whose finger drag is turned into relative-mouse motion (mirrors the
+//     existing touchpad relmouse scaling), and a short tap there is turned into a
+//     left click;
+//   - a MULTI-TOUCH A/B/X/Y diamond in the bottom-right (each button its own
+//     independent hotspot so several can be held at once);
+//   - L1/R1 shoulders in the top corners (labelled pills) and a small Start
+//     button at the top centre.
 //
-// Synthetic joystick events (buttons and analog axes) are pushed through the
-// generic event manager; the gamepad.svg asset is reused for the glyphs and a
-// missing asset is non-fatal.
+// Synthetic joystick / mouse events are pushed through the generic event
+// manager; the gamepad.svg asset is reused for the face-button and Start glyphs
+// (a missing asset is non-fatal), while the thumbstick ring/knob and the L1/R1
+// pills are drawn from primitives into spare regions of the same surface.
 
 #ifndef BACKENDS_PLATFORM_SDL_TOUCHCONTROLS_H_
 #define BACKENDS_PLATFORM_SDL_TOUCHCONTROLS_H_
 
 #include "common/events.h"
+#include "common/rect.h"
 
 namespace Graphics {
 class ManagedSurface;
@@ -60,15 +67,6 @@ public:
 		kActionMove = 1,
 		kActionUp = 2,
 		kActionCancel = 3
-	};
-
-	// Directional input mode. The integer values intentionally match the iOS
-	// DirectionalInput enum (backends/platform/ios7/ios7_common.h) so the
-	// shared "gamepad_controller_directional_input" setting selects the same
-	// behaviour on both backends.
-	enum DirectionalInput {
-		kDirectionalInputThumbstick = 0,
-		kDirectionalInputDpad = 1
 	};
 
 	TouchControls();
@@ -97,12 +95,14 @@ private:
 
 	unsigned int _zombieCount;
 
-	// Layout / appearance, refreshed every frame from ConfMan (see
-	// refreshConfig()). They mirror the iOS GCVirtualController settings.
-	bool _minimalLayout;          // true -> directional + A/B/X/Y only
-	bool _directionalThumbstick;  // true -> left thumbstick, false -> D-pad
-	uint8 _baseAlpha;             // resting opacity (gamepad_controller_opacity)
+	// Resting opacity of the glyphs (gamepad_controller_opacity), refreshed
+	// every frame from ConfMan (see refreshConfig()).
+	uint8 _baseAlpha;
 	void refreshConfig();
+
+	// Draws the thumbstick ring/knob and the L1/R1 pills from primitives into
+	// the spare bottom row of the gamepad surface (called once after load).
+	void renderPrimitives();
 
 	// Home (resting) centre of a control, in fixed-point screen pixels.
 	int homeX(int percent) const { return (int)_screen_width * percent / 100; }
@@ -149,23 +149,29 @@ private:
 	Function *getZombieFunctionFromPos(int x, int y);
 
 	enum FunctionId {
-		kFunctionNone = -1,
-		kFunctionDirectional = 0, // left thumbstick or D-pad (always present)
-		kFunctionButtons     = 1, // A/B/X/Y face buttons (always present)
-		kFunctionRightStick  = 2, // right thumbstick / look (full layout only)
-		kFunctionShoulderL   = 3, // L1 shoulder (full layout only)
-		kFunctionShoulderR   = 4, // R1 shoulder (full layout only)
-		kFunctionStart       = 5, // Start/menu button (always present)
-		kFunctionCount       = 6
+		kFunctionNone      = -1,
+		kFunctionThumb     = 0, // floating left thumbstick (LEFT_STICK axes)
+		kFunctionButtonY   = 1, // A/B/X/Y diamond (independent hotspots)
+		kFunctionButtonB   = 2,
+		kFunctionButtonA   = 3,
+		kFunctionButtonX   = 4,
+		kFunctionShoulderL = 5, // L1 shoulder (top-left)
+		kFunctionShoulderR = 6, // R1 shoulder (top-right)
+		kFunctionStart     = 7, // Start/menu button (top centre)
+		kFunctionLook      = 8, // drag-to-look (right half, invisible)
+		kFunctionCount     = 9
 	};
 	FunctionId getFunctionId(int x, int y);
-	bool isFunctionPresent(FunctionId id) const;
 
 	Function *_functions[kFunctionCount];
 
 	static void buttonDown(Common::JoystickButton jb);
 	static void buttonUp(Common::JoystickButton jb);
 	static void axisMotion(Common::JoystickAxis axis, int16 value);
+	// Relative-mouse motion for drag-to-look (relX/relY in window pixels).
+	static void mouseRelative(int relX, int relY);
+	// Synthetic left click at the current cursor position (tap-to-click).
+	static void mouseClick();
 
 	/**
 	 * Draws a part of the joystick surface on the screen
@@ -181,64 +187,46 @@ private:
 
 	// Functions implementations
 
-	// Directional input: analog left thumbstick (emits LEFT_STICK axes) or a
-	// 4-way D-pad (emits JOYSTICK_BUTTON_DPAD_*), selected at runtime by
-	// parent->_directionalThumbstick. The glyph (D-pad cell of gamepad.svg) is
-	// reused for both modes; in thumbstick mode the arrows light up to give
-	// directional feedback while analog axes are emitted.
-	struct FunctionDirectional : Function {
-		FunctionDirectional(const TouchControls *parent) :
-			Function(parent), mask(0), axisX(0), axisY(0) {}
-		void resetState() override { mask = 0; axisX = axisY = 0; }
+	// Floating left thumbstick: recentres under the finger and emits the
+	// LEFT_STICK analog axes. Rendered as a translucent base ring + a filled
+	// knob that follows the finger (clamped to the stick radius).
+	struct FunctionThumb : Function {
+		FunctionThumb(const TouchControls *parent) :
+			Function(parent), axisX(0), axisY(0), knobX(0), knobY(0) {}
+		void resetState() override { axisX = axisY = 0; knobX = knobY = 0; }
 
 		bool isInside(int, int) override;
 		void touch(int, int, Action) override;
 		void draw(uint8 baseAlpha, uint8 hlAlpha) override;
 
-		// Drawn glyph helpers (shared with FunctionRightStick via parent).
-		void drawStick(uint8 baseAlpha, uint8 hlAlpha, int cx, int cy, uint32 dirMask);
-
-		uint32 mask;     // last D-pad / display direction mask
-		int16 axisX, axisY;
-	private:
-		void touchDpad(int dX, int dY, Action action);
-		void touchThumb(int dX, int dY, Action action,
-				Common::JoystickAxis ax, Common::JoystickAxis ay);
-		void maskToDpadButtons(uint32 oldMask, uint32 newMask);
-		uint32 directionMask(int dX, int dY) const;
+		int16 axisX, axisY; // last emitted axis values
+		int knobX, knobY;   // knob offset from centre (fixed-point px, clamped)
 	};
 
-	// Right thumbstick (full layout): emits RIGHT_STICK axes. Reuses the same
-	// stick glyph as the directional control.
-	struct FunctionRightStick : Function {
-		FunctionRightStick(const TouchControls *parent) :
-			Function(parent), mask(0), axisX(0), axisY(0) {}
-		void resetState() override { mask = 0; axisX = axisY = 0; }
+	// One face button (Y/B/A/X) of the bottom-right diamond. Each button is its
+	// own independent hotspot so several can be held simultaneously.
+	struct FunctionButton : Function {
+		FunctionButton(const TouchControls *parent, Common::JoystickButton jb,
+				int dxSvg, int dySvg, const Common::Rect &rest, const Common::Rect &hl) :
+			Function(parent), _jb(jb), _dxSvg(dxSvg), _dySvg(dySvg),
+			_restClip(rest), _hlClip(hl), pressed(false) {}
+		void resetState() override { pressed = false; }
+
+		// Centre of this button in fixed-point screen pixels.
+		void center(int &cx, int &cy) const;
 
 		bool isInside(int, int) override;
 		void touch(int, int, Action) override;
 		void draw(uint8 baseAlpha, uint8 hlAlpha) override;
 
-		uint32 mask;
-		int16 axisX, axisY;
+		Common::JoystickButton _jb;
+		int _dxSvg, _dySvg;          // diamond offset from cluster centre (SVG px)
+		Common::Rect _restClip, _hlClip;
+		bool pressed;
 	};
 
-	// A/B/X/Y face buttons, picked by direction from the cluster centre
-	// (unchanged behaviour from the original right-hand cluster).
-	struct FunctionButtons : Function {
-		FunctionButtons(const TouchControls *parent) :
-			Function(parent), button(0) {}
-		void resetState() override { button = 0; }
-
-		bool isInside(int, int) override;
-		void touch(int, int, Action) override;
-		void draw(uint8 baseAlpha, uint8 hlAlpha) override;
-
-		uint32 button;
-	};
-
-	// L1 / R1 shoulder buttons (full layout): fixed hotspots in the top
-	// corners. The glyph reuses the labelled circles of gamepad.svg.
+	// L1 / R1 shoulder buttons: fixed hotspots in the top corners, drawn as
+	// labelled pills.
 	struct FunctionShoulder : Function {
 		FunctionShoulder(const TouchControls *parent, Common::JoystickButton jb, bool right) :
 			Function(parent), _jb(jb), _right(right), pressed(false) {}
@@ -253,12 +241,8 @@ private:
 		bool pressed;
 	};
 
-	// Start / menu button: a small fixed hotspot at the top centre, present in
-	// both the full and minimal layouts. Emits JOYSTICK_BUTTON_START (mapped to
-	// Esc / menu / skip by the engine keymaps). Unlike the iOS GCVirtualController
-	// - which cannot expose Start - the custom SDL pad draws this itself, giving
-	// touch users a one-tap menu/skip button. The glyph reuses a labelled circle
-	// of gamepad.svg (the menu "lens" of column 2).
+	// Start / menu button: a small fixed hotspot at the top centre. Emits
+	// JOYSTICK_BUTTON_START (mapped to Esc / menu / skip by the engine keymaps).
 	struct FunctionStart : Function {
 		FunctionStart(const TouchControls *parent) :
 			Function(parent), pressed(false) {}
@@ -269,6 +253,23 @@ private:
 		void draw(uint8 baseAlpha, uint8 hlAlpha) override;
 
 		bool pressed;
+	};
+
+	// Drag-to-look: the right half of the screen, excluding the button/shoulder
+	// hotspots. Invisible (no widget). A drag becomes relative-mouse motion (the
+	// camera); a short tap becomes a left click.
+	struct FunctionLook : Function {
+		FunctionLook(const TouchControls *parent) :
+			Function(parent), prevX(0), prevY(0), hiresX(0), hiresY(0), maxTravel(0) {}
+		void resetState() override { prevX = prevY = 0; hiresX = hiresY = 0; maxTravel = 0; }
+
+		bool isInside(int, int) override { return false; } // no widget, no zombie reuse
+		void touch(int, int, Action) override;
+		void draw(uint8, uint8) override {}
+
+		int prevX, prevY;     // previous finger position (fixed-point px)
+		float hiresX, hiresY; // sub-pixel relmouse accumulator
+		int maxTravel;        // max travel from start (window px), for tap detection
 	};
 };
 

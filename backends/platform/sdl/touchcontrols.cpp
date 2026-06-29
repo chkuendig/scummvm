@@ -27,84 +27,101 @@
 #include "common/system.h"
 #include "common/textconsole.h"
 #include "common/util.h"
+#include "graphics/fontman.h"
+#include "graphics/font.h"
 #include "graphics/managed_surface.h"
 #include "graphics/svg.h"
+
+#include <math.h>
 
 // ---------------------------------------------------------------------------
 // gamepad.svg sprite-sheet layout (in SVG pixels, 384x256, three 128x128
 // columns each with a "resting" row and a "pressed" highlight row):
-//   col 0 row 0 (0,0)     : D-pad base (circle + grey arrows)
-//   col 0 row 1 (0,128)   : D-pad pressed arrows (white)
+//   col 0 row 0 (0,0)     : D-pad base (unused by this layout)
+//   col 0 row 1 (0,128)   : D-pad pressed arrows (unused)
 //   col 1 row 0 (128,0)   : A/B/X/Y resting cluster
 //   col 1 row 1 (128,128) : A/B/X/Y pressed highlights
-//   col 2 row 0 (256,0)   : labelled circles (reused for shoulder glyphs)
+//   col 2 row 0 (256,0)   : labelled circles (the menu "lens" reused for Start)
 //   col 2 row 1 (256,128) : (system highlights, unused here)
+//
+// A spare row is appended below the 384x256 sheet (SVG y 256..384) into which
+// the thumbstick ring + knob and the L1/R1 pills are drawn from primitives at
+// load time (see renderPrimitives()).
 // ---------------------------------------------------------------------------
 #define SVG_WIDTH          384
 #define SVG_HEIGHT         256
+// Total height of the backing surface: the sheet plus the spare primitives row.
+#define SVG_FULL_HEIGHT    384
 #define BG_WIDTH           128
 #define BG_HEIGHT          128
-#define ARROW_DEAD          21
-#define ARROW_WIDTH         64
-#define ARROW_HEIGHT        64
-#define ARROW_HL_TOP       128
-#define BUTTON_DEAD         12
-#define BUTTON_END          64
 #define BUTTON_WIDTH        64
 #define BUTTON_HEIGHT       64
-#define BUTTON_HL_LEFT     128
-#define BUTTON_HL_TOP      128
 
-// Shoulder glyphs are reused from the labelled circles of column 2 (the "LS"
-// and "RS" circles), each a 48x48 region centred on its label.
-#define SHOULDER_GLYPH      48
-#define SHOULDER_L_CLIP     260, 40, 308, 88
-#define SHOULDER_R_CLIP     332, 40, 380, 88
-// Hit radius around a shoulder glyph (SVG pixels).
-#define SHOULDER_HIT        40
+// A/B/X/Y resting glyph crops from the cluster (col 1 row 0), one per button.
+#define ABXY_REST_Y         160,   0, 224,  64
+#define ABXY_REST_B         192,  32, 256,  96
+#define ABXY_REST_A         160,  64, 224, 128
+#define ABXY_REST_X         128,  32, 192,  96
+// A/B/X/Y pressed-highlight glyphs (col 1 row 1).
+#define ABXY_HL_Y           128, 128, 192, 192
+#define ABXY_HL_B           192, 128, 256, 192
+#define ABXY_HL_A           128, 192, 192, 256
+#define ABXY_HL_X           192, 192, 256, 256
+
+// Spacing of the diamond buttons from the cluster centre (SVG px) and the hit
+// radius around each (SVG px). Spread wider than the natural 32px glyph spacing
+// so the four hotspots do not overlap (independent multi-touch presses).
+#define ABXY_SPACING        44
+#define ABXY_HIT            30
 
 // Start/menu glyph reuses the lower labelled circle of column 2 (the silver
 // menu "lens"), a 48x48 region centred on the glyph at SVG (320, 100).
-#define START_GLYPH         48
 #define START_CLIP          296, 76, 344, 124
-// Hit radius around the Start glyph (SVG pixels); kept smaller/subtler than the
-// face buttons and shoulders.
 #define START_HIT           30
 
-// Analog stick geometry (SVG pixels). The base circle is 62; the usable
-// radius maps |offset| == STICK_RADIUS to a full-scale axis value.
-#define STICK_RADIUS        50
-// Radial dead-zone (~8% of the radius).
-#define STICK_DEAD           4
+// Floating left thumbstick geometry (SVG px). The base ring fills a 128 cell;
+// the knob travels up to STICK_RADIUS from the centre, which also maps to a
+// full-scale axis value.
+#define STICK_OUTER_R       60
+#define STICK_RING_W         9
+#define STICK_KNOB_R        22
+#define STICK_RADIUS        40
+#define STICK_DEAD           3   // ~8% radial dead-zone
+#define STICK_HIT           62   // hit radius for zombie re-touch
+#define STICK_BASE_CLIP       0, 256, 128, 384
+#define STICK_KNOB_CLIP     128, 256, 224, 352
+
+// L1 / R1 shoulder pills, drawn into the spare row.
+#define L1_CLIP             224, 258, 320, 302
+#define R1_CLIP             224, 306, 320, 350
+#define SHOULDER_HIT        48
 
 #define ALPHA_OPAQUE       255
 #define ZOMBIE_TIMEOUT     500 // ms
 
-// ---------------------------------------------------------------------------
-// Home (resting) positions of the controls, in percent of the window. The
-// layout mirrors the iOS GCVirtualController in landscape: directional input
-// bottom-left, A/B/X/Y bottom-right, the right thumbstick centred between them
-// (full layout) and the shoulders in the top corners. Tune these after device
-// testing.
-// ---------------------------------------------------------------------------
-#define DIR_HOME_X_PCT       16
-#define DIR_HOME_Y_PCT       72
-#define RSTICK_HOME_X_PCT    50
-#define RSTICK_HOME_Y_PCT    72
-#define ABXY_HOME_X_PCT      84
-#define ABXY_HOME_Y_PCT      72
-#define SHOULDER_L_X_PCT      7
-#define SHOULDER_R_X_PCT     93
-#define SHOULDER_Y_PCT       14
-// Start/menu button: top centre, present in both layouts.
-#define START_HOME_X_PCT     50
-#define START_HOME_Y_PCT      7
+// Drag-to-look: a finger that lifts having travelled less than this (window px)
+// synthesizes a left click instead.
+#define TAP_MAX_TRAVEL       8
 
-// Horizontal regions used to assign a finger to a control when it is not on a
-// button/shoulder hotspot. Left region -> directional, right region -> A/B/X/Y,
-// the gap in between -> right thumbstick (full layout only).
+// ---------------------------------------------------------------------------
+// Home (resting) positions of the controls, in percent of the window. AAA
+// touch-FPS layout in landscape: floating move thumbstick bottom-left, A/B/X/Y
+// diamond bottom-right, shoulders top corners, Start top-centre and an
+// invisible drag-to-look region filling the rest of the right half.
+// ---------------------------------------------------------------------------
+#define DIR_HOME_X_PCT       18
+#define DIR_HOME_Y_PCT       75
+#define ABXY_HOME_X_PCT      85
+#define ABXY_HOME_Y_PCT      75
+#define SHOULDER_L_X_PCT      9
+#define SHOULDER_R_X_PCT     91
+#define SHOULDER_Y_PCT       12
+#define START_HOME_X_PCT     50
+#define START_HOME_Y_PCT      8
+
+// Fingers left of this (percent of width) and not on a hotspot drive the
+// thumbstick; everything else drives drag-to-look.
 #define LEFT_REGION_MAX_PCT  40
-#define RIGHT_REGION_MIN_PCT 60
 
 // The scale factor is stored as a fixed point 30.2 bits
 // This avoids floating point operations
@@ -132,16 +149,21 @@ TouchControls::TouchControls() :
 	_svg(nullptr),
 	_loadFailed(false),
 	_zombieCount(0),
-	_minimalLayout(false),
-	_directionalThumbstick(true),
 	_baseAlpha(ALPHA_OPAQUE * 6 / 10) {
 	_gesturesInsets[0] = _gesturesInsets[1] = _gesturesInsets[2] = _gesturesInsets[3] = 0;
-	_functions[kFunctionDirectional] = new FunctionDirectional(this);
-	_functions[kFunctionButtons]     = new FunctionButtons(this);
-	_functions[kFunctionRightStick]  = new FunctionRightStick(this);
-	_functions[kFunctionShoulderL]   = new FunctionShoulder(this, Common::JOYSTICK_BUTTON_LEFT_SHOULDER, false);
-	_functions[kFunctionShoulderR]   = new FunctionShoulder(this, Common::JOYSTICK_BUTTON_RIGHT_SHOULDER, true);
-	_functions[kFunctionStart]       = new FunctionStart(this);
+	_functions[kFunctionThumb]     = new FunctionThumb(this);
+	_functions[kFunctionButtonY]   = new FunctionButton(this, Common::JOYSTICK_BUTTON_Y,
+			0, -ABXY_SPACING, Common::Rect(ABXY_REST_Y), Common::Rect(ABXY_HL_Y));
+	_functions[kFunctionButtonB]   = new FunctionButton(this, Common::JOYSTICK_BUTTON_B,
+			ABXY_SPACING, 0, Common::Rect(ABXY_REST_B), Common::Rect(ABXY_HL_B));
+	_functions[kFunctionButtonA]   = new FunctionButton(this, Common::JOYSTICK_BUTTON_A,
+			0, ABXY_SPACING, Common::Rect(ABXY_REST_A), Common::Rect(ABXY_HL_A));
+	_functions[kFunctionButtonX]   = new FunctionButton(this, Common::JOYSTICK_BUTTON_X,
+			-ABXY_SPACING, 0, Common::Rect(ABXY_REST_X), Common::Rect(ABXY_HL_X));
+	_functions[kFunctionShoulderL] = new FunctionShoulder(this, Common::JOYSTICK_BUTTON_LEFT_SHOULDER, false);
+	_functions[kFunctionShoulderR] = new FunctionShoulder(this, Common::JOYSTICK_BUTTON_RIGHT_SHOULDER, true);
+	_functions[kFunctionStart]     = new FunctionStart(this);
+	_functions[kFunctionLook]      = new FunctionLook(this);
 }
 
 void TouchControls::init(float scale) {
@@ -151,11 +173,9 @@ void TouchControls::init(float scale) {
 		return;
 	}
 
-	// Register the shared gamepad settings (same keys and defaults as the iOS
+	// Register the shared gamepad opacity setting (same key/default as the iOS
 	// backend) so reads below never hit an unregistered key.
 	ConfMan.registerDefault("gamepad_controller_opacity", 6);
-	ConfMan.registerDefault("gamepad_controller_directional_input", kDirectionalInputThumbstick);
-	ConfMan.registerDefault("gamepad_controller_minimal_layout", false);
 
 	_scale = scale * SCALE_FACTOR_FXP;
 	// As scale is small, this should fit in int
@@ -170,8 +190,73 @@ void TouchControls::init(float scale) {
 		return;
 	}
 
+	// Rasterize the sheet, then copy it into a taller surface so we have a spare
+	// row below it to draw the thumbstick ring/knob and the L1/R1 pills into.
+	Graphics::SVGBitmap sheet(&stream, SVG_PIXELS(SVG_WIDTH), SVG_PIXELS(SVG_HEIGHT));
+
 	delete _svg;
-	_svg = new Graphics::SVGBitmap(&stream, SVG_PIXELS(SVG_WIDTH), SVG_PIXELS(SVG_HEIGHT));
+	_svg = new Graphics::ManagedSurface(SVG_PIXELS(SVG_WIDTH), SVG_PIXELS(SVG_FULL_HEIGHT), sheet.format);
+	_svg->simpleBlitFrom(sheet);
+	renderPrimitives();
+}
+
+void TouchControls::renderPrimitives() {
+	if (!_svg) {
+		return;
+	}
+
+	Graphics::PixelFormat fmt = _svg->format;
+
+	// Clear the spare row to fully transparent.
+	_svg->fillRect(Common::Rect(0, SVG_PIXELS(SVG_HEIGHT), SVG_PIXELS(SVG_WIDTH), SVG_PIXELS(SVG_FULL_HEIGHT)),
+			fmt.ARGBToColor(0, 0, 0, 0));
+
+	const uint32 ringFill = fmt.ARGBToColor(80,  20,  20,  25);
+	const uint32 ringEdge = fmt.ARGBToColor(220, 235, 235, 235);
+	const uint32 knobFill = fmt.ARGBToColor(235, 210, 210, 215);
+	const uint32 knobEdge = fmt.ARGBToColor(235, 110, 110, 120);
+	const uint32 pillFill = fmt.ARGBToColor(150, 25,  25,  30);
+	const uint32 pillEdge = fmt.ARGBToColor(220, 235, 235, 235);
+	const uint32 textCol  = fmt.ARGBToColor(255, 245, 245, 245);
+
+	// --- Thumbstick base ring (centre SVG 64,320) ---
+	{
+		int cx = SVG_PIXELS(64), cy = SVG_PIXELS(320);
+		int rOut = SVG_PIXELS(STICK_OUTER_R);
+		int rIn  = SVG_PIXELS(STICK_OUTER_R - STICK_RING_W);
+		_svg->drawEllipse(cx - rOut, cy - rOut, cx + rOut, cy + rOut, ringEdge, true);
+		_svg->drawEllipse(cx - rIn,  cy - rIn,  cx + rIn,  cy + rIn,  ringFill, true);
+	}
+	// --- Thumbstick knob (centre SVG 176,304) ---
+	{
+		int cx = SVG_PIXELS(176), cy = SVG_PIXELS(304);
+		int rOut = SVG_PIXELS(STICK_KNOB_R);
+		int rIn  = SVG_PIXELS(STICK_KNOB_R - 3);
+		_svg->drawEllipse(cx - rOut, cy - rOut, cx + rOut, cy + rOut, knobEdge, true);
+		_svg->drawEllipse(cx - rIn,  cy - rIn,  cx + rIn,  cy + rIn,  knobFill, true);
+	}
+
+	// --- L1 / R1 pills with labels ---
+	const Graphics::Font *font = FontMan.getFontByUsage(Graphics::FontManager::kBigGUIFont);
+	if (!font) {
+		font = FontMan.getFontByUsage(Graphics::FontManager::kGUIFont);
+	}
+	struct { Common::Rect clip; const char *label; } pills[2] = {
+		{ Common::Rect(L1_CLIP), "L1" },
+		{ Common::Rect(R1_CLIP), "R1" }
+	};
+	for (int i = 0; i < 2; i++) {
+		Common::Rect r(SVG_PIXELS(pills[i].clip.left),  SVG_PIXELS(pills[i].clip.top),
+				SVG_PIXELS(pills[i].clip.right), SVG_PIXELS(pills[i].clip.bottom));
+		int arc = r.height() / 2;
+		_svg->drawRoundRect(r, arc, pillFill, true);
+		_svg->drawRoundRect(r, arc, pillEdge, false);
+		if (font) {
+			int ty = r.top + (r.height() - font->getFontHeight()) / 2;
+			font->drawString(_svg, pills[i].label, r.left, ty, r.width(), textCol,
+					Graphics::kTextAlignCenter);
+		}
+	}
 }
 
 TouchControls::~TouchControls() {
@@ -182,9 +267,6 @@ TouchControls::~TouchControls() {
 }
 
 void TouchControls::refreshConfig() {
-	_directionalThumbstick =
-		(ConfMan.getInt("gamepad_controller_directional_input") == kDirectionalInputThumbstick);
-	_minimalLayout = ConfMan.getBool("gamepad_controller_minimal_layout");
 	int opacity = CLIP(ConfMan.getInt("gamepad_controller_opacity"), 0, 10);
 	_baseAlpha = ALPHA_OPAQUE * opacity / 10;
 }
@@ -215,22 +297,6 @@ void TouchControls::beforeDraw() {
 	_zombieCount = zombieCount;
 }
 
-bool TouchControls::isFunctionPresent(FunctionId id) const {
-	switch (id) {
-	case kFunctionDirectional:
-	case kFunctionButtons:
-	case kFunctionStart:
-		return true;
-	case kFunctionRightStick:
-	case kFunctionShoulderL:
-	case kFunctionShoulderR:
-		// Full layout only.
-		return !_minimalLayout;
-	default:
-		return false;
-	}
-}
-
 TouchControls::FunctionId TouchControls::getFunctionId(int x, int y) {
 	if (_screen_width == 0) {
 		// Avoid divide by 0 error
@@ -245,33 +311,31 @@ TouchControls::FunctionId TouchControls::getFunctionId(int x, int y) {
 		return kFunctionNone;
 	}
 
-	// Priority: button/shoulder hotspots first, then the horizontal regions
-	// (directional, then right thumbstick, then A/B/X/Y).
-	// The Start hotspot (top centre) is present in both layouts, so it is
-	// tested first, before the full-layout-only shoulder hotspots.
+	// Hit-test priority: Start > shoulders > A/B/X/Y hotspots > left region
+	// (thumbstick) > right region (drag-to-look).
 	if (_functions[kFunctionStart]->isInside(x, y)) {
 		return kFunctionStart;
 	}
-	if (!_minimalLayout) {
-		if (_functions[kFunctionShoulderL]->isInside(x, y)) {
-			return kFunctionShoulderL;
-		}
-		if (_functions[kFunctionShoulderR]->isInside(x, y)) {
-			return kFunctionShoulderR;
+	if (_functions[kFunctionShoulderL]->isInside(x, y)) {
+		return kFunctionShoulderL;
+	}
+	if (_functions[kFunctionShoulderR]->isInside(x, y)) {
+		return kFunctionShoulderR;
+	}
+	static const FunctionId abxy[] = {
+		kFunctionButtonY, kFunctionButtonB, kFunctionButtonA, kFunctionButtonX
+	};
+	for (int i = 0; i < ARRAYSIZE(abxy); i++) {
+		if (_functions[abxy[i]]->isInside(x, y)) {
+			return abxy[i];
 		}
 	}
 
 	int xRatio = x * 100 / (int)_screen_width;
-
 	if (xRatio < LEFT_REGION_MAX_PCT) {
-		return kFunctionDirectional;
-	} else if (xRatio >= RIGHT_REGION_MIN_PCT) {
-		return kFunctionButtons;
-	} else if (!_minimalLayout) {
-		return kFunctionRightStick;
+		return kFunctionThumb;
 	}
-
-	return kFunctionNone;
+	return kFunctionLook;
 }
 
 void TouchControls::setDrawer(TouchControlsDrawer *drawer, int width, int height) {
@@ -304,9 +368,6 @@ TouchControls::Function *TouchControls::getZombieFunctionFromPos(int x, int y) {
 		return nullptr;
 	}
 	for (uint i = 0; i < kFunctionCount; i++) {
-		if (!isFunctionPresent((FunctionId)i)) {
-			continue;
-		}
 		Function *func = _functions[i];
 		if (func->status != kFunctionZombie) {
 			// Already assigned to a finger or dead
@@ -329,9 +390,6 @@ void TouchControls::draw() {
 	uint32 now = g_system->getMillis(true);
 
 	for (uint i = 0; i < kFunctionCount; i++) {
-		if (!isFunctionPresent((FunctionId)i)) {
-			continue;
-		}
 		Function *func = _functions[i];
 		uint8 hlAlpha;
 		switch (func->status) {
@@ -478,6 +536,30 @@ void TouchControls::axisMotion(Common::JoystickAxis axis, int16 value) {
 	dynamic_cast<OSystem_SDL *>(g_system)->pushEvent(ev);
 }
 
+void TouchControls::mouseRelative(int relX, int relY) {
+	Common::Event ev;
+	ev.type = Common::EVENT_MOUSEMOVE;
+	// Absolute position is kept at the current cursor; the engine (HPL1) reads
+	// the relative delta for the camera.
+	ev.mouse = g_system->getEventManager()->getMousePos();
+	ev.relMouse = Common::Point(relX, relY);
+	dynamic_cast<OSystem_SDL *>(g_system)->pushEvent(ev);
+}
+
+void TouchControls::mouseClick() {
+	Common::Point p = g_system->getEventManager()->getMousePos();
+
+	Common::Event down;
+	down.type = Common::EVENT_LBUTTONDOWN;
+	down.mouse = p;
+	dynamic_cast<OSystem_SDL *>(g_system)->pushEvent(down);
+
+	Common::Event up;
+	up.type = Common::EVENT_LBUTTONUP;
+	up.mouse = p;
+	dynamic_cast<OSystem_SDL *>(g_system)->pushEvent(up);
+}
+
 void TouchControls::drawSurface(uint8 alpha, int x, int y, int offX, int offY, const Common::Rect &clip) const {
 	if (!alpha) {
 		return;
@@ -490,325 +572,122 @@ void TouchControls::drawSurface(uint8 alpha, int x, int y, int offX, int offY, c
 }
 
 // ===========================================================================
-// Directional input (left thumbstick or D-pad)
+// Floating left thumbstick (move / LEFT_STICK axes)
 // ===========================================================================
 
-bool TouchControls::FunctionDirectional::isInside(int x, int y) {
+bool TouchControls::FunctionThumb::isInside(int x, int y) {
 	int dX = x - startX;
 	int dY = y - startY;
-	// norm 2 squared (to avoid square root)
 	unsigned int sqNorm = (unsigned int)(dX * dX) + (unsigned int)(dY * dY);
-
-	if (sqNorm <= FUNC_SVG_SQ_SCALED(BUTTON_END)) {
-		return true;
-	}
-
-	// Also accept touches near the old last touch
-	dX = x - currentX;
-	dY = y - currentY;
-	sqNorm = (unsigned int)(dX * dX) + (unsigned int)(dY * dY);
-
-	if (sqNorm <= FUNC_SVG_SQ_SCALED(ARROW_DEAD)) {
-		return true;
-	}
-
-	return false;
+	return sqNorm <= FUNC_SVG_SQ_SCALED(STICK_HIT);
 }
 
-uint32 TouchControls::FunctionDirectional::directionMask(int dX, int dY) const {
-	uint32 newMask = 0;
-
-	// norm 2 squared (to avoid square root)
-	unsigned int sqNorm = (unsigned int)(dX * dX) + (unsigned int)(dY * dY);
-
-	if (sqNorm >= FUNC_SVG_SQ_SCALED(ARROW_DEAD)) {
-		// We are far enough from the center.
-		// Up/down sensitive zone: angles outside +/-30deg (1/sqrt(3)).
-		// Left/right sensitive zone: angles within +/-60deg (sqrt(3)).
-		unsigned int sq3 = abs(dX) * 51409 / 29681;
-		unsigned int isq3 = abs(dX) * 29681 / 51409;
-		unsigned int adY = abs(dY);
-
-		if (adY <= sq3) {
-			// Left or right
-			newMask |= (dX < 0) ? 8 : 2;
-		}
-		if (adY >= isq3) {
-			// Up or down
-			newMask |= (dY < 0) ? 1 : 4;
-		}
-	}
-
-	return newMask;
-}
-
-void TouchControls::FunctionDirectional::maskToDpadButtons(uint32 oldMask, uint32 newMask) {
-	static const Common::JoystickButton buttons[] = {
-		Common::JOYSTICK_BUTTON_DPAD_UP, Common::JOYSTICK_BUTTON_DPAD_RIGHT,
-		Common::JOYSTICK_BUTTON_DPAD_DOWN, Common::JOYSTICK_BUTTON_DPAD_LEFT
-	};
-
-	uint32 diff = newMask ^ oldMask;
-
-	for (int i = 0, m = 1; i < ARRAYSIZE(buttons); i++, m <<= 1) {
-		if (!(diff & m)) {
-			continue;
-		}
-		if (oldMask & m) {
-			TouchControls::buttonUp(buttons[i]);
-		}
-	}
-	for (int i = 0, m = 1; i < ARRAYSIZE(buttons); i++, m <<= 1) {
-		if (!(diff & m)) {
-			continue;
-		}
-		if (newMask & m) {
-			TouchControls::buttonDown(buttons[i]);
-		}
-	}
-}
-
-void TouchControls::FunctionDirectional::touchDpad(int dX, int dY, Action action) {
-	if (action == kActionCancel || action == kActionUp) {
-		maskToDpadButtons(mask, 0);
-		mask = 0;
-		return;
-	}
-
-	uint32 newMask = directionMask(dX, dY);
-	if (mask != newMask) {
-		maskToDpadButtons(mask, newMask);
-	}
-	mask = newMask;
-}
-
-void TouchControls::FunctionDirectional::touchThumb(int dX, int dY, Action action,
-		Common::JoystickAxis ax, Common::JoystickAxis ay) {
+void TouchControls::FunctionThumb::touch(int dX, int dY, Action action) {
 	int16 newX = 0, newY = 0;
+	int kX = 0, kY = 0;
 
 	if (action != kActionCancel && action != kActionUp) {
-		unsigned int sqNorm = (unsigned int)(dX * dX) + (unsigned int)(dY * dY);
-		if (sqNorm >= FUNC_SVG_SQ_SCALED(STICK_DEAD)) {
-			// radiusFP maps |offset| == STICK_RADIUS to a full-scale value.
-			// It is expressed in the same fixed-point screen units as dX/dY.
-			int radiusFP = SVG_UNSCALED(STICK_RADIUS) * (int)parent->_scale;
-			if (radiusFP > 0) {
-				// Per-axis clip (square envelope); good enough for a first pass.
-				newX = (int16)CLIP(dX * Common::JOYAXIS_MAX / radiusFP,
-						(int)Common::JOYAXIS_MIN, (int)Common::JOYAXIS_MAX);
-				newY = (int16)CLIP(dY * Common::JOYAXIS_MAX / radiusFP,
-						(int)Common::JOYAXIS_MIN, (int)Common::JOYAXIS_MAX);
-			}
+		// radiusFP maps |offset| == STICK_RADIUS to a full-scale axis value,
+		// in the same fixed-point screen units as dX/dY.
+		int radiusFP = SVG_UNSCALED(STICK_RADIUS) * (int)parent->_scale;
+		int64 sq = (int64)dX * dX + (int64)dY * dY;
+
+		// Clamp the visible knob to the stick radius (circular envelope).
+		if (radiusFP > 0 && sq > (int64)radiusFP * radiusFP) {
+			double d = sqrt((double)sq);
+			kX = (int)(dX * (double)radiusFP / d);
+			kY = (int)(dY * (double)radiusFP / d);
+		} else {
+			kX = dX;
+			kY = dY;
 		}
-		// Reuse the D-pad direction logic only to light up the arrows.
-		mask = directionMask(dX, dY);
-	} else {
-		mask = 0;
+
+		unsigned int sqNorm = (unsigned int)(dX * dX) + (unsigned int)(dY * dY);
+		if (radiusFP > 0 && sqNorm >= FUNC_SVG_SQ_SCALED(STICK_DEAD)) {
+			// Per-axis clip (square envelope); good enough for a first pass.
+			newX = (int16)CLIP(dX * Common::JOYAXIS_MAX / radiusFP,
+					(int)Common::JOYAXIS_MIN, (int)Common::JOYAXIS_MAX);
+			newY = (int16)CLIP(dY * Common::JOYAXIS_MAX / radiusFP,
+					(int)Common::JOYAXIS_MIN, (int)Common::JOYAXIS_MAX);
+		}
 	}
 
+	knobX = kX;
+	knobY = kY;
+
 	if (newX != axisX) {
-		TouchControls::axisMotion(ax, newX);
+		TouchControls::axisMotion(Common::JOYSTICK_AXIS_LEFT_STICK_X, newX);
 		axisX = newX;
 	}
 	if (newY != axisY) {
-		TouchControls::axisMotion(ay, newY);
+		TouchControls::axisMotion(Common::JOYSTICK_AXIS_LEFT_STICK_Y, newY);
 		axisY = newY;
 	}
 }
 
-void TouchControls::FunctionDirectional::touch(int dX, int dY, Action action) {
-	if (parent->_directionalThumbstick) {
-		touchThumb(dX, dY, action,
-				Common::JOYSTICK_AXIS_LEFT_STICK_X, Common::JOYSTICK_AXIS_LEFT_STICK_Y);
-	} else {
-		touchDpad(dX, dY, action);
-	}
-}
-
-void TouchControls::FunctionDirectional::drawStick(uint8 baseAlpha, uint8 hlAlpha, int cx, int cy, uint32 dirMask) {
-	// Base: D-pad cell (circle + grey arrows), reused for both modes.
-	{
-		Common::Rect clip(0, 0, BG_WIDTH, BG_HEIGHT);
-		parent->drawSurface(baseAlpha, cx, cy, -clip.width() / 2, -clip.height() / 2, clip);
-	}
-
-	if (!hlAlpha || !dirMask) {
-		return;
-	}
-
-	// Pressed arrows from the highlight row.
-	if (dirMask & 1) {
-		Common::Rect clip(0, ARROW_HL_TOP, ARROW_WIDTH, ARROW_HL_TOP + ARROW_HEIGHT);
-		parent->drawSurface(hlAlpha, cx, cy, -1 * clip.width() / 2, -2 * clip.height() / 2, clip);
-	}
-	if (dirMask & 2) {
-		Common::Rect clip(ARROW_WIDTH, ARROW_HL_TOP, 2 * ARROW_WIDTH, ARROW_HL_TOP + ARROW_HEIGHT);
-		parent->drawSurface(hlAlpha, cx, cy, 0, -1 * clip.height() / 2, clip);
-	}
-	if (dirMask & 4) {
-		Common::Rect clip(0, ARROW_HL_TOP + ARROW_HEIGHT, ARROW_WIDTH, ARROW_HL_TOP + 2 * ARROW_HEIGHT);
-		parent->drawSurface(hlAlpha, cx, cy, -1 * clip.width() / 2, 0, clip);
-	}
-	if (dirMask & 8) {
-		Common::Rect clip(ARROW_WIDTH, ARROW_HL_TOP + ARROW_HEIGHT, 2 * ARROW_WIDTH, ARROW_HL_TOP + 2 * ARROW_HEIGHT);
-		parent->drawSurface(hlAlpha, cx, cy, -2 * clip.width() / 2, -1 * clip.height() / 2, clip);
-	}
-}
-
-void TouchControls::FunctionDirectional::draw(uint8 baseAlpha, uint8 hlAlpha) {
+void TouchControls::FunctionThumb::draw(uint8 baseAlpha, uint8 hlAlpha) {
 	bool active = (status != kFunctionInactive);
 	int cx = active ? startX : parent->homeX(DIR_HOME_X_PCT);
 	int cy = active ? startY : parent->homeY(DIR_HOME_Y_PCT);
-	drawStick(baseAlpha, hlAlpha, cx, cy, mask);
-}
 
-// ===========================================================================
-// Right thumbstick (full layout)
-// ===========================================================================
-
-bool TouchControls::FunctionRightStick::isInside(int x, int y) {
-	int dX = x - startX;
-	int dY = y - startY;
-	unsigned int sqNorm = (unsigned int)(dX * dX) + (unsigned int)(dY * dY);
-	return sqNorm <= FUNC_SVG_SQ_SCALED(BUTTON_END);
-}
-
-void TouchControls::FunctionRightStick::touch(int dX, int dY, Action action) {
-	int16 newX = 0, newY = 0;
-
-	if (action != kActionCancel && action != kActionUp) {
-		unsigned int sqNorm = (unsigned int)(dX * dX) + (unsigned int)(dY * dY);
-		if (sqNorm >= FUNC_SVG_SQ_SCALED(STICK_DEAD)) {
-			int radiusFP = SVG_UNSCALED(STICK_RADIUS) * (int)parent->_scale;
-			if (radiusFP > 0) {
-				newX = (int16)CLIP(dX * Common::JOYAXIS_MAX / radiusFP,
-						(int)Common::JOYAXIS_MIN, (int)Common::JOYAXIS_MAX);
-				newY = (int16)CLIP(dY * Common::JOYAXIS_MAX / radiusFP,
-						(int)Common::JOYAXIS_MIN, (int)Common::JOYAXIS_MAX);
-			}
-			// Light up arrows roughly in the offset direction.
-			mask = 0;
-			if (abs(dX) > abs(dY) / 2) {
-				mask |= (dX < 0) ? 8 : 2;
-			}
-			if (abs(dY) > abs(dX) / 2) {
-				mask |= (dY < 0) ? 1 : 4;
-			}
-		} else {
-			mask = 0;
-		}
-	} else {
-		mask = 0;
-	}
-
-	if (newX != axisX) {
-		TouchControls::axisMotion(Common::JOYSTICK_AXIS_RIGHT_STICK_X, newX);
-		axisX = newX;
-	}
-	if (newY != axisY) {
-		TouchControls::axisMotion(Common::JOYSTICK_AXIS_RIGHT_STICK_Y, newY);
-		axisY = newY;
-	}
-}
-
-void TouchControls::FunctionRightStick::draw(uint8 baseAlpha, uint8 hlAlpha) {
-	bool active = (status != kFunctionInactive);
-	int cx = active ? startX : parent->homeX(RSTICK_HOME_X_PCT);
-	int cy = active ? startY : parent->homeY(RSTICK_HOME_Y_PCT);
-
-	// Reuse the directional stick glyph (D-pad cell + arrows).
-	FunctionDirectional *dir =
-		static_cast<FunctionDirectional *>(parent->_functions[kFunctionDirectional]);
-	dir->drawStick(baseAlpha, hlAlpha, cx, cy, mask);
-}
-
-// ===========================================================================
-// A/B/X/Y face buttons (right cluster)
-// ===========================================================================
-
-bool TouchControls::FunctionButtons::isInside(int x, int y) {
-	int dX = x - startX;
-	int dY = y - startY;
-	unsigned int sqNorm = (unsigned int)(dX * dX) + (unsigned int)(dY * dY);
-	return sqNorm <= FUNC_SVG_SQ_SCALED(BUTTON_END);
-}
-
-void TouchControls::FunctionButtons::touch(int dX, int dY, Action action) {
-	static const Common::JoystickButton buttons[] = {
-		Common::JOYSTICK_BUTTON_Y, Common::JOYSTICK_BUTTON_B,
-		Common::JOYSTICK_BUTTON_A, Common::JOYSTICK_BUTTON_X
-	};
-	if (action == kActionCancel || action == kActionUp) {
-		if (button) {
-			buttonUp(buttons[button - 1]);
-		}
-		button = 0;
-		return;
-	}
-
-	uint32 newButton = 0;
-
-	unsigned int sqNorm = (unsigned int)(dX * dX) + (unsigned int)(dY * dY);
-
-	if (sqNorm >= FUNC_SVG_SQ_SCALED(BUTTON_DEAD) && sqNorm <= FUNC_SVG_SQ_SCALED(BUTTON_END)) {
-		// Pick the button by direction (+/-45deg sectors).
-		unsigned int adX = abs(dX);
-		unsigned int adY = abs(dY);
-		if (adY <= adX) {
-			newButton = (dX < 0) ? 4 : 2; // X or B
-		} else {
-			newButton = (dY < 0) ? 1 : 3; // Y or A
-		}
-	}
-
-	if (button != newButton) {
-		if (button) {
-			buttonUp(buttons[button - 1]);
-		}
-		button = newButton;
-		if (button) {
-			buttonDown(buttons[button - 1]);
-		}
-	}
-}
-
-void TouchControls::FunctionButtons::draw(uint8 baseAlpha, uint8 hlAlpha) {
-	bool active = (status != kFunctionInactive);
-	int cx = active ? startX : parent->homeX(ABXY_HOME_X_PCT);
-	int cy = active ? startY : parent->homeY(ABXY_HOME_Y_PCT);
-
-	// Resting cluster (column 1, row 0).
+	// Base ring.
 	{
-		Common::Rect clip(BG_WIDTH, 0, 2 * BG_WIDTH, BG_HEIGHT);
+		Common::Rect clip(STICK_BASE_CLIP);
 		parent->drawSurface(baseAlpha, cx, cy, -clip.width() / 2, -clip.height() / 2, clip);
 	}
 
-	if (!hlAlpha || button == 0) {
-		return;
+	// Knob follows the finger (centred when inactive); brightened while held.
+	int kx = active ? knobX : 0;
+	int ky = active ? knobY : 0;
+	Common::Rect clip(STICK_KNOB_CLIP);
+	parent->drawSurface(baseAlpha, cx + kx, cy + ky, -clip.width() / 2, -clip.height() / 2, clip);
+	if (hlAlpha) {
+		parent->drawSurface(hlAlpha, cx + kx, cy + ky, -clip.width() / 2, -clip.height() / 2, clip);
 	}
-
-	Common::Rect clip(BUTTON_WIDTH, BUTTON_HEIGHT);
-	int16 offX, offY;
-	if (button == 1) {        // Y
-		clip.translate(BUTTON_HL_LEFT, BUTTON_HL_TOP);
-		offX = -1; offY = -2;
-	} else if (button == 2) { // B
-		clip.translate(BUTTON_HL_LEFT + BUTTON_WIDTH, BUTTON_HL_TOP);
-		offX = 0; offY = -1;
-	} else if (button == 3) { // A
-		clip.translate(BUTTON_HL_LEFT, BUTTON_HL_TOP + BUTTON_HEIGHT);
-		offX = -1; offY = 0;
-	} else if (button == 4) { // X
-		clip.translate(BUTTON_HL_LEFT + BUTTON_WIDTH, BUTTON_HL_TOP + BUTTON_HEIGHT);
-		offX = -2; offY = -1;
-	} else {
-		return;
-	}
-	parent->drawSurface(hlAlpha, cx, cy, offX * clip.width() / 2, offY * clip.height() / 2, clip);
 }
 
 // ===========================================================================
-// L1 / R1 shoulder buttons (full layout)
+// A/B/X/Y face buttons (independent diamond hotspots)
+// ===========================================================================
+
+void TouchControls::FunctionButton::center(int &cx, int &cy) const {
+	cx = parent->homeX(ABXY_HOME_X_PCT) + SVG_UNSCALED(_dxSvg) * (int)parent->_scale;
+	cy = parent->homeY(ABXY_HOME_Y_PCT) + SVG_UNSCALED(_dySvg) * (int)parent->_scale;
+}
+
+bool TouchControls::FunctionButton::isInside(int x, int y) {
+	int cx, cy;
+	center(cx, cy);
+	int dX = x - cx;
+	int dY = y - cy;
+	unsigned int sqNorm = (unsigned int)(dX * dX) + (unsigned int)(dY * dY);
+	return sqNorm <= FUNC_SVG_SQ_SCALED(ABXY_HIT);
+}
+
+void TouchControls::FunctionButton::touch(int dX, int dY, Action action) {
+	bool wantPressed = (action != kActionCancel && action != kActionUp);
+	if (wantPressed != pressed) {
+		pressed = wantPressed;
+		if (pressed) {
+			buttonDown(_jb);
+		} else {
+			buttonUp(_jb);
+		}
+	}
+}
+
+void TouchControls::FunctionButton::draw(uint8 baseAlpha, uint8 hlAlpha) {
+	int cx, cy;
+	center(cx, cy);
+
+	parent->drawSurface(baseAlpha, cx, cy, -_restClip.width() / 2, -_restClip.height() / 2, _restClip);
+	if (hlAlpha && pressed) {
+		parent->drawSurface(hlAlpha, cx, cy, -_hlClip.width() / 2, -_hlClip.height() / 2, _hlClip);
+	}
+}
+
+// ===========================================================================
+// L1 / R1 shoulder buttons (top corners, labelled pills)
 // ===========================================================================
 
 bool TouchControls::FunctionShoulder::isInside(int x, int y) {
@@ -836,16 +715,16 @@ void TouchControls::FunctionShoulder::draw(uint8 baseAlpha, uint8 hlAlpha) {
 	int cx = parent->homeX(_right ? SHOULDER_R_X_PCT : SHOULDER_L_X_PCT);
 	int cy = parent->homeY(SHOULDER_Y_PCT);
 
-	Common::Rect clip = _right ? Common::Rect(SHOULDER_R_CLIP) : Common::Rect(SHOULDER_L_CLIP);
+	Common::Rect clip = _right ? Common::Rect(R1_CLIP) : Common::Rect(L1_CLIP);
 	parent->drawSurface(baseAlpha, cx, cy, -clip.width() / 2, -clip.height() / 2, clip);
 	if (hlAlpha) {
-		// Brighten the glyph while pressed.
+		// Brighten the pill while pressed.
 		parent->drawSurface(hlAlpha, cx, cy, -clip.width() / 2, -clip.height() / 2, clip);
 	}
 }
 
 // ===========================================================================
-// Start / menu button (top centre, both layouts)
+// Start / menu button (top centre)
 // ===========================================================================
 
 bool TouchControls::FunctionStart::isInside(int x, int y) {
@@ -879,5 +758,59 @@ void TouchControls::FunctionStart::draw(uint8 baseAlpha, uint8 hlAlpha) {
 	if (hlAlpha) {
 		// Brighten the glyph while pressed.
 		parent->drawSurface(hlAlpha, cx, cy, -clip.width() / 2, -clip.height() / 2, clip);
+	}
+}
+
+// ===========================================================================
+// Drag-to-look (right half, invisible: relative-mouse camera + tap-to-click)
+// ===========================================================================
+
+void TouchControls::FunctionLook::touch(int dX, int dY, Action action) {
+	if (action == kActionDown) {
+		prevX = currentX;
+		prevY = currentY;
+		hiresX = hiresY = 0.0f;
+		maxTravel = 0;
+		return;
+	}
+
+	if (action == kActionCancel) {
+		return;
+	}
+
+	// Track the largest travel from the press origin (window px) for the
+	// tap-to-click decision (Manhattan distance is plenty here).
+	int travel = (abs(dX) + abs(dY)) / SCALE_FACTOR_FXP;
+	if (travel > maxTravel) {
+		maxTravel = travel;
+	}
+
+	if (action == kActionUp) {
+		if (maxTravel <= TAP_MAX_TRAVEL) {
+			mouseClick();
+		}
+		return;
+	}
+
+	// kActionMove: convert per-frame finger delta into relative-mouse motion,
+	// mirroring the touchpad relmouse scaling in sdl2-events.cpp.
+	int ddX = (int)currentX - prevX;
+	int ddY = (int)currentY - prevY;
+	prevX = currentX;
+	prevY = currentY;
+
+	int kbdMouseSpeed = CLIP<int>(ConfMan.getInt("kbdmouse_speed"), 0, 7);
+	float speedFactor = (kbdMouseSpeed + 1) * 0.25f;
+
+	hiresX += (ddX / (float)SCALE_FACTOR_FXP) * 1.25f * speedFactor;
+	hiresY += (ddY / (float)SCALE_FACTOR_FXP) * 1.25f * speedFactor;
+
+	int relX = (int)hiresX;
+	int relY = (int)hiresY;
+	hiresX -= relX;
+	hiresY -= relY;
+
+	if (relX || relY) {
+		mouseRelative(relX, relY);
 	}
 }
