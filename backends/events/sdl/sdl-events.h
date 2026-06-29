@@ -167,8 +167,20 @@ protected:
 	/**
 	 * Hit-test a touch finger against the on-screen mode-toggle button.
 	 * @p action is a TouchControls::Action value. Returns true if consumed.
+	 *
+	 * A short tap cycles the touch mode; a long press (>= kTouchToggleLongPressMs)
+	 * opens the virtual keyboard, mirroring the iOS backend.
 	 */
 	bool handleTouchToggle(int action, float normX, float normY);
+
+	/** Long-press threshold (ms) on the touch toggle to open the vkeybd. */
+	static const uint32 kTouchToggleLongPressMs = 500;
+
+	/** getMillis() time the touch toggle was pressed down (0 if not pressed). */
+	uint32 _touchToggleDownTime = 0;
+
+	/** Whether a finger-down landed on the touch toggle and is still held. */
+	bool _touchTogglePressed = false;
 #endif
 
 	//@}
