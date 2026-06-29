@@ -31,9 +31,8 @@
 //     left click;
 //   - a MULTI-TOUCH A/B/X/Y diamond in the bottom-right (each button its own
 //     independent hotspot so several can be held at once);
-//   - L1/R1 shoulders in the top corners (labelled pills), a small Start button
-//     at the top centre, and a ScummVM "S" button (top-left) that opens the
-//     Global Main Menu.
+//   - a compact secondary top-centre row of smaller controls: L1, the ScummVM
+//     "S" button (opens the Global Main Menu), Start and R1.
 //
 // The whole pad is hidden unless the on-screen gamepad is the active touch mode.
 //
@@ -187,8 +186,10 @@ private:
 	 * @param offX  The left offset in SVG pixels
 	 * @param offY  The top offset in SVG pixels
 	 * @param clip  The clipping rectangle in source surface in SVG pixels
+	 * @param sizePct Glyph size as a percentage of its native size (100 = 1:1);
+	 *               the SVG-px offsets are scaled identically so centring holds.
 	 */
-	void drawSurface(uint8 alpha, int x, int y, int offX, int offY, const Common::Rect &clip) const;
+	void drawSurface(uint8 alpha, int x, int y, int offX, int offY, const Common::Rect &clip, int sizePct = 100) const;
 
 
 	// Functions implementations
@@ -230,12 +231,16 @@ private:
 	};
 
 	// One face button (Y/B/A/X) of the bottom-right diamond. Each button is its
-	// own independent hotspot so several can be held simultaneously.
+	// own independent hotspot so several can be held simultaneously. The whole
+	// resting cluster glyph is drawn once (by the cluster owner) and each button
+	// draws its own pressed highlight, so the glyphs stay clean and uncut.
 	struct FunctionButton : Function {
 		FunctionButton(const TouchControls *parent, Common::JoystickButton jb,
-				int dxSvg, int dySvg, const Common::Rect &rest, const Common::Rect &hl) :
+				int dxSvg, int dySvg, const Common::Rect &hl,
+				int hlMulX, int hlMulY, bool clusterOwner) :
 			Function(parent), _jb(jb), _dxSvg(dxSvg), _dySvg(dySvg),
-			_restClip(rest), _hlClip(hl), pressed(false) {}
+			_hlClip(hl), _hlMulX(hlMulX), _hlMulY(hlMulY),
+			_clusterOwner(clusterOwner), pressed(false) {}
 		void resetState() override { pressed = false; }
 
 		// Centre of this button in fixed-point screen pixels.
@@ -246,8 +251,10 @@ private:
 		void draw(uint8 baseAlpha, uint8 hlAlpha) override;
 
 		Common::JoystickButton _jb;
-		int _dxSvg, _dySvg;          // diamond offset from cluster centre (SVG px)
-		Common::Rect _restClip, _hlClip;
+		int _dxSvg, _dySvg;          // letter offset from cluster centre (SVG px)
+		Common::Rect _hlClip;        // pressed-highlight crop (col 1 row 1)
+		int _hlMulX, _hlMulY;        // highlight offset from cluster centre (half-cells)
+		bool _clusterOwner;          // draws the shared resting cluster glyph
 		bool pressed;
 	};
 
@@ -291,7 +298,8 @@ private:
 
 		bool isInside(int, int) override { return false; } // no widget, no zombie reuse
 		void touch(int, int, Action) override;
-		void draw(uint8, uint8) override {}
+		// Draws the ring/dot drag indicator while actively dragging.
+		void draw(uint8 baseAlpha, uint8 hlAlpha) override;
 
 		int prevX, prevY;     // previous finger position (fixed-point px)
 		float hiresX, hiresY; // sub-pixel relmouse accumulator

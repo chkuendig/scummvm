@@ -45,39 +45,46 @@
 //   col 2 row 1 (256,128) : (system highlights, unused here)
 //
 // A spare row is appended below the 384x256 sheet (SVG y 256..384) into which
-// the ScummVM "S" button and the L1/R1 pills are drawn from primitives at load
-// time (see renderPrimitives()).
+// the ScummVM "S" button, the L1/R1 pills and the drag-to-look ring/knob are
+// drawn from primitives at load time (see renderPrimitives()).
 // ---------------------------------------------------------------------------
 #define SVG_WIDTH          384
 #define SVG_HEIGHT         256
 // Total height of the backing surface: the sheet plus the spare primitives row.
 #define SVG_FULL_HEIGHT    384
-#define BG_WIDTH           128
-#define BG_HEIGHT          128
-#define BUTTON_WIDTH        64
-#define BUTTON_HEIGHT       64
 
-// A/B/X/Y resting glyph crops from the cluster (col 1 row 0), one per button.
-#define ABXY_REST_Y         160,   0, 224,  64
-#define ABXY_REST_B         192,  32, 256,  96
-#define ABXY_REST_A         160,  64, 224, 128
-#define ABXY_REST_X         128,  32, 192,  96
-// A/B/X/Y pressed-highlight glyphs (col 1 row 1).
+// ---------------------------------------------------------------------------
+// Glyph sizes, as a percentage of the gamepad.svg native (1.5x) glyph size.
+// Grouped and tunable: the primary controls (D-pad, A/B/X/Y) are drawn smaller
+// than the old 100% so they sit comfortably under the thumbs, and the secondary
+// top-row controls (L1/R1, Start, ScummVM) smaller still so they clearly read
+// as secondary.
+// ---------------------------------------------------------------------------
+#define DPAD_SIZE_PCT        68
+#define ABXY_SIZE_PCT        68
+#define AUX_SIZE_PCT         52
+
+// A/B/X/Y: the whole resting cluster glyph (col 1 row 0) is drawn once, cleanly
+// (no per-button cropping), and a per-button pressed-highlight circle (col 1
+// row 1) is drawn on top of whichever button(s) are held. This keeps the four
+// independent multi-touch hotspots while rendering uncut glyphs.
+#define ABXY_CLUSTER_CLIP   128,   0, 256, 128
 #define ABXY_HL_Y           128, 128, 192, 192
 #define ABXY_HL_B           192, 128, 256, 192
 #define ABXY_HL_A           128, 192, 192, 256
 #define ABXY_HL_X           192, 192, 256, 256
 
-// Spacing of the diamond buttons from the cluster centre (SVG px) and the hit
-// radius around each (SVG px). Spread wider than the natural 32px glyph spacing
-// so the four hotspots do not overlap (independent multi-touch presses).
-#define ABXY_SPACING        44
-#define ABXY_HIT            30
+// Letter spacing from the cluster centre (SVG px, matches the cluster art) and
+// the per-button hit radius (SVG px). The hotspots sit on the letters; the
+// radius is kept just under half the diagonal letter spacing so the four
+// hotspots stay independent (multi-touch).
+#define ABXY_GLYPH_OFFSET   36
+#define ABXY_HIT            18
 
 // Start/menu glyph reuses the lower labelled circle of column 2 (the silver
 // menu "lens"), a 48x48 region centred on the glyph at SVG (320, 100).
 #define START_CLIP          296, 76, 344, 124
-#define START_HIT           30
+#define START_HIT           24
 
 // Floating D-pad geometry (SVG px). The base cell fills a 128 cell; the pressed
 // arrow highlights are 64x64 crops of the highlight row (col 0 row 1).
@@ -90,12 +97,20 @@
 
 // ScummVM "S" button, drawn from primitives into the spare row. Opens the GMM.
 #define SCUMM_CLIP            0, 256,  48, 304
-#define SCUMM_HIT           26
+#define SCUMM_HIT           24
 
 // L1 / R1 shoulder pills, drawn into the spare row.
 #define L1_CLIP             224, 258, 320, 302
 #define R1_CLIP             224, 306, 320, 350
-#define SHOULDER_HIT        48
+#define SHOULDER_HIT        32
+
+// Drag-to-look indicator (drawn from primitives into the spare row): a ring
+// ("base", anchored at the finger-down position) and a filled dot ("knob", at
+// the current finger position). Sizes in SVG px.
+#define LOOK_RING_RADIUS    34
+#define LOOK_DOT_RADIUS     13
+#define LOOK_RING_CLIP       60, 256, 60 + 2 * LOOK_RING_RADIUS, 256 + 2 * LOOK_RING_RADIUS
+#define LOOK_DOT_CLIP       150, 256, 150 + 2 * LOOK_DOT_RADIUS, 256 + 2 * LOOK_DOT_RADIUS
 
 #define ALPHA_OPAQUE       255
 #define ZOMBIE_TIMEOUT     500 // ms
@@ -104,26 +119,34 @@
 // synthesizes a left click instead.
 #define TAP_MAX_TRAVEL       8
 
+// Drag-to-look feel (tunable). The per-frame finger delta is turned into
+// relative-mouse motion as:  relMouse = delta * BASE * (1 + ACCEL * speed),
+// where speed is the per-frame finger travel magnitude in window pixels. BASE
+// is ~2x the previous sensitivity; ACCEL makes fast flicks move the camera
+// disproportionately more than slow drags.
+#define LOOK_BASE_SENS       2.5f
+#define LOOK_ACCEL           0.04f
+
 // ---------------------------------------------------------------------------
 // Home (resting) positions of the controls, in percent of the window. AAA
 // touch-FPS layout in landscape: D-pad bottom-left, A/B/X/Y diamond
-// bottom-right, shoulders top corners, Start top-centre, the ScummVM button in
-// the top-left corner and an invisible drag-to-look region filling the rest of
-// the right half.
+// bottom-right, and a compact secondary top-centre row holding (left to right)
+// L1, the ScummVM button, Start and R1. An invisible drag-to-look region fills
+// the rest of the right half. (The mode-toggle icon lives in the top-right
+// corner and is drawn elsewhere.)
 // ---------------------------------------------------------------------------
-#define DIR_HOME_X_PCT       18
-#define DIR_HOME_Y_PCT       75
+#define DIR_HOME_X_PCT       17
+#define DIR_HOME_Y_PCT       76
 #define ABXY_HOME_X_PCT      85
-#define ABXY_HOME_Y_PCT      75
-#define SHOULDER_L_X_PCT      9
-#define SHOULDER_R_X_PCT     91
-#define SHOULDER_Y_PCT       12
-#define START_HOME_X_PCT     50
-#define START_HOME_Y_PCT      8
-// ScummVM/GMM button: top-left corner, clear of the L1 pill and the mode-toggle
-// icon (which lives in the top-right corner).
-#define SCUMM_HOME_X_PCT      4
-#define SCUMM_HOME_Y_PCT      7
+#define ABXY_HOME_Y_PCT      76
+
+// Secondary top-centre cluster: four evenly spaced items centred on 50%.
+#define AUX_Y_PCT             9
+#define AUX_STEP_X_PCT       10
+#define AUX_L1_X_PCT        (50 - 3 * AUX_STEP_X_PCT / 2)   // 35
+#define AUX_SCUMM_X_PCT     (50 - 1 * AUX_STEP_X_PCT / 2)   // 45
+#define AUX_START_X_PCT     (50 + 1 * AUX_STEP_X_PCT / 2)   // 55
+#define AUX_R1_X_PCT        (50 + 3 * AUX_STEP_X_PCT / 2)   // 65
 
 // Fingers left of this (percent of width) and not on a hotspot drive the
 // D-pad; everything else drives drag-to-look.
@@ -158,14 +181,18 @@ TouchControls::TouchControls() :
 	_baseAlpha(ALPHA_OPAQUE * 6 / 10) {
 	_gesturesInsets[0] = _gesturesInsets[1] = _gesturesInsets[2] = _gesturesInsets[3] = 0;
 	_functions[kFunctionDpad]      = new FunctionDpad(this);
+	// The first face button owns the shared resting-cluster glyph (drawn once);
+	// all four still have independent hotspots and pressed highlights. The last
+	// two args are the highlight crop offset (in half-widths/heights) from the
+	// cluster centre, matching the colour circles of the highlight row.
 	_functions[kFunctionButtonY]   = new FunctionButton(this, Common::JOYSTICK_BUTTON_Y,
-			0, -ABXY_SPACING, Common::Rect(ABXY_REST_Y), Common::Rect(ABXY_HL_Y));
+			0, -ABXY_GLYPH_OFFSET, Common::Rect(ABXY_HL_Y), -1, -2, true);
 	_functions[kFunctionButtonB]   = new FunctionButton(this, Common::JOYSTICK_BUTTON_B,
-			ABXY_SPACING, 0, Common::Rect(ABXY_REST_B), Common::Rect(ABXY_HL_B));
+			ABXY_GLYPH_OFFSET, 0, Common::Rect(ABXY_HL_B), 0, -1, false);
 	_functions[kFunctionButtonA]   = new FunctionButton(this, Common::JOYSTICK_BUTTON_A,
-			0, ABXY_SPACING, Common::Rect(ABXY_REST_A), Common::Rect(ABXY_HL_A));
+			0, ABXY_GLYPH_OFFSET, Common::Rect(ABXY_HL_A), -1, 0, false);
 	_functions[kFunctionButtonX]   = new FunctionButton(this, Common::JOYSTICK_BUTTON_X,
-			-ABXY_SPACING, 0, Common::Rect(ABXY_REST_X), Common::Rect(ABXY_HL_X));
+			-ABXY_GLYPH_OFFSET, 0, Common::Rect(ABXY_HL_X), -2, -1, false);
 	_functions[kFunctionShoulderL] = new FunctionShoulder(this, Common::JOYSTICK_BUTTON_LEFT_SHOULDER, false);
 	_functions[kFunctionShoulderR] = new FunctionShoulder(this, Common::JOYSTICK_BUTTON_RIGHT_SHOULDER, true);
 	_functions[kFunctionStart]     = new FunctionStart(this);
@@ -260,6 +287,33 @@ void TouchControls::renderPrimitives() {
 			font->drawString(_svg, pills[i].label, r.left, ty, r.width(), textCol,
 					Graphics::kTextAlignCenter);
 		}
+	}
+
+	// --- Drag-to-look indicator: a ring ("base") and a filled dot ("knob") ---
+	const uint32 ringCol = fmt.ARGBToColor(210, 240, 240, 240);
+	const uint32 dotCol  = fmt.ARGBToColor(255, 255, 255, 255); // brighter knob
+	{
+		Common::Rect c(LOOK_RING_CLIP);
+		Common::Rect r(SVG_PIXELS(c.left), SVG_PIXELS(c.top),
+				SVG_PIXELS(c.right), SVG_PIXELS(c.bottom));
+		int cx = (r.left + r.right) / 2;
+		int cy = (r.top + r.bottom) / 2;
+		int rOut = r.width() / 2 - 1;
+		// A few concentric outlines give the ring some thickness.
+		int thick = MAX(2, r.width() / 14);
+		for (int t = 0; t < thick; t++) {
+			_svg->drawEllipse(cx - rOut + t, cy - rOut + t,
+					cx + rOut - t, cy + rOut - t, ringCol, false);
+		}
+	}
+	{
+		Common::Rect c(LOOK_DOT_CLIP);
+		Common::Rect r(SVG_PIXELS(c.left), SVG_PIXELS(c.top),
+				SVG_PIXELS(c.right), SVG_PIXELS(c.bottom));
+		int cx = (r.left + r.right) / 2;
+		int cy = (r.top + r.bottom) / 2;
+		int rOut = r.width() / 2 - 1;
+		_svg->drawEllipse(cx - rOut, cy - rOut, cx + rOut, cy + rOut, dotCol, true);
 	}
 }
 
@@ -586,15 +640,20 @@ void TouchControls::mainMenu() {
 	dynamic_cast<OSystem_SDL *>(g_system)->pushEvent(ev);
 }
 
-void TouchControls::drawSurface(uint8 alpha, int x, int y, int offX, int offY, const Common::Rect &clip) const {
+void TouchControls::drawSurface(uint8 alpha, int x, int y, int offX, int offY, const Common::Rect &clip, int sizePct) const {
 	if (!alpha) {
 		return;
 	}
 	Common::Rect clip_(SVG_PIXELS(clip.left), SVG_PIXELS(clip.top),
 			SVG_PIXELS(clip.right), SVG_PIXELS(clip.bottom));
-	_drawer->touchControlDraw(alpha,
-			SCALED_PIXELS(x + SVG_SCALED(offX)), SCALED_PIXELS(y + SVG_SCALED(offY)),
-			clip_.width(), clip_.height(), clip_);
+	// Destination size = source crop scaled by sizePct (drawTexture/RenderCopy
+	// stretch the crop). The SVG-px offsets are scaled identically so centring
+	// math (e.g. -clip.width()/2) keeps centring the scaled glyph.
+	int w = clip_.width() * sizePct / 100;
+	int h = clip_.height() * sizePct / 100;
+	int dx = SCALED_PIXELS(x) + SVG_PIXELS(offX) * sizePct / 100;
+	int dy = SCALED_PIXELS(y) + SVG_PIXELS(offY) * sizePct / 100;
+	_drawer->touchControlDraw(alpha, dx, dy, w, h, clip_);
 }
 
 // ===========================================================================
@@ -679,7 +738,7 @@ void TouchControls::FunctionDpad::draw(uint8 baseAlpha, uint8 hlAlpha) {
 	// Base: D-pad cell (circle + grey arrows).
 	{
 		Common::Rect clip(DPAD_BASE_CLIP);
-		parent->drawSurface(baseAlpha, cx, cy, -clip.width() / 2, -clip.height() / 2, clip);
+		parent->drawSurface(baseAlpha, cx, cy, -clip.width() / 2, -clip.height() / 2, clip, DPAD_SIZE_PCT);
 	}
 
 	if (!hlAlpha || !mask) {
@@ -689,19 +748,19 @@ void TouchControls::FunctionDpad::draw(uint8 baseAlpha, uint8 hlAlpha) {
 	// Pressed arrow highlights from col 0 row 1.
 	if (mask & 1) { // up
 		Common::Rect clip(0, DPAD_HL_TOP, DPAD_ARROW_W, DPAD_HL_TOP + DPAD_ARROW_H);
-		parent->drawSurface(hlAlpha, cx, cy, -clip.width() / 2, -clip.height(), clip);
+		parent->drawSurface(hlAlpha, cx, cy, -clip.width() / 2, -clip.height(), clip, DPAD_SIZE_PCT);
 	}
 	if (mask & 2) { // right
 		Common::Rect clip(DPAD_ARROW_W, DPAD_HL_TOP, 2 * DPAD_ARROW_W, DPAD_HL_TOP + DPAD_ARROW_H);
-		parent->drawSurface(hlAlpha, cx, cy, 0, -clip.height() / 2, clip);
+		parent->drawSurface(hlAlpha, cx, cy, 0, -clip.height() / 2, clip, DPAD_SIZE_PCT);
 	}
 	if (mask & 4) { // down
 		Common::Rect clip(0, DPAD_HL_TOP + DPAD_ARROW_H, DPAD_ARROW_W, DPAD_HL_TOP + 2 * DPAD_ARROW_H);
-		parent->drawSurface(hlAlpha, cx, cy, -clip.width() / 2, 0, clip);
+		parent->drawSurface(hlAlpha, cx, cy, -clip.width() / 2, 0, clip, DPAD_SIZE_PCT);
 	}
 	if (mask & 8) { // left
 		Common::Rect clip(DPAD_ARROW_W, DPAD_HL_TOP + DPAD_ARROW_H, 2 * DPAD_ARROW_W, DPAD_HL_TOP + 2 * DPAD_ARROW_H);
-		parent->drawSurface(hlAlpha, cx, cy, -clip.width(), -clip.height() / 2, clip);
+		parent->drawSurface(hlAlpha, cx, cy, -clip.width(), -clip.height() / 2, clip, DPAD_SIZE_PCT);
 	}
 }
 
@@ -710,8 +769,8 @@ void TouchControls::FunctionDpad::draw(uint8 baseAlpha, uint8 hlAlpha) {
 // ===========================================================================
 
 bool TouchControls::FunctionScummVM::isInside(int x, int y) {
-	int cx = parent->homeX(SCUMM_HOME_X_PCT);
-	int cy = parent->homeY(SCUMM_HOME_Y_PCT);
+	int cx = parent->homeX(AUX_SCUMM_X_PCT);
+	int cy = parent->homeY(AUX_Y_PCT);
 	int dX = x - cx;
 	int dY = y - cy;
 	unsigned int sqNorm = (unsigned int)(dX * dX) + (unsigned int)(dY * dY);
@@ -730,14 +789,14 @@ void TouchControls::FunctionScummVM::touch(int dX, int dY, Action action) {
 }
 
 void TouchControls::FunctionScummVM::draw(uint8 baseAlpha, uint8 hlAlpha) {
-	int cx = parent->homeX(SCUMM_HOME_X_PCT);
-	int cy = parent->homeY(SCUMM_HOME_Y_PCT);
+	int cx = parent->homeX(AUX_SCUMM_X_PCT);
+	int cy = parent->homeY(AUX_Y_PCT);
 
 	Common::Rect clip(SCUMM_CLIP);
-	parent->drawSurface(baseAlpha, cx, cy, -clip.width() / 2, -clip.height() / 2, clip);
+	parent->drawSurface(baseAlpha, cx, cy, -clip.width() / 2, -clip.height() / 2, clip, AUX_SIZE_PCT);
 	if (hlAlpha) {
 		// Brighten the badge while pressed.
-		parent->drawSurface(hlAlpha, cx, cy, -clip.width() / 2, -clip.height() / 2, clip);
+		parent->drawSurface(hlAlpha, cx, cy, -clip.width() / 2, -clip.height() / 2, clip, AUX_SIZE_PCT);
 	}
 }
 
@@ -746,8 +805,9 @@ void TouchControls::FunctionScummVM::draw(uint8 baseAlpha, uint8 hlAlpha) {
 // ===========================================================================
 
 void TouchControls::FunctionButton::center(int &cx, int &cy) const {
-	cx = parent->homeX(ABXY_HOME_X_PCT) + SVG_UNSCALED(_dxSvg) * (int)parent->_scale;
-	cy = parent->homeY(ABXY_HOME_Y_PCT) + SVG_UNSCALED(_dySvg) * (int)parent->_scale;
+	// The hotspots sit on the letters of the (scaled) resting cluster glyph.
+	cx = parent->homeX(ABXY_HOME_X_PCT) + SVG_UNSCALED(_dxSvg) * (int)parent->_scale * ABXY_SIZE_PCT / 100;
+	cy = parent->homeY(ABXY_HOME_Y_PCT) + SVG_UNSCALED(_dySvg) * (int)parent->_scale * ABXY_SIZE_PCT / 100;
 }
 
 bool TouchControls::FunctionButton::isInside(int x, int y) {
@@ -772,12 +832,22 @@ void TouchControls::FunctionButton::touch(int dX, int dY, Action action) {
 }
 
 void TouchControls::FunctionButton::draw(uint8 baseAlpha, uint8 hlAlpha) {
-	int cx, cy;
-	center(cx, cy);
+	// The whole resting cluster glyph is drawn once (by the cluster owner),
+	// cleanly and uncut, centred on the cluster home position.
+	int ccx = parent->homeX(ABXY_HOME_X_PCT);
+	int ccy = parent->homeY(ABXY_HOME_Y_PCT);
 
-	parent->drawSurface(baseAlpha, cx, cy, -_restClip.width() / 2, -_restClip.height() / 2, _restClip);
+	if (_clusterOwner) {
+		Common::Rect clip(ABXY_CLUSTER_CLIP);
+		parent->drawSurface(baseAlpha, ccx, ccy, -clip.width() / 2, -clip.height() / 2, clip, ABXY_SIZE_PCT);
+	}
+
+	// Per-button pressed highlight: the matching colour circle of the highlight
+	// row, placed (relative to the cluster centre) on top of this button.
 	if (hlAlpha && pressed) {
-		parent->drawSurface(hlAlpha, cx, cy, -_hlClip.width() / 2, -_hlClip.height() / 2, _hlClip);
+		Common::Rect clip(_hlClip);
+		parent->drawSurface(hlAlpha, ccx, ccy,
+				_hlMulX * clip.width() / 2, _hlMulY * clip.height() / 2, clip, ABXY_SIZE_PCT);
 	}
 }
 
@@ -786,8 +856,8 @@ void TouchControls::FunctionButton::draw(uint8 baseAlpha, uint8 hlAlpha) {
 // ===========================================================================
 
 bool TouchControls::FunctionShoulder::isInside(int x, int y) {
-	int cx = parent->homeX(_right ? SHOULDER_R_X_PCT : SHOULDER_L_X_PCT);
-	int cy = parent->homeY(SHOULDER_Y_PCT);
+	int cx = parent->homeX(_right ? AUX_R1_X_PCT : AUX_L1_X_PCT);
+	int cy = parent->homeY(AUX_Y_PCT);
 	int dX = x - cx;
 	int dY = y - cy;
 	unsigned int sqNorm = (unsigned int)(dX * dX) + (unsigned int)(dY * dY);
@@ -807,14 +877,14 @@ void TouchControls::FunctionShoulder::touch(int dX, int dY, Action action) {
 }
 
 void TouchControls::FunctionShoulder::draw(uint8 baseAlpha, uint8 hlAlpha) {
-	int cx = parent->homeX(_right ? SHOULDER_R_X_PCT : SHOULDER_L_X_PCT);
-	int cy = parent->homeY(SHOULDER_Y_PCT);
+	int cx = parent->homeX(_right ? AUX_R1_X_PCT : AUX_L1_X_PCT);
+	int cy = parent->homeY(AUX_Y_PCT);
 
 	Common::Rect clip = _right ? Common::Rect(R1_CLIP) : Common::Rect(L1_CLIP);
-	parent->drawSurface(baseAlpha, cx, cy, -clip.width() / 2, -clip.height() / 2, clip);
+	parent->drawSurface(baseAlpha, cx, cy, -clip.width() / 2, -clip.height() / 2, clip, AUX_SIZE_PCT);
 	if (hlAlpha) {
 		// Brighten the pill while pressed.
-		parent->drawSurface(hlAlpha, cx, cy, -clip.width() / 2, -clip.height() / 2, clip);
+		parent->drawSurface(hlAlpha, cx, cy, -clip.width() / 2, -clip.height() / 2, clip, AUX_SIZE_PCT);
 	}
 }
 
@@ -823,8 +893,8 @@ void TouchControls::FunctionShoulder::draw(uint8 baseAlpha, uint8 hlAlpha) {
 // ===========================================================================
 
 bool TouchControls::FunctionStart::isInside(int x, int y) {
-	int cx = parent->homeX(START_HOME_X_PCT);
-	int cy = parent->homeY(START_HOME_Y_PCT);
+	int cx = parent->homeX(AUX_START_X_PCT);
+	int cy = parent->homeY(AUX_Y_PCT);
 	int dX = x - cx;
 	int dY = y - cy;
 	unsigned int sqNorm = (unsigned int)(dX * dX) + (unsigned int)(dY * dY);
@@ -845,14 +915,14 @@ void TouchControls::FunctionStart::touch(int dX, int dY, Action action) {
 }
 
 void TouchControls::FunctionStart::draw(uint8 baseAlpha, uint8 hlAlpha) {
-	int cx = parent->homeX(START_HOME_X_PCT);
-	int cy = parent->homeY(START_HOME_Y_PCT);
+	int cx = parent->homeX(AUX_START_X_PCT);
+	int cy = parent->homeY(AUX_Y_PCT);
 
 	Common::Rect clip(START_CLIP);
-	parent->drawSurface(baseAlpha, cx, cy, -clip.width() / 2, -clip.height() / 2, clip);
+	parent->drawSurface(baseAlpha, cx, cy, -clip.width() / 2, -clip.height() / 2, clip, AUX_SIZE_PCT);
 	if (hlAlpha) {
 		// Brighten the glyph while pressed.
-		parent->drawSurface(hlAlpha, cx, cy, -clip.width() / 2, -clip.height() / 2, clip);
+		parent->drawSurface(hlAlpha, cx, cy, -clip.width() / 2, -clip.height() / 2, clip, AUX_SIZE_PCT);
 	}
 }
 
@@ -888,7 +958,9 @@ void TouchControls::FunctionLook::touch(int dX, int dY, Action action) {
 	}
 
 	// kActionMove: convert per-frame finger delta into relative-mouse motion,
-	// mirroring the touchpad relmouse scaling in sdl2-events.cpp.
+	// mirroring the touchpad relmouse scaling in sdl2-events.cpp, but with a
+	// higher base sensitivity and speed-based acceleration so fast flicks turn
+	// the camera disproportionately more than slow drags.
 	int ddX = (int)currentX - prevX;
 	int ddY = (int)currentY - prevY;
 	prevX = currentX;
@@ -897,8 +969,14 @@ void TouchControls::FunctionLook::touch(int dX, int dY, Action action) {
 	int kbdMouseSpeed = CLIP<int>(ConfMan.getInt("kbdmouse_speed"), 0, 7);
 	float speedFactor = (kbdMouseSpeed + 1) * 0.25f;
 
-	hiresX += (ddX / (float)SCALE_FACTOR_FXP) * 1.25f * speedFactor;
-	hiresY += (ddY / (float)SCALE_FACTOR_FXP) * 1.25f * speedFactor;
+	// Per-frame finger delta and travel magnitude, in window pixels.
+	float dxPx = ddX / (float)SCALE_FACTOR_FXP;
+	float dyPx = ddY / (float)SCALE_FACTOR_FXP;
+	float fingerSpeed = sqrtf(dxPx * dxPx + dyPx * dyPx);
+	float gain = LOOK_BASE_SENS * speedFactor * (1.0f + LOOK_ACCEL * fingerSpeed);
+
+	hiresX += dxPx * gain;
+	hiresY += dyPx * gain;
 
 	int relX = (int)hiresX;
 	int relY = (int)hiresY;
@@ -908,4 +986,22 @@ void TouchControls::FunctionLook::touch(int dX, int dY, Action action) {
 	if (relX || relY) {
 		mouseRelative(relX, relY);
 	}
+}
+
+void TouchControls::FunctionLook::draw(uint8 baseAlpha, uint8 /*hlAlpha*/) {
+	// Only while a finger is actively dragging the look region: a ring anchored
+	// at the finger-down position plus a filled dot at the current finger
+	// position, so the offset shows look direction/speed. Gone on release.
+	if (status != kFunctionActive) {
+		return;
+	}
+
+	// The knob is drawn a little brighter than the configured pad opacity.
+	uint8 dotAlpha = (uint8)MIN<int>(ALPHA_OPAQUE, baseAlpha + (ALPHA_OPAQUE - baseAlpha) / 2);
+
+	Common::Rect ring(LOOK_RING_CLIP);
+	parent->drawSurface(baseAlpha, startX, startY, -ring.width() / 2, -ring.height() / 2, ring);
+
+	Common::Rect dot(LOOK_DOT_CLIP);
+	parent->drawSurface(dotAlpha, currentX, currentY, -dot.width() / 2, -dot.height() / 2, dot);
 }
