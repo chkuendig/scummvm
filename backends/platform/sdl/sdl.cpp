@@ -710,6 +710,10 @@ void OSystem_SDL::engineDone() {
 	_eventSource->setEngineRunning(false);
 }
 
+void OSystem_SDL::pushEvent(const Common::Event &ev) {
+	_eventSource->addEvent(ev);
+}
+
 void OSystem_SDL::initSDL() {
 	// Check if SDL has not been initialized
 	if (!_initedSDL) {

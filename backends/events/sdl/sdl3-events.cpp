@@ -614,6 +614,13 @@ void SdlEventSource::preprocessFingerMotion(SDL_Event *event) {
 }
 
 bool SdlEventSource::pollEvent(Common::Event &event) {
+	// Drain synthetic events (e.g. from the on-screen touch controls) first so
+	// they are routed through the keymapper like any other input event.
+	if (!_eventQueue.empty()) {
+		event = _eventQueue.pop();
+		return true;
+	}
+
 	finishSimulatedMouseClicks();
 
 	// In case we still need to send a key up event for a key down from a

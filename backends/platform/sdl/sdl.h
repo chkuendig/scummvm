@@ -119,6 +119,12 @@ public:
 	bool openUrl(const Common::String &url) override;
 #endif
 
+	/**
+	 * Inject a synthetic event into the SDL event source so it is routed
+	 * through the keymapper (used by the on-screen touch controls).
+	 */
+	void pushEvent(const Common::Event &ev);
+
 	void setWindowCaption(const Common::U32String &caption) override;
 	void addSysArchivesToSearchSet(Common::SearchSet &s, int priority = 0) override;
 	Common::MutexInternal *createMutex() override;
