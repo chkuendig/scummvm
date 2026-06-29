@@ -225,10 +225,6 @@ public:
 	virtual void ShowCursor(bool abX) = 0;
 
 	virtual int GetMultisampling() = 0;
-	/**
-	 * Get Size of screen
-	 * \return
-	 */
 	virtual cVector2f GetScreenSize() = 0;
 	virtual cVector2f GetVirtualSize() = 0;
 	/**
@@ -259,6 +255,14 @@ public:
 	virtual Graphics::PixelFormat *GetPixelFormat() = 0;
 
 	virtual iGpuProgram *CreateGpuProgram(const tString &vertex, const tString &fragment) = 0;
+
+	/**
+	 * The backend's default "textured + vertex color" shader, used as the
+	 * trans-pass fallback on backends with no fixed-function pipeline. Returns
+	 * nullptr on backends where fixed-function still works (desktop GL, TGL) —
+	 * callers should treat nullptr as "use fixed function."
+	 */
+	virtual iGpuProgram *GetSimpleShader() { return nullptr; }
 
 	// TODO: Kinda quick and diry, better to have a screen to Bitmap.
 	//  and then a save as in the Bitmap.

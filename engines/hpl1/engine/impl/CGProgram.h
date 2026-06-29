@@ -40,6 +40,10 @@
 
 namespace hpl {
 
+#if USE_FORCED_GLES2
+class cLowLevelGraphicsGLES;
+#endif
+
 class cCGProgram : public iGpuProgram {
 public:
 	cCGProgram(const tString &vertex, const tString &fragment);
@@ -63,12 +67,35 @@ public:
 	bool SetMatrixf(const tString &asName, eGpuProgramMatrix mType,
 					eGpuProgramMatrixOp mOp);
 
+#if USE_FORCED_GLES2
+	// GLES2 has no glGetFloatv(GL_MODELVIEW_MATRIX). cCGProgram::SetMatrixf
+	// (ViewProjection, Identity) reads the matrix stack from the LowLevel
+	// renderer instead — set this once from cLowLevelGraphicsGLES::Init.
+	static void SetCurrentLowLevel(cLowLevelGraphicsGLES *apLowLevel) { s_pLowLevel = apLowLevel; }
+#endif
+
+#if USE_FORCED_GLES2
+	// GLES2 has no non-normalized Rect sampler; cCGProgram polyfills
+	// texture2DRect() with normalized UVs and needs the framebuffer size. Set
+	// on screen/virtual-size changes; Bind() pushes the reciprocal as a uniform.
+	static void SetCurrentFramebufferSize(int aWidth, int aHeight) {
+		s_framebufferWidth = aWidth;
+		s_framebufferHeight = aHeight;
+	}
+#endif
+
 private:
 	OpenGL::Shader *_shader;
 
 	tString msName;
 	tString msFile;
 	tString msEntry;
+
+#if USE_FORCED_GLES2
+	static cLowLevelGraphicsGLES *s_pLowLevel;
+	static int s_framebufferWidth;
+	static int s_framebufferHeight;
+#endif
 };
 
 } // namespace hpl
