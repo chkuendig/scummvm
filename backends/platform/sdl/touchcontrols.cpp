@@ -22,36 +22,135 @@
 #include "backends/platform/sdl/touchcontrols.h"
 #include "backends/platform/sdl/sdl.h"
 
+#include "common/config-manager.h"
 #include "common/file.h"
 #include "common/system.h"
 #include "common/textconsole.h"
 #include "common/util.h"
+#include "graphics/fontman.h"
+#include "graphics/font.h"
 #include "graphics/managed_surface.h"
 #include "graphics/svg.h"
 
+#include <math.h>
+
+// ---------------------------------------------------------------------------
+// gamepad.svg sprite-sheet layout (in SVG pixels, 384x256, three 128x128
+// columns each with a "resting" row and a "pressed" highlight row):
+//   col 0 row 0 (0,0)     : D-pad base (circle + grey arrows)
+//   col 0 row 1 (0,128)   : D-pad pressed arrows (white highlights)
+//   col 1 row 0 (128,0)   : A/B/X/Y resting cluster
+//   col 1 row 1 (128,128) : A/B/X/Y pressed highlights
+//   col 2 row 0 (256,0)   : labelled circles (the menu "lens" reused for Start)
+//   col 2 row 1 (256,128) : (system highlights, unused here)
+//
+// A spare row is appended below the 384x256 sheet (SVG y 256..384) into which
+// the ScummVM "S" button, the L1/R1 pills and the drag-to-look ring/knob are
+// drawn from primitives at load time (see renderPrimitives()).
+// ---------------------------------------------------------------------------
 #define SVG_WIDTH          384
 #define SVG_HEIGHT         256
-#define BG_WIDTH           128
-#define BG_HEIGHT          128
-#define ARROW_DEAD          21
-#define ARROW_SUPER         42
-#define ARROW_END           64
-#define ARROW_WIDTH         64
-#define ARROW_SEMI_HEIGHT   52
-#define ARROW_HEIGHT        64
-#define ARROW_HL_LEFT        0
-#define ARROW_HL_TOP       128
-#define BUTTON_DEAD         12
-#define BUTTON_END          64
-#define BUTTON_WIDTH        64
-#define BUTTON_HEIGHT       64
-#define BUTTON_HL_LEFT     128
-#define BUTTON_HL_TOP      128
-#define BUTTON2_HL_LEFT    256
-#define BUTTON2_HL_TOP     128
+// Total height of the backing surface: the sheet plus the spare primitives row.
+#define SVG_FULL_HEIGHT    384
+
+// ---------------------------------------------------------------------------
+// Glyph sizes, as a percentage of the gamepad.svg native (1.5x) glyph size.
+// Grouped and tunable: the primary controls (D-pad, A/B/X/Y) are drawn smaller
+// than the old 100% so they sit comfortably under the thumbs, and the secondary
+// top-row controls (L1/R1, Start, ScummVM) smaller still so they clearly read
+// as secondary.
+// ---------------------------------------------------------------------------
+#define DPAD_SIZE_PCT        68
+#define ABXY_SIZE_PCT        68
+#define AUX_SIZE_PCT         52
+
+// A/B/X/Y: the whole resting cluster glyph (col 1 row 0) is drawn once, cleanly
+// (no per-button cropping), and a per-button pressed-highlight circle (col 1
+// row 1) is drawn on top of whichever button(s) are held. This keeps the four
+// independent multi-touch hotspots while rendering uncut glyphs.
+#define ABXY_CLUSTER_CLIP   128,   0, 256, 128
+#define ABXY_HL_Y           128, 128, 192, 192
+#define ABXY_HL_B           192, 128, 256, 192
+#define ABXY_HL_A           128, 192, 192, 256
+#define ABXY_HL_X           192, 192, 256, 256
+
+// Letter spacing from the cluster centre (SVG px, matches the cluster art) and
+// the per-button hit radius (SVG px). The hotspots sit on the letters; the
+// radius is kept just under half the diagonal letter spacing so the four
+// hotspots stay independent (multi-touch).
+#define ABXY_GLYPH_OFFSET   36
+#define ABXY_HIT            18
+
+// Start/menu glyph reuses the lower labelled circle of column 2 (the silver
+// menu "lens"), a 48x48 region centred on the glyph at SVG (320, 100).
+#define START_CLIP          296, 76, 344, 124
+#define START_HIT           24
+
+// Floating D-pad geometry (SVG px). The base cell fills a 128 cell; the pressed
+// arrow highlights are 64x64 crops of the highlight row (col 0 row 1).
+#define DPAD_BASE_CLIP        0,   0, 128, 128
+#define DPAD_ARROW_W        64
+#define DPAD_ARROW_H        64
+#define DPAD_HL_TOP        128
+#define DPAD_DEAD           21   // direction dead-zone (SVG px)
+#define DPAD_HIT            62   // hit radius for zombie re-touch / inside test
+
+// ScummVM "S" button, drawn from primitives into the spare row. Opens the GMM.
+#define SCUMM_CLIP            0, 256,  48, 304
+#define SCUMM_HIT           24
+
+// L1 / R1 shoulder pills, drawn into the spare row.
+#define L1_CLIP             224, 256, 272, 304
+#define R1_CLIP             280, 256, 328, 304
+#define SHOULDER_HIT        32
+
+// Drag-to-look indicator (drawn from primitives into the spare row): a ring
+// ("base", anchored at the finger-down position) and a filled dot ("knob", at
+// the current finger position). Sizes in SVG px.
+#define LOOK_RING_RADIUS    34
+#define LOOK_DOT_RADIUS     13
+#define LOOK_RING_CLIP       60, 256, 60 + 2 * LOOK_RING_RADIUS, 256 + 2 * LOOK_RING_RADIUS
+#define LOOK_DOT_CLIP       150, 256, 150 + 2 * LOOK_DOT_RADIUS, 256 + 2 * LOOK_DOT_RADIUS
 
 #define ALPHA_OPAQUE       255
 #define ZOMBIE_TIMEOUT     500 // ms
+
+// Drag-to-look: a finger that lifts having travelled less than this (window px)
+// synthesizes a left click instead.
+#define TAP_MAX_TRAVEL       8
+
+// Drag-to-look feel (tunable). The per-frame finger delta is turned into
+// relative-mouse motion as:  relMouse = delta * BASE * (1 + ACCEL * speed),
+// where speed is the per-frame finger travel magnitude in window pixels. BASE
+// is ~2x the previous sensitivity; ACCEL makes fast flicks move the camera
+// disproportionately more than slow drags.
+#define LOOK_BASE_SENS       2.5f
+#define LOOK_ACCEL           0.04f
+
+// ---------------------------------------------------------------------------
+// Home (resting) positions of the controls, in percent of the window. AAA
+// touch-FPS layout in landscape: D-pad bottom-left, A/B/X/Y diamond
+// bottom-right, and a compact secondary top-centre row holding (left to right)
+// L1, the ScummVM button, Start and R1. An invisible drag-to-look region fills
+// the rest of the right half. (The mode-toggle icon lives in the top-right
+// corner and is drawn elsewhere.)
+// ---------------------------------------------------------------------------
+#define DIR_HOME_X_PCT       17
+#define DIR_HOME_Y_PCT       76
+#define ABXY_HOME_X_PCT      85
+#define ABXY_HOME_Y_PCT      76
+
+// Secondary top-centre cluster: four evenly spaced items centred on 50%.
+#define AUX_Y_PCT             9
+#define AUX_STEP_X_PCT       10
+#define AUX_L1_X_PCT        (50 - 3 * AUX_STEP_X_PCT / 2)   // 35
+#define AUX_SCUMM_X_PCT     (50 - 1 * AUX_STEP_X_PCT / 2)   // 45
+#define AUX_START_X_PCT     (50 + 1 * AUX_STEP_X_PCT / 2)   // 55
+#define AUX_R1_X_PCT        (50 + 3 * AUX_STEP_X_PCT / 2)   // 65
+
+// Fingers left of this (percent of width) and not on a hotspot drive the
+// D-pad; everything else drives drag-to-look.
+#define LEFT_REGION_MAX_PCT  40
 
 // The scale factor is stored as a fixed point 30.2 bits
 // This avoids floating point operations
@@ -78,11 +177,27 @@ TouchControls::TouchControls() :
 	_scale2(0),
 	_svg(nullptr),
 	_loadFailed(false),
-	_zombieCount(0) {
+	_zombieCount(0),
+	_baseAlpha(ALPHA_OPAQUE * 6 / 10) {
 	_gesturesInsets[0] = _gesturesInsets[1] = _gesturesInsets[2] = _gesturesInsets[3] = 0;
-	_functions[kFunctionLeft]   = new FunctionLeft(this);
-	_functions[kFunctionRight]  = new FunctionRight(this);
-	_functions[kFunctionCenter] = new FunctionCenter(this);
+	_functions[kFunctionDpad]      = new FunctionDpad(this);
+	// The first face button owns the shared resting-cluster glyph (drawn once);
+	// all four still have independent hotspots and pressed highlights. The last
+	// two args are the highlight crop offset (in half-widths/heights) from the
+	// cluster centre, matching the colour circles of the highlight row.
+	_functions[kFunctionButtonY]   = new FunctionButton(this, Common::JOYSTICK_BUTTON_Y,
+			0, -ABXY_GLYPH_OFFSET, Common::Rect(ABXY_HL_Y), -1, -2, true);
+	_functions[kFunctionButtonB]   = new FunctionButton(this, Common::JOYSTICK_BUTTON_B,
+			ABXY_GLYPH_OFFSET, 0, Common::Rect(ABXY_HL_B), 0, -1, false);
+	_functions[kFunctionButtonA]   = new FunctionButton(this, Common::JOYSTICK_BUTTON_A,
+			0, ABXY_GLYPH_OFFSET, Common::Rect(ABXY_HL_A), -1, 0, false);
+	_functions[kFunctionButtonX]   = new FunctionButton(this, Common::JOYSTICK_BUTTON_X,
+			-ABXY_GLYPH_OFFSET, 0, Common::Rect(ABXY_HL_X), -2, -1, false);
+	_functions[kFunctionShoulderL] = new FunctionShoulder(this, Common::JOYSTICK_BUTTON_LEFT_SHOULDER, false);
+	_functions[kFunctionShoulderR] = new FunctionShoulder(this, Common::JOYSTICK_BUTTON_RIGHT_SHOULDER, true);
+	_functions[kFunctionStart]     = new FunctionStart(this);
+	_functions[kFunctionScummVM]   = new FunctionScummVM(this);
+	_functions[kFunctionLook]      = new FunctionLook(this);
 }
 
 void TouchControls::init(float scale) {
@@ -91,6 +206,10 @@ void TouchControls::init(float scale) {
 	if (_loadFailed) {
 		return;
 	}
+
+	// Register the shared gamepad opacity setting (same key/default as the iOS
+	// backend) so reads below never hit an unregistered key.
+	ConfMan.registerDefault("gamepad_controller_opacity", 6);
 
 	_scale = scale * SCALE_FACTOR_FXP;
 	// As scale is small, this should fit in int
@@ -105,8 +224,99 @@ void TouchControls::init(float scale) {
 		return;
 	}
 
+	// Rasterize the sheet, then copy it into a taller surface so we have a spare
+	// row below it to draw the thumbstick ring/knob and the L1/R1 pills into.
+	Graphics::SVGBitmap sheet(&stream, SVG_PIXELS(SVG_WIDTH), SVG_PIXELS(SVG_HEIGHT));
+
 	delete _svg;
-	_svg = new Graphics::SVGBitmap(&stream, SVG_PIXELS(SVG_WIDTH), SVG_PIXELS(SVG_HEIGHT));
+	_svg = new Graphics::ManagedSurface(SVG_PIXELS(SVG_WIDTH), SVG_PIXELS(SVG_FULL_HEIGHT), sheet.format);
+	_svg->simpleBlitFrom(sheet);
+	renderPrimitives();
+}
+
+void TouchControls::renderPrimitives() {
+	if (!_svg) {
+		return;
+	}
+
+	Graphics::PixelFormat fmt = _svg->format;
+
+	// Clear the spare row to fully transparent.
+	_svg->fillRect(Common::Rect(0, SVG_PIXELS(SVG_HEIGHT), SVG_PIXELS(SVG_WIDTH), SVG_PIXELS(SVG_FULL_HEIGHT)),
+			fmt.ARGBToColor(0, 0, 0, 0));
+
+	const uint32 pillFill = fmt.ARGBToColor(150, 25,  25,  30);
+	const uint32 pillEdge = fmt.ARGBToColor(220, 235, 235, 235);
+	const uint32 textCol  = fmt.ARGBToColor(255, 245, 245, 245);
+
+	const Graphics::Font *font = FontMan.getFontByUsage(Graphics::FontManager::kBigGUIFont);
+	if (!font) {
+		font = FontMan.getFontByUsage(Graphics::FontManager::kGUIFont);
+	}
+
+	// --- ScummVM "S" button (round badge with an "S" glyph) ---
+	{
+		Common::Rect c(SCUMM_CLIP);
+		Common::Rect r(SVG_PIXELS(c.left), SVG_PIXELS(c.top),
+				SVG_PIXELS(c.right), SVG_PIXELS(c.bottom));
+		int cx = (r.left + r.right) / 2;
+		int cy = (r.top + r.bottom) / 2;
+		int rOut = r.width() / 2 - 1;
+		_svg->drawEllipse(cx - rOut, cy - rOut, cx + rOut, cy + rOut, pillFill, true);
+		_svg->drawEllipse(cx - rOut, cy - rOut, cx + rOut, cy + rOut, pillEdge, false);
+		if (font) {
+			int ty = cy - font->getFontHeight() / 2;
+			font->drawString(_svg, "S", r.left, ty, r.width(), textCol,
+					Graphics::kTextAlignCenter);
+		}
+	}
+
+	// --- L1 / R1 round badges with labels (match the ScummVM "S" badge) ---
+	struct { Common::Rect clip; const char *label; } pills[2] = {
+		{ Common::Rect(L1_CLIP), "L1" },
+		{ Common::Rect(R1_CLIP), "R1" }
+	};
+	for (int i = 0; i < 2; i++) {
+		Common::Rect r(SVG_PIXELS(pills[i].clip.left),  SVG_PIXELS(pills[i].clip.top),
+				SVG_PIXELS(pills[i].clip.right), SVG_PIXELS(pills[i].clip.bottom));
+		int cx = (r.left + r.right) / 2;
+		int cy = (r.top + r.bottom) / 2;
+		int rOut = r.width() / 2 - 1;
+		_svg->drawEllipse(cx - rOut, cy - rOut, cx + rOut, cy + rOut, pillFill, true);
+		_svg->drawEllipse(cx - rOut, cy - rOut, cx + rOut, cy + rOut, pillEdge, false);
+		if (font) {
+			int ty = cy - font->getFontHeight() / 2;
+			font->drawString(_svg, pills[i].label, r.left, ty, r.width(), textCol,
+					Graphics::kTextAlignCenter);
+		}
+	}
+
+	// --- Drag-to-look indicator: a ring ("base") and a filled dot ("knob") ---
+	const uint32 ringCol = fmt.ARGBToColor(210, 240, 240, 240);
+	const uint32 dotCol  = fmt.ARGBToColor(255, 255, 255, 255); // brighter knob
+	{
+		Common::Rect c(LOOK_RING_CLIP);
+		Common::Rect r(SVG_PIXELS(c.left), SVG_PIXELS(c.top),
+				SVG_PIXELS(c.right), SVG_PIXELS(c.bottom));
+		int cx = (r.left + r.right) / 2;
+		int cy = (r.top + r.bottom) / 2;
+		int rOut = r.width() / 2 - 1;
+		// A few concentric outlines give the ring some thickness.
+		int thick = MAX(2, r.width() / 14);
+		for (int t = 0; t < thick; t++) {
+			_svg->drawEllipse(cx - rOut + t, cy - rOut + t,
+					cx + rOut - t, cy + rOut - t, ringCol, false);
+		}
+	}
+	{
+		Common::Rect c(LOOK_DOT_CLIP);
+		Common::Rect r(SVG_PIXELS(c.left), SVG_PIXELS(c.top),
+				SVG_PIXELS(c.right), SVG_PIXELS(c.bottom));
+		int cx = (r.left + r.right) / 2;
+		int cy = (r.top + r.bottom) / 2;
+		int rOut = r.width() / 2 - 1;
+		_svg->drawEllipse(cx - rOut, cy - rOut, cx + rOut, cy + rOut, dotCol, true);
+	}
 }
 
 TouchControls::~TouchControls() {
@@ -114,6 +324,11 @@ TouchControls::~TouchControls() {
 	for(unsigned int i = 0; i < kFunctionCount; i++) {
 		delete _functions[i];
 	}
+}
+
+void TouchControls::refreshConfig() {
+	int opacity = CLIP(ConfMan.getInt("gamepad_controller_opacity"), 0, 10);
+	_baseAlpha = ALPHA_OPAQUE * opacity / 10;
 }
 
 void TouchControls::beforeDraw() {
@@ -156,21 +371,42 @@ TouchControls::FunctionId TouchControls::getFunctionId(int x, int y) {
 		return kFunctionNone;
 	}
 
-	float xRatio = float(x) / _screen_width;
-
-	if (xRatio < 0.3) {
-		return kFunctionLeft;
-	} else if (xRatio < 0.7) {
-		return kFunctionCenter;
-	} else {
-		return kFunctionRight;
+	// Hit-test priority: Start > ScummVM > shoulders > A/B/X/Y hotspots > left
+	// region (D-pad) > right region (drag-to-look).
+	if (_functions[kFunctionStart]->isInside(x, y)) {
+		return kFunctionStart;
 	}
+	if (_functions[kFunctionScummVM]->isInside(x, y)) {
+		return kFunctionScummVM;
+	}
+	if (_functions[kFunctionShoulderL]->isInside(x, y)) {
+		return kFunctionShoulderL;
+	}
+	if (_functions[kFunctionShoulderR]->isInside(x, y)) {
+		return kFunctionShoulderR;
+	}
+	static const FunctionId abxy[] = {
+		kFunctionButtonY, kFunctionButtonB, kFunctionButtonA, kFunctionButtonX
+	};
+	for (int i = 0; i < ARRAYSIZE(abxy); i++) {
+		if (_functions[abxy[i]]->isInside(x, y)) {
+			return abxy[i];
+		}
+	}
+
+	int xRatio = x * 100 / (int)_screen_width;
+	if (xRatio < LEFT_REGION_MAX_PCT) {
+		return kFunctionDpad;
+	}
+	return kFunctionLook;
 }
 
 void TouchControls::setDrawer(TouchControlsDrawer *drawer, int width, int height) {
 	_drawer = drawer;
 	_screen_width = width * SCALE_FACTOR_FXP;
 	_screen_height = height * SCALE_FACTOR_FXP;
+
+	refreshConfig();
 
 	if (drawer && _svg) {
 		drawer->touchControlInitSurface(*_svg);
@@ -214,27 +450,40 @@ void TouchControls::draw() {
 		return;
 	}
 
+	// Hide the entire pad unless the on-screen gamepad is the active touch mode:
+	// nothing is drawn in touchpad/mouse mode, when on-screen controls are off,
+	// or when a physical controller forced the fallback mode.
+	OSystem_SDL *sdlSystem = dynamic_cast<OSystem_SDL *>(g_system);
+	if (!sdlSystem || !sdlSystem->hasTouchscreen() ||
+			!ConfMan.getBool("onscreen_control") ||
+			sdlSystem->getTouchMode() != OSystem_SDL::TOUCH_MODE_GAMEPAD) {
+		return;
+	}
+
 	uint32 now = g_system->getMillis(true);
 
 	for (uint i = 0; i < kFunctionCount; i++) {
 		Function *func = _functions[i];
-		uint8 alpha;
+		uint8 hlAlpha;
 		switch (func->status) {
 		case kFunctionActive:
-			alpha = ALPHA_OPAQUE;
+			hlAlpha = ALPHA_OPAQUE;
 			break;
 		case kFunctionZombie:
 			if (func->lastActivable < now) {
-				// This function is definitely dead
-				continue;
+				hlAlpha = 0;
+			} else {
+				hlAlpha = (func->lastActivable - now) * ALPHA_OPAQUE / ZOMBIE_TIMEOUT;
 			}
-			alpha = (func->lastActivable - now) * ALPHA_OPAQUE / ZOMBIE_TIMEOUT;
 			break;
 		case kFunctionInactive:
 		default:
-			continue;
+			hlAlpha = 0;
+			break;
 		}
-		func->draw(alpha);
+		// Resting glyphs are always drawn at the configured opacity; the
+		// pressed-state highlight is drawn on top while a finger is down.
+		func->draw(_baseAlpha, hlAlpha);
 	}
 }
 
@@ -352,37 +601,114 @@ void TouchControls::buttonUp(Common::JoystickButton jb) {
 	dynamic_cast<OSystem_SDL *>(g_system)->pushEvent(ev);
 }
 
-void TouchControls::drawSurface(uint8 alpha, int x, int y, int offX, int offY, const Common::Rect &clip) const {
-	Common::Rect clip_(SVG_PIXELS(clip.left), SVG_PIXELS(clip.top),
-			SVG_PIXELS(clip.right), SVG_PIXELS(clip.bottom));
-	_drawer->touchControlDraw(alpha,
-			SCALED_PIXELS(x + SVG_SCALED(offX)), SCALED_PIXELS(y + SVG_SCALED(offY)),
-			clip_.width(), clip_.height(), clip_);
+void TouchControls::axisMotion(Common::JoystickAxis axis, int16 value) {
+	Common::Event ev;
+	ev.type = Common::EVENT_JOYAXIS_MOTION;
+	ev.joystick.axis = axis;
+	ev.joystick.position = value;
+	dynamic_cast<OSystem_SDL *>(g_system)->pushEvent(ev);
 }
 
-bool TouchControls::FunctionLeft::isInside(int x, int y) {
+void TouchControls::mouseRelative(int relX, int relY) {
+	Common::Event ev;
+	ev.type = Common::EVENT_MOUSEMOVE;
+	// Absolute position is kept at the current cursor; the engine (HPL1) reads
+	// the relative delta for the camera.
+	ev.mouse = g_system->getEventManager()->getMousePos();
+	ev.relMouse = Common::Point(relX, relY);
+	dynamic_cast<OSystem_SDL *>(g_system)->pushEvent(ev);
+}
+
+void TouchControls::mouseClick() {
+	Common::Point p = g_system->getEventManager()->getMousePos();
+
+	Common::Event down;
+	down.type = Common::EVENT_LBUTTONDOWN;
+	down.mouse = p;
+	dynamic_cast<OSystem_SDL *>(g_system)->pushEvent(down);
+
+	Common::Event up;
+	up.type = Common::EVENT_LBUTTONUP;
+	up.mouse = p;
+	dynamic_cast<OSystem_SDL *>(g_system)->pushEvent(up);
+}
+
+void TouchControls::mainMenu() {
+	// Open the ScummVM Global Main Menu. EVENT_MAINMENU is handled by the default
+	// event manager, which calls Engine::openMainMenuDialog() (the GMM). Pushed
+	// through the same event queue as the toggle long-press EVENT_VIRTUAL_KEYBOARD.
+	Common::Event ev;
+	ev.type = Common::EVENT_MAINMENU;
+	dynamic_cast<OSystem_SDL *>(g_system)->pushEvent(ev);
+}
+
+void TouchControls::drawSurface(uint8 alpha, int x, int y, int offX, int offY, const Common::Rect &clip, int sizePct) const {
+	if (!alpha) {
+		return;
+	}
+	Common::Rect clip_(SVG_PIXELS(clip.left), SVG_PIXELS(clip.top),
+			SVG_PIXELS(clip.right), SVG_PIXELS(clip.bottom));
+	// Destination size = source crop scaled by sizePct (drawTexture/RenderCopy
+	// stretch the crop). The SVG-px offsets are scaled identically so centring
+	// math (e.g. -clip.width()/2) keeps centring the scaled glyph.
+	int w = clip_.width() * sizePct / 100;
+	int h = clip_.height() * sizePct / 100;
+	// The SVG-px offsets are usually negative (centring, e.g. -clip.width()/2).
+	// _scale is unsigned, so the offset must be scaled with explicit signed
+	// arithmetic: a negative value multiplied by the unsigned _scale wraps to a
+	// huge positive number, and dividing that here (rather than letting it cancel
+	// in a later add) would push the glyph millions of pixels off-screen.
+	int offXpx = SVG_UNSCALED(offX) * (int)_scale / SCALE_FACTOR_FXP;
+	int offYpx = SVG_UNSCALED(offY) * (int)_scale / SCALE_FACTOR_FXP;
+	int dx = SCALED_PIXELS(x) + offXpx * sizePct / 100;
+	int dy = SCALED_PIXELS(y) + offYpx * sizePct / 100;
+	_drawer->touchControlDraw(alpha, dx, dy, w, h, clip_);
+}
+
+// ===========================================================================
+// Floating D-pad (move / DPAD_UP/DOWN/LEFT/RIGHT buttons)
+// ===========================================================================
+
+bool TouchControls::FunctionDpad::isInside(int x, int y) {
 	int dX = x - startX;
 	int dY = y - startY;
-	// norm 2 squared (to avoid square root)
 	unsigned int sqNorm = (unsigned int)(dX * dX) + (unsigned int)(dY * dY);
-
-	if (sqNorm <= FUNC_SVG_SQ_SCALED(ARROW_END)) {
+	if (sqNorm <= FUNC_SVG_SQ_SCALED(DPAD_HIT)) {
 		return true;
 	}
-
-	// Also accept touches near the old last touch
+	// Also accept touches near the last finger position (zombie re-touch).
 	dX = x - currentX;
 	dY = y - currentY;
 	sqNorm = (unsigned int)(dX * dX) + (unsigned int)(dY * dY);
-
-	if (sqNorm <= FUNC_SVG_SQ_SCALED(ARROW_DEAD)) {
-		return true;
-	}
-
-	return false;
+	return sqNorm <= FUNC_SVG_SQ_SCALED(DPAD_DEAD);
 }
 
-void TouchControls::FunctionLeft::maskToLeftButtons(uint32 oldMask, uint32 newMask) {
+uint32 TouchControls::FunctionDpad::directionMask(int dX, int dY) const {
+	uint32 newMask = 0;
+
+	unsigned int sqNorm = (unsigned int)(dX * dX) + (unsigned int)(dY * dY);
+	if (sqNorm >= FUNC_SVG_SQ_SCALED(DPAD_DEAD)) {
+		// We are far enough from the centre. 8-way octant test:
+		//   Left/right sensitive zone: |dY| <= |dX| * tan(60deg) (sqrt(3))
+		//   Up/down   sensitive zone: |dY| >= |dX| * tan(30deg) (1/sqrt(3))
+		unsigned int sq3 = abs(dX) * 51409 / 29681;
+		unsigned int isq3 = abs(dX) * 29681 / 51409;
+		unsigned int adY = abs(dY);
+
+		if (adY <= sq3) {
+			// Left or right (bit 3 / bit 1).
+			newMask |= (dX < 0) ? 8 : 2;
+		}
+		if (adY >= isq3) {
+			// Up or down (bit 0 / bit 2).
+			newMask |= (dY < 0) ? 1 : 4;
+		}
+	}
+
+	return newMask;
+}
+
+void TouchControls::FunctionDpad::maskToDpadButtons(uint32 oldMask, uint32 newMask) {
 	static const Common::JoystickButton buttons[] = {
 		Common::JOYSTICK_BUTTON_DPAD_UP, Common::JOYSTICK_BUTTON_DPAD_RIGHT,
 		Common::JOYSTICK_BUTTON_DPAD_DOWN, Common::JOYSTICK_BUTTON_DPAD_LEFT
@@ -390,379 +716,301 @@ void TouchControls::FunctionLeft::maskToLeftButtons(uint32 oldMask, uint32 newMa
 
 	uint32 diff = newMask ^ oldMask;
 
-	for(int i = 0, m = 1; i < ARRAYSIZE(buttons); i++, m <<= 1) {
-		if (!(diff & m)) {
-			continue;
-		}
-		if (oldMask & m) {
+	for (int i = 0, m = 1; i < ARRAYSIZE(buttons); i++, m <<= 1) {
+		if ((diff & m) && (oldMask & m)) {
 			TouchControls::buttonUp(buttons[i]);
 		}
 	}
-	if (diff & 16) {
-		if (oldMask & 16) {
-			TouchControls::buttonUp(Common::JOYSTICK_BUTTON_RIGHT_SHOULDER);
-		} else {
-			TouchControls::buttonDown(Common::JOYSTICK_BUTTON_RIGHT_SHOULDER);
-		}
-	}
-	for(int i = 0, m = 1; i < ARRAYSIZE(buttons); i++, m <<= 1) {
-		if (!(diff & m)) {
-			continue;
-		}
-		if (newMask & m) {
+	for (int i = 0, m = 1; i < ARRAYSIZE(buttons); i++, m <<= 1) {
+		if ((diff & m) && (newMask & m)) {
 			TouchControls::buttonDown(buttons[i]);
 		}
 	}
 }
 
-void TouchControls::FunctionLeft::touch(int dX, int dY, Action action) {
-	if (action == kActionCancel ||
-		action == kActionUp) {
-		maskToLeftButtons(mask, 0);
-		resetState();
-		return;
-	}
-
+void TouchControls::FunctionDpad::touch(int dX, int dY, Action action) {
 	uint32 newMask = 0;
-
-	// norm 2 squared (to avoid square root)
-	unsigned int sqNorm = (unsigned int)(dX * dX) + (unsigned int)(dY * dY);
-
-	if (sqNorm >= FUNC_SVG_SQ_SCALED(ARROW_DEAD)) {
-		// We are far enough from the center
-		// For right we use angles -60,60 as a sensitive zone
-		// For left it's the same but mirrored in negative
-		// We must be between the two lines which are of tan(60),tan(-60) and this corrsponds to sqrt(3)
-		// For up down we use angles -30,30  as a sensitive zone
-		// We must be outside the two lines which are of tan(30),tan(-30) and this corrsponds to 1/sqrt(3)
-		/*
-		static const double SQRT3 = 1.73205080756887719318;
-		unsigned int sq3 = SQRT3 * abs(dX);
-		*/
-		// Optimize by using an approximation of sqrt(3)
-		unsigned int sq3 = abs(dX) * 51409 / 29681;
-		unsigned int isq3 = abs(dX) * 29681 / 51409;
-
-		unsigned int adY = abs(dY);
-
-		if (adY <= sq3) {
-			// Left or right
-			if (dX < 0) {
-				newMask |= 8;
-			} else {
-				newMask |= 2;
-			}
-		}
-		if (adY >= isq3) {
-			// Up or down
-			if (dY < 0) {
-				newMask |= 1;
-			} else {
-				newMask |= 4;
-			}
-
-		}
+	if (action != kActionCancel && action != kActionUp) {
+		newMask = directionMask(dX, dY);
 	}
-
-	if (sqNorm > FUNC_SVG_SQ_SCALED(ARROW_SUPER)) {
-		newMask |= 16;
+	if (newMask != mask) {
+		maskToDpadButtons(mask, newMask);
+		mask = newMask;
 	}
-
-	if (mask != newMask) {
-		maskToLeftButtons(mask, newMask);
-	}
-
-	mask = newMask;
 }
 
-void TouchControls::FunctionLeft::draw(uint8 alpha) {
-	// Draw background
+void TouchControls::FunctionDpad::draw(uint8 baseAlpha, uint8 hlAlpha) {
+	bool active = (status != kFunctionInactive);
+	int cx = active ? startX : parent->homeX(DIR_HOME_X_PCT);
+	int cy = active ? startY : parent->homeY(DIR_HOME_Y_PCT);
+
+	// Base: D-pad cell (circle + grey arrows).
 	{
-		Common::Rect clip(0, 0, BG_WIDTH, BG_HEIGHT);
-		parent->drawSurface(alpha, startX, startY, -clip.width() / 2, -clip.height() / 2, clip);
+		Common::Rect clip(DPAD_BASE_CLIP);
+		parent->drawSurface(baseAlpha, cx, cy, -clip.width() / 2, -clip.height() / 2, clip, DPAD_SIZE_PCT);
 	}
 
-	if (mask == 0) {
+	if (!hlAlpha || !mask) {
 		return;
 	}
 
-
-	// Width and height here are rotated for left/right
-	uint16 width = ARROW_WIDTH;
-	uint16 height;
-	if (mask & 16) {
-		height = ARROW_HEIGHT;
-	} else {
-		height = ARROW_SEMI_HEIGHT;
+	// Pressed arrow highlights from col 0 row 1.
+	if (mask & 1) { // up
+		Common::Rect clip(0, DPAD_HL_TOP, DPAD_ARROW_W, DPAD_HL_TOP + DPAD_ARROW_H);
+		parent->drawSurface(hlAlpha, cx, cy, -clip.width() / 2, -clip.height(), clip, DPAD_SIZE_PCT);
 	}
-
-	// We can draw multiple arrows
-	if (mask & 1) {
-		// Draw UP
-		Common::Rect clip(width, height);
-		clip.translate(0, ARROW_HL_TOP + ARROW_HEIGHT - height);
-		int16 offX = -1, offY = -2;
-		parent->drawSurface(ALPHA_OPAQUE, startX, startY, offX * clip.width() / 2, offY * clip.height() / 2, clip);
+	if (mask & 2) { // right
+		Common::Rect clip(DPAD_ARROW_W, DPAD_HL_TOP, 2 * DPAD_ARROW_W, DPAD_HL_TOP + DPAD_ARROW_H);
+		parent->drawSurface(hlAlpha, cx, cy, 0, -clip.height() / 2, clip, DPAD_SIZE_PCT);
 	}
-	if (mask & 2) {
-		// Draw RIGHT
-		Common::Rect clip(height, width);
-		clip.translate(ARROW_WIDTH, ARROW_HL_TOP);
-		int16 offX = 0, offY = -1;
-		parent->drawSurface(ALPHA_OPAQUE, startX, startY, offX * clip.width() / 2, offY * clip.height() / 2, clip);
+	if (mask & 4) { // down
+		Common::Rect clip(0, DPAD_HL_TOP + DPAD_ARROW_H, DPAD_ARROW_W, DPAD_HL_TOP + 2 * DPAD_ARROW_H);
+		parent->drawSurface(hlAlpha, cx, cy, -clip.width() / 2, 0, clip, DPAD_SIZE_PCT);
 	}
-	if (mask & 4) {
-		// Draw DOWN
-		Common::Rect clip(width, height);
-		clip.translate(0, ARROW_HL_TOP + ARROW_HEIGHT);
-		int16 offX = -1, offY = 0;
-		parent->drawSurface(ALPHA_OPAQUE, startX, startY, offX * clip.width() / 2, offY * clip.height() / 2, clip);
-	}
-	if (mask & 8) {
-		// Draw LEFT
-		Common::Rect clip(height, width);
-		clip.translate(ARROW_WIDTH + ARROW_WIDTH - height, ARROW_HL_TOP + ARROW_HEIGHT);
-		int16 offX = -2, offY = -1;
-		parent->drawSurface(ALPHA_OPAQUE, startX, startY, offX * clip.width() / 2, offY * clip.height() / 2, clip);
+	if (mask & 8) { // left
+		Common::Rect clip(DPAD_ARROW_W, DPAD_HL_TOP + DPAD_ARROW_H, 2 * DPAD_ARROW_W, DPAD_HL_TOP + 2 * DPAD_ARROW_H);
+		parent->drawSurface(hlAlpha, cx, cy, -clip.width(), -clip.height() / 2, clip, DPAD_SIZE_PCT);
 	}
 }
 
-bool TouchControls::FunctionRight::isInside(int x, int y) {
-	int dX = x - startX;
-	int dY = y - startY;
-	// norm 2 squared (to avoid square root)
+// ===========================================================================
+// ScummVM button (top-left, opens the Global Main Menu)
+// ===========================================================================
+
+bool TouchControls::FunctionScummVM::isInside(int x, int y) {
+	int cx = parent->homeX(AUX_SCUMM_X_PCT);
+	int cy = parent->homeY(AUX_Y_PCT);
+	int dX = x - cx;
+	int dY = y - cy;
 	unsigned int sqNorm = (unsigned int)(dX * dX) + (unsigned int)(dY * dY);
-
-	return sqNorm <= FUNC_SVG_SQ_SCALED(BUTTON_END);
+	return sqNorm <= FUNC_SVG_SQ_SCALED(SCUMM_HIT);
 }
 
-void TouchControls::FunctionRight::touch(int dX, int dY, Action action) {
-	static const Common::JoystickButton buttons[] = {
-		Common::JOYSTICK_BUTTON_Y, Common::JOYSTICK_BUTTON_B,
-		Common::JOYSTICK_BUTTON_A, Common::JOYSTICK_BUTTON_X
-	};
-	static const Common::JoystickButton modifiers[] = {
-		Common::JOYSTICK_BUTTON_INVALID, Common::JOYSTICK_BUTTON_INVALID,
-		Common::JOYSTICK_BUTTON_INVALID, Common::JOYSTICK_BUTTON_INVALID
-	};
-	if (action == kActionCancel ||
-		action == kActionUp) {
-		if (button) {
-			buttonUp(buttons[button - 1]);
-			buttonUp(modifiers[button - 1]);
+void TouchControls::FunctionScummVM::touch(int dX, int dY, Action action) {
+	// Fire the GMM once on press; the press visual lasts until the finger lifts.
+	bool wantPressed = (action != kActionCancel && action != kActionUp);
+	if (wantPressed != pressed) {
+		pressed = wantPressed;
+		if (pressed) {
+			mainMenu();
 		}
-		resetState();
-		return;
 	}
+}
 
-	uint32 newButton = 0;
+void TouchControls::FunctionScummVM::draw(uint8 baseAlpha, uint8 hlAlpha) {
+	int cx = parent->homeX(AUX_SCUMM_X_PCT);
+	int cy = parent->homeY(AUX_Y_PCT);
 
-	// norm 2 squared (to avoid square root)
+	Common::Rect clip(SCUMM_CLIP);
+	parent->drawSurface(baseAlpha, cx, cy, -clip.width() / 2, -clip.height() / 2, clip, AUX_SIZE_PCT);
+	if (hlAlpha) {
+		// Brighten the badge while pressed.
+		parent->drawSurface(hlAlpha, cx, cy, -clip.width() / 2, -clip.height() / 2, clip, AUX_SIZE_PCT);
+	}
+}
+
+// ===========================================================================
+// A/B/X/Y face buttons (independent diamond hotspots)
+// ===========================================================================
+
+void TouchControls::FunctionButton::center(int &cx, int &cy) const {
+	// The hotspots sit on the letters of the (scaled) resting cluster glyph.
+	cx = parent->homeX(ABXY_HOME_X_PCT) + SVG_UNSCALED(_dxSvg) * (int)parent->_scale * ABXY_SIZE_PCT / 100;
+	cy = parent->homeY(ABXY_HOME_Y_PCT) + SVG_UNSCALED(_dySvg) * (int)parent->_scale * ABXY_SIZE_PCT / 100;
+}
+
+bool TouchControls::FunctionButton::isInside(int x, int y) {
+	int cx, cy;
+	center(cx, cy);
+	int dX = x - cx;
+	int dY = y - cy;
 	unsigned int sqNorm = (unsigned int)(dX * dX) + (unsigned int)(dY * dY);
+	return sqNorm <= FUNC_SVG_SQ_SCALED(ABXY_HIT);
+}
 
-	if (sqNorm >= FUNC_SVG_SQ_SCALED(BUTTON_DEAD) && sqNorm <= FUNC_SVG_SQ_SCALED(BUTTON_END)) {
-		// We are far enough from the center
-		// For right we use angles -45,45 as a sensitive zone
-		// For left it's the same but mirrored in negative
-		// We must be between the two lines which are of tan(45),tan(-45) and this corrsponds to 1
-		// For up down we use angles -45,45  as a sensitive zone
-		// We must be outside the two lines which are of tan(45),tan(-45) and this corrsponds to 1
-		unsigned int adX = abs(dX);
-		unsigned int adY = abs(dY);
-
-		if (adY <= adX) {
-			// X or B
-			if (dX < 0) {
-				newButton = 4;
-			} else {
-				newButton = 2;
-			}
+void TouchControls::FunctionButton::touch(int dX, int dY, Action action) {
+	bool wantPressed = (action != kActionCancel && action != kActionUp);
+	if (wantPressed != pressed) {
+		pressed = wantPressed;
+		if (pressed) {
+			buttonDown(_jb);
 		} else {
-			// Y or A
-			if (dY < 0) {
-				newButton = 1;
-			} else {
-				newButton = 3;
-			}
-
-		}
-	} else {
-		newButton = 0;
-	}
-
-	if (button != newButton) {
-		// Release the previously pressed button, if any
-		if (button) {
-			buttonUp(buttons[button - 1]);
-			buttonUp(modifiers[button - 1]);
-		}
-		button = newButton;
-		// Press the new button
-		if (button) {
-			buttonDown(modifiers[button - 1]);
-			buttonDown(buttons[button - 1]);
+			buttonUp(_jb);
 		}
 	}
 }
 
-void TouchControls::FunctionRight::draw(uint8 alpha) {
-	// Draw background
-	{
-		Common::Rect clip(BG_WIDTH, 0, 2 * BG_WIDTH, BG_HEIGHT);
-		parent->drawSurface(alpha, startX, startY, -clip.width() / 2, -clip.height() / 2, clip);
+void TouchControls::FunctionButton::draw(uint8 baseAlpha, uint8 hlAlpha) {
+	// The whole resting cluster glyph is drawn once (by the cluster owner),
+	// cleanly and uncut, centred on the cluster home position.
+	int ccx = parent->homeX(ABXY_HOME_X_PCT);
+	int ccy = parent->homeY(ABXY_HOME_Y_PCT);
+
+	if (_clusterOwner) {
+		Common::Rect clip(ABXY_CLUSTER_CLIP);
+		parent->drawSurface(baseAlpha, ccx, ccy, -clip.width() / 2, -clip.height() / 2, clip, ABXY_SIZE_PCT);
 	}
 
-	if (button == 0) {
-		return;
+	// Per-button pressed highlight: the matching colour circle of the highlight
+	// row, placed (relative to the cluster centre) on top of this button.
+	if (hlAlpha && pressed) {
+		Common::Rect clip(_hlClip);
+		parent->drawSurface(hlAlpha, ccx, ccy,
+				_hlMulX * clip.width() / 2, _hlMulY * clip.height() / 2, clip, ABXY_SIZE_PCT);
 	}
-
-
-	Common::Rect clip(BUTTON_WIDTH, BUTTON_HEIGHT);
-
-	int16 offX, offY;
-
-	if (button == 1) {
-		// Draw Y
-		clip.translate(BUTTON_HL_LEFT, BUTTON_HL_TOP);
-		offX = -1;
-		offY = -2;
-	} else if (button == 2) {
-		// Draw B
-		clip.translate(BUTTON_HL_LEFT + BUTTON_WIDTH, BUTTON_HL_TOP);
-		offX = 0;
-		offY = -1;
-	} else if (button == 3) {
-		// Draw A
-		clip.translate(BUTTON_HL_LEFT, BUTTON_HL_TOP + BUTTON_HEIGHT);
-		offX = -1;
-		offY = 0;
-	} else if (button == 4) {
-		// Draw X
-		clip.translate(BUTTON_HL_LEFT + BUTTON_WIDTH, BUTTON_HL_TOP + BUTTON_HEIGHT);
-		offX = -2;
-		offY = -1;
-	} else {
-		return;
-	}
-	parent->drawSurface(ALPHA_OPAQUE, startX, startY, offX * clip.width() / 2, offY * clip.height() / 2, clip);
 }
 
-bool TouchControls::FunctionCenter::isInside(int x, int y) {
-	int dX = x - startX;
-	int dY = y - startY;
-	// norm 2 squared (to avoid square root)
+// ===========================================================================
+// L1 / R1 shoulder buttons (top corners, labelled pills)
+// ===========================================================================
+
+bool TouchControls::FunctionShoulder::isInside(int x, int y) {
+	int cx = parent->homeX(_right ? AUX_R1_X_PCT : AUX_L1_X_PCT);
+	int cy = parent->homeY(AUX_Y_PCT);
+	int dX = x - cx;
+	int dY = y - cy;
 	unsigned int sqNorm = (unsigned int)(dX * dX) + (unsigned int)(dY * dY);
-
-	return sqNorm <= FUNC_SVG_SQ_SCALED(BUTTON_END);
+	return sqNorm <= FUNC_SVG_SQ_SCALED(SHOULDER_HIT);
 }
 
-void TouchControls::FunctionCenter::touch(int dX, int dY, Action action) {
-	static const Common::JoystickButton buttons[] = {
-		Common::JOYSTICK_BUTTON_GUIDE, Common::JOYSTICK_BUTTON_RIGHT_STICK,
-		Common::JOYSTICK_BUTTON_START, Common::JOYSTICK_BUTTON_LEFT_STICK
-	};
-	static const Common::JoystickButton modifiers[] = {
-		Common::JOYSTICK_BUTTON_INVALID, Common::JOYSTICK_BUTTON_INVALID,
-		Common::JOYSTICK_BUTTON_INVALID, Common::JOYSTICK_BUTTON_INVALID
-	};
-	if (action == kActionCancel ||
-		action == kActionUp) {
-		if (button) {
-			buttonUp(buttons[button - 1]);
-			buttonUp(modifiers[button - 1]);
-		}
-		resetState();
-		return;
-	}
-
-	uint32 newButton = 0;
-
-	// norm 2 squared (to avoid square root)
-	unsigned int sqNorm = (unsigned int)(dX * dX) + (unsigned int)(dY * dY);
-
-	if (sqNorm >= FUNC_SVG_SQ_SCALED(BUTTON_DEAD) && sqNorm <= FUNC_SVG_SQ_SCALED(BUTTON_END)) {
-		// We are far enough from the center
-		// For right we use angles -45,45 as a sensitive zone
-		// For left it's the same but mirrored in negative
-		// We must be between the two lines which are of tan(45),tan(-45) and this corrsponds to 1
-		// For up down we use angles -45,45  as a sensitive zone
-		// We must be outside the two lines which are of tan(45),tan(-45) and this corrsponds to 1
-		unsigned int adX = abs(dX);
-		unsigned int adY = abs(dY);
-
-		if (adY <= adX) {
-			// X or B
-			if (dX < 0) {
-				newButton = 4;
-			} else {
-				newButton = 2;
-			}
+void TouchControls::FunctionShoulder::touch(int dX, int dY, Action action) {
+	bool wantPressed = (action != kActionCancel && action != kActionUp);
+	if (wantPressed != pressed) {
+		pressed = wantPressed;
+		if (pressed) {
+			buttonDown(_jb);
 		} else {
-			// Y or A
-			if (dY < 0) {
-				newButton = 1;
-			} else {
-				newButton = 3;
-			}
-
-		}
-	} else {
-		newButton = 0;
-	}
-
-	if (button != newButton) {
-		// Release the previously pressed button, if any
-		if (button) {
-			buttonUp(buttons[button - 1]);
-			buttonUp(modifiers[button - 1]);
-		}
-		button = newButton;
-		// Press the new button
-		if (button) {
-			buttonDown(modifiers[button - 1]);
-			buttonDown(buttons[button - 1]);
+			buttonUp(_jb);
 		}
 	}
 }
 
-void TouchControls::FunctionCenter::draw(uint8 alpha) {
-	// Draw background
-	{
-		Common::Rect clip(BG_WIDTH * 2, 0, 3 * BG_WIDTH, BG_HEIGHT);
-		parent->drawSurface(alpha, startX, startY, -clip.width() / 2, -clip.height() / 2, clip);
-	}
+void TouchControls::FunctionShoulder::draw(uint8 baseAlpha, uint8 hlAlpha) {
+	int cx = parent->homeX(_right ? AUX_R1_X_PCT : AUX_L1_X_PCT);
+	int cy = parent->homeY(AUX_Y_PCT);
 
-	if (button == 0) {
+	Common::Rect clip = _right ? Common::Rect(R1_CLIP) : Common::Rect(L1_CLIP);
+	parent->drawSurface(baseAlpha, cx, cy, -clip.width() / 2, -clip.height() / 2, clip, AUX_SIZE_PCT);
+	if (hlAlpha) {
+		// Brighten the pill while pressed.
+		parent->drawSurface(hlAlpha, cx, cy, -clip.width() / 2, -clip.height() / 2, clip, AUX_SIZE_PCT);
+	}
+}
+
+// ===========================================================================
+// Start / menu button (top centre)
+// ===========================================================================
+
+bool TouchControls::FunctionStart::isInside(int x, int y) {
+	int cx = parent->homeX(AUX_START_X_PCT);
+	int cy = parent->homeY(AUX_Y_PCT);
+	int dX = x - cx;
+	int dY = y - cy;
+	unsigned int sqNorm = (unsigned int)(dX * dX) + (unsigned int)(dY * dY);
+	return sqNorm <= FUNC_SVG_SQ_SCALED(START_HIT);
+}
+
+void TouchControls::FunctionStart::touch(int dX, int dY, Action action) {
+	// Digital, like the face buttons: pressed while a finger is down.
+	bool wantPressed = (action != kActionCancel && action != kActionUp);
+	if (wantPressed != pressed) {
+		pressed = wantPressed;
+		if (pressed) {
+			buttonDown(Common::JOYSTICK_BUTTON_START);
+		} else {
+			buttonUp(Common::JOYSTICK_BUTTON_START);
+		}
+	}
+}
+
+void TouchControls::FunctionStart::draw(uint8 baseAlpha, uint8 hlAlpha) {
+	int cx = parent->homeX(AUX_START_X_PCT);
+	int cy = parent->homeY(AUX_Y_PCT);
+
+	Common::Rect clip(START_CLIP);
+	parent->drawSurface(baseAlpha, cx, cy, -clip.width() / 2, -clip.height() / 2, clip, AUX_SIZE_PCT);
+	if (hlAlpha) {
+		// Brighten the glyph while pressed.
+		parent->drawSurface(hlAlpha, cx, cy, -clip.width() / 2, -clip.height() / 2, clip, AUX_SIZE_PCT);
+	}
+}
+
+// ===========================================================================
+// Drag-to-look (right half, invisible: relative-mouse camera + tap-to-click)
+// ===========================================================================
+
+void TouchControls::FunctionLook::touch(int dX, int dY, Action action) {
+	if (action == kActionDown) {
+		prevX = currentX;
+		prevY = currentY;
+		hiresX = hiresY = 0.0f;
+		maxTravel = 0;
 		return;
 	}
 
-	Common::Rect clip(BUTTON_WIDTH, BUTTON_HEIGHT);
-
-	int16 offX, offY;
-
-	if (button == 1) {
-		// Draw Y
-		clip.translate(BUTTON2_HL_LEFT, BUTTON2_HL_TOP);
-		offX = -1;
-		offY = -2;
-	} else if (button == 2) {
-		// Draw B
-		clip.translate(BUTTON2_HL_LEFT + BUTTON_WIDTH, BUTTON2_HL_TOP);
-		offX = 0;
-		offY = -1;
-	} else if (button == 3) {
-		// Draw A
-		clip.translate(BUTTON2_HL_LEFT, BUTTON2_HL_TOP + BUTTON_HEIGHT);
-		offX = -1;
-		offY = 0;
-	} else if (button == 4) {
-		// Draw X
-		clip.translate(BUTTON2_HL_LEFT + BUTTON_WIDTH, BUTTON2_HL_TOP + BUTTON_HEIGHT);
-		offX = -2;
-		offY = -1;
-	} else {
+	if (action == kActionCancel) {
 		return;
 	}
-	// Always draw overlay as opaque
-	parent->drawSurface(ALPHA_OPAQUE, startX, startY, offX * clip.width() / 2, offY * clip.height() / 2, clip);
+
+	// Track the largest travel from the press origin (window px) for the
+	// tap-to-click decision (Manhattan distance is plenty here).
+	int travel = (abs(dX) + abs(dY)) / SCALE_FACTOR_FXP;
+	if (travel > maxTravel) {
+		maxTravel = travel;
+	}
+
+	if (action == kActionUp) {
+		if (maxTravel <= TAP_MAX_TRAVEL) {
+			mouseClick();
+		}
+		return;
+	}
+
+	// kActionMove: convert per-frame finger delta into relative-mouse motion,
+	// mirroring the touchpad relmouse scaling in sdl2-events.cpp, but with a
+	// higher base sensitivity and speed-based acceleration so fast flicks turn
+	// the camera disproportionately more than slow drags.
+	int ddX = (int)currentX - prevX;
+	int ddY = (int)currentY - prevY;
+	prevX = currentX;
+	prevY = currentY;
+
+	int kbdMouseSpeed = CLIP<int>(ConfMan.getInt("kbdmouse_speed"), 0, 7);
+	float speedFactor = (kbdMouseSpeed + 1) * 0.25f;
+
+	// Per-frame finger delta and travel magnitude, in window pixels.
+	float dxPx = ddX / (float)SCALE_FACTOR_FXP;
+	float dyPx = ddY / (float)SCALE_FACTOR_FXP;
+	float fingerSpeed = sqrtf(dxPx * dxPx + dyPx * dyPx);
+	float gain = LOOK_BASE_SENS * speedFactor * (1.0f + LOOK_ACCEL * fingerSpeed);
+
+	hiresX += dxPx * gain;
+	hiresY += dyPx * gain;
+
+	int relX = (int)hiresX;
+	int relY = (int)hiresY;
+	hiresX -= relX;
+	hiresY -= relY;
+
+	if (relX || relY) {
+		mouseRelative(relX, relY);
+	}
+}
+
+void TouchControls::FunctionLook::draw(uint8 baseAlpha, uint8 /*hlAlpha*/) {
+	// Only while a finger is actively dragging the look region: a ring anchored
+	// at the finger-down position plus a filled dot at the current finger
+	// position, so the offset shows look direction/speed. Gone on release.
+	if (status != kFunctionActive) {
+		return;
+	}
+
+	// The knob is drawn a little brighter than the configured pad opacity.
+	uint8 dotAlpha = (uint8)MIN<int>(ALPHA_OPAQUE, baseAlpha + (ALPHA_OPAQUE - baseAlpha) / 2);
+
+	Common::Rect ring(LOOK_RING_CLIP);
+	parent->drawSurface(baseAlpha, startX, startY, -ring.width() / 2, -ring.height() / 2, ring);
+
+	Common::Rect dot(LOOK_DOT_CLIP);
+	parent->drawSurface(dotAlpha, currentX, currentY, -dot.width() / 2, -dot.height() / 2, dot);
 }
