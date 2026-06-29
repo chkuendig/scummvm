@@ -37,16 +37,16 @@
 // ---------------------------------------------------------------------------
 // gamepad.svg sprite-sheet layout (in SVG pixels, 384x256, three 128x128
 // columns each with a "resting" row and a "pressed" highlight row):
-//   col 0 row 0 (0,0)     : D-pad base (unused by this layout)
-//   col 0 row 1 (0,128)   : D-pad pressed arrows (unused)
+//   col 0 row 0 (0,0)     : D-pad base (circle + grey arrows)
+//   col 0 row 1 (0,128)   : D-pad pressed arrows (white highlights)
 //   col 1 row 0 (128,0)   : A/B/X/Y resting cluster
 //   col 1 row 1 (128,128) : A/B/X/Y pressed highlights
 //   col 2 row 0 (256,0)   : labelled circles (the menu "lens" reused for Start)
 //   col 2 row 1 (256,128) : (system highlights, unused here)
 //
 // A spare row is appended below the 384x256 sheet (SVG y 256..384) into which
-// the thumbstick ring + knob and the L1/R1 pills are drawn from primitives at
-// load time (see renderPrimitives()).
+// the ScummVM "S" button and the L1/R1 pills are drawn from primitives at load
+// time (see renderPrimitives()).
 // ---------------------------------------------------------------------------
 #define SVG_WIDTH          384
 #define SVG_HEIGHT         256
@@ -79,17 +79,18 @@
 #define START_CLIP          296, 76, 344, 124
 #define START_HIT           30
 
-// Floating left thumbstick geometry (SVG px). The base ring fills a 128 cell;
-// the knob travels up to STICK_RADIUS from the centre, which also maps to a
-// full-scale axis value.
-#define STICK_OUTER_R       60
-#define STICK_RING_W         9
-#define STICK_KNOB_R        22
-#define STICK_RADIUS        40
-#define STICK_DEAD           3   // ~8% radial dead-zone
-#define STICK_HIT           62   // hit radius for zombie re-touch
-#define STICK_BASE_CLIP       0, 256, 128, 384
-#define STICK_KNOB_CLIP     128, 256, 224, 352
+// Floating D-pad geometry (SVG px). The base cell fills a 128 cell; the pressed
+// arrow highlights are 64x64 crops of the highlight row (col 0 row 1).
+#define DPAD_BASE_CLIP        0,   0, 128, 128
+#define DPAD_ARROW_W        64
+#define DPAD_ARROW_H        64
+#define DPAD_HL_TOP        128
+#define DPAD_DEAD           21   // direction dead-zone (SVG px)
+#define DPAD_HIT            62   // hit radius for zombie re-touch / inside test
+
+// ScummVM "S" button, drawn from primitives into the spare row. Opens the GMM.
+#define SCUMM_CLIP            0, 256,  48, 304
+#define SCUMM_HIT           26
 
 // L1 / R1 shoulder pills, drawn into the spare row.
 #define L1_CLIP             224, 258, 320, 302
@@ -105,9 +106,10 @@
 
 // ---------------------------------------------------------------------------
 // Home (resting) positions of the controls, in percent of the window. AAA
-// touch-FPS layout in landscape: floating move thumbstick bottom-left, A/B/X/Y
-// diamond bottom-right, shoulders top corners, Start top-centre and an
-// invisible drag-to-look region filling the rest of the right half.
+// touch-FPS layout in landscape: D-pad bottom-left, A/B/X/Y diamond
+// bottom-right, shoulders top corners, Start top-centre, the ScummVM button in
+// the top-left corner and an invisible drag-to-look region filling the rest of
+// the right half.
 // ---------------------------------------------------------------------------
 #define DIR_HOME_X_PCT       18
 #define DIR_HOME_Y_PCT       75
@@ -118,9 +120,13 @@
 #define SHOULDER_Y_PCT       12
 #define START_HOME_X_PCT     50
 #define START_HOME_Y_PCT      8
+// ScummVM/GMM button: top-left corner, clear of the L1 pill and the mode-toggle
+// icon (which lives in the top-right corner).
+#define SCUMM_HOME_X_PCT      4
+#define SCUMM_HOME_Y_PCT      7
 
 // Fingers left of this (percent of width) and not on a hotspot drive the
-// thumbstick; everything else drives drag-to-look.
+// D-pad; everything else drives drag-to-look.
 #define LEFT_REGION_MAX_PCT  40
 
 // The scale factor is stored as a fixed point 30.2 bits
@@ -151,7 +157,7 @@ TouchControls::TouchControls() :
 	_zombieCount(0),
 	_baseAlpha(ALPHA_OPAQUE * 6 / 10) {
 	_gesturesInsets[0] = _gesturesInsets[1] = _gesturesInsets[2] = _gesturesInsets[3] = 0;
-	_functions[kFunctionThumb]     = new FunctionThumb(this);
+	_functions[kFunctionDpad]      = new FunctionDpad(this);
 	_functions[kFunctionButtonY]   = new FunctionButton(this, Common::JOYSTICK_BUTTON_Y,
 			0, -ABXY_SPACING, Common::Rect(ABXY_REST_Y), Common::Rect(ABXY_HL_Y));
 	_functions[kFunctionButtonB]   = new FunctionButton(this, Common::JOYSTICK_BUTTON_B,
@@ -163,6 +169,7 @@ TouchControls::TouchControls() :
 	_functions[kFunctionShoulderL] = new FunctionShoulder(this, Common::JOYSTICK_BUTTON_LEFT_SHOULDER, false);
 	_functions[kFunctionShoulderR] = new FunctionShoulder(this, Common::JOYSTICK_BUTTON_RIGHT_SHOULDER, true);
 	_functions[kFunctionStart]     = new FunctionStart(this);
+	_functions[kFunctionScummVM]   = new FunctionScummVM(this);
 	_functions[kFunctionLook]      = new FunctionLook(this);
 }
 
@@ -211,36 +218,33 @@ void TouchControls::renderPrimitives() {
 	_svg->fillRect(Common::Rect(0, SVG_PIXELS(SVG_HEIGHT), SVG_PIXELS(SVG_WIDTH), SVG_PIXELS(SVG_FULL_HEIGHT)),
 			fmt.ARGBToColor(0, 0, 0, 0));
 
-	const uint32 ringFill = fmt.ARGBToColor(80,  20,  20,  25);
-	const uint32 ringEdge = fmt.ARGBToColor(220, 235, 235, 235);
-	const uint32 knobFill = fmt.ARGBToColor(235, 210, 210, 215);
-	const uint32 knobEdge = fmt.ARGBToColor(235, 110, 110, 120);
 	const uint32 pillFill = fmt.ARGBToColor(150, 25,  25,  30);
 	const uint32 pillEdge = fmt.ARGBToColor(220, 235, 235, 235);
 	const uint32 textCol  = fmt.ARGBToColor(255, 245, 245, 245);
 
-	// --- Thumbstick base ring (centre SVG 64,320) ---
-	{
-		int cx = SVG_PIXELS(64), cy = SVG_PIXELS(320);
-		int rOut = SVG_PIXELS(STICK_OUTER_R);
-		int rIn  = SVG_PIXELS(STICK_OUTER_R - STICK_RING_W);
-		_svg->drawEllipse(cx - rOut, cy - rOut, cx + rOut, cy + rOut, ringEdge, true);
-		_svg->drawEllipse(cx - rIn,  cy - rIn,  cx + rIn,  cy + rIn,  ringFill, true);
-	}
-	// --- Thumbstick knob (centre SVG 176,304) ---
-	{
-		int cx = SVG_PIXELS(176), cy = SVG_PIXELS(304);
-		int rOut = SVG_PIXELS(STICK_KNOB_R);
-		int rIn  = SVG_PIXELS(STICK_KNOB_R - 3);
-		_svg->drawEllipse(cx - rOut, cy - rOut, cx + rOut, cy + rOut, knobEdge, true);
-		_svg->drawEllipse(cx - rIn,  cy - rIn,  cx + rIn,  cy + rIn,  knobFill, true);
-	}
-
-	// --- L1 / R1 pills with labels ---
 	const Graphics::Font *font = FontMan.getFontByUsage(Graphics::FontManager::kBigGUIFont);
 	if (!font) {
 		font = FontMan.getFontByUsage(Graphics::FontManager::kGUIFont);
 	}
+
+	// --- ScummVM "S" button (round badge with an "S" glyph) ---
+	{
+		Common::Rect c(SCUMM_CLIP);
+		Common::Rect r(SVG_PIXELS(c.left), SVG_PIXELS(c.top),
+				SVG_PIXELS(c.right), SVG_PIXELS(c.bottom));
+		int cx = (r.left + r.right) / 2;
+		int cy = (r.top + r.bottom) / 2;
+		int rOut = r.width() / 2 - 1;
+		_svg->drawEllipse(cx - rOut, cy - rOut, cx + rOut, cy + rOut, pillFill, true);
+		_svg->drawEllipse(cx - rOut, cy - rOut, cx + rOut, cy + rOut, pillEdge, false);
+		if (font) {
+			int ty = cy - font->getFontHeight() / 2;
+			font->drawString(_svg, "S", r.left, ty, r.width(), textCol,
+					Graphics::kTextAlignCenter);
+		}
+	}
+
+	// --- L1 / R1 pills with labels ---
 	struct { Common::Rect clip; const char *label; } pills[2] = {
 		{ Common::Rect(L1_CLIP), "L1" },
 		{ Common::Rect(R1_CLIP), "R1" }
@@ -311,10 +315,13 @@ TouchControls::FunctionId TouchControls::getFunctionId(int x, int y) {
 		return kFunctionNone;
 	}
 
-	// Hit-test priority: Start > shoulders > A/B/X/Y hotspots > left region
-	// (thumbstick) > right region (drag-to-look).
+	// Hit-test priority: Start > ScummVM > shoulders > A/B/X/Y hotspots > left
+	// region (D-pad) > right region (drag-to-look).
 	if (_functions[kFunctionStart]->isInside(x, y)) {
 		return kFunctionStart;
+	}
+	if (_functions[kFunctionScummVM]->isInside(x, y)) {
+		return kFunctionScummVM;
 	}
 	if (_functions[kFunctionShoulderL]->isInside(x, y)) {
 		return kFunctionShoulderL;
@@ -333,7 +340,7 @@ TouchControls::FunctionId TouchControls::getFunctionId(int x, int y) {
 
 	int xRatio = x * 100 / (int)_screen_width;
 	if (xRatio < LEFT_REGION_MAX_PCT) {
-		return kFunctionThumb;
+		return kFunctionDpad;
 	}
 	return kFunctionLook;
 }
@@ -384,6 +391,16 @@ void TouchControls::draw() {
 	assert(_drawer != nullptr);
 
 	if (!_svg) {
+		return;
+	}
+
+	// Hide the entire pad unless the on-screen gamepad is the active touch mode:
+	// nothing is drawn in touchpad/mouse mode, when on-screen controls are off,
+	// or when a physical controller forced the fallback mode.
+	OSystem_SDL *sdlSystem = dynamic_cast<OSystem_SDL *>(g_system);
+	if (!sdlSystem || !sdlSystem->hasTouchscreen() ||
+			!ConfMan.getBool("onscreen_control") ||
+			sdlSystem->getTouchMode() != OSystem_SDL::TOUCH_MODE_GAMEPAD) {
 		return;
 	}
 
@@ -560,6 +577,15 @@ void TouchControls::mouseClick() {
 	dynamic_cast<OSystem_SDL *>(g_system)->pushEvent(up);
 }
 
+void TouchControls::mainMenu() {
+	// Open the ScummVM Global Main Menu. EVENT_MAINMENU is handled by the default
+	// event manager, which calls Engine::openMainMenuDialog() (the GMM). Pushed
+	// through the same event queue as the toggle long-press EVENT_VIRTUAL_KEYBOARD.
+	Common::Event ev;
+	ev.type = Common::EVENT_MAINMENU;
+	dynamic_cast<OSystem_SDL *>(g_system)->pushEvent(ev);
+}
+
 void TouchControls::drawSurface(uint8 alpha, int x, int y, int offX, int offY, const Common::Rect &clip) const {
 	if (!alpha) {
 		return;
@@ -572,77 +598,146 @@ void TouchControls::drawSurface(uint8 alpha, int x, int y, int offX, int offY, c
 }
 
 // ===========================================================================
-// Floating left thumbstick (move / LEFT_STICK axes)
+// Floating D-pad (move / DPAD_UP/DOWN/LEFT/RIGHT buttons)
 // ===========================================================================
 
-bool TouchControls::FunctionThumb::isInside(int x, int y) {
+bool TouchControls::FunctionDpad::isInside(int x, int y) {
 	int dX = x - startX;
 	int dY = y - startY;
 	unsigned int sqNorm = (unsigned int)(dX * dX) + (unsigned int)(dY * dY);
-	return sqNorm <= FUNC_SVG_SQ_SCALED(STICK_HIT);
+	if (sqNorm <= FUNC_SVG_SQ_SCALED(DPAD_HIT)) {
+		return true;
+	}
+	// Also accept touches near the last finger position (zombie re-touch).
+	dX = x - currentX;
+	dY = y - currentY;
+	sqNorm = (unsigned int)(dX * dX) + (unsigned int)(dY * dY);
+	return sqNorm <= FUNC_SVG_SQ_SCALED(DPAD_DEAD);
 }
 
-void TouchControls::FunctionThumb::touch(int dX, int dY, Action action) {
-	int16 newX = 0, newY = 0;
-	int kX = 0, kY = 0;
+uint32 TouchControls::FunctionDpad::directionMask(int dX, int dY) const {
+	uint32 newMask = 0;
 
+	unsigned int sqNorm = (unsigned int)(dX * dX) + (unsigned int)(dY * dY);
+	if (sqNorm >= FUNC_SVG_SQ_SCALED(DPAD_DEAD)) {
+		// We are far enough from the centre. 8-way octant test:
+		//   Left/right sensitive zone: |dY| <= |dX| * tan(60deg) (sqrt(3))
+		//   Up/down   sensitive zone: |dY| >= |dX| * tan(30deg) (1/sqrt(3))
+		unsigned int sq3 = abs(dX) * 51409 / 29681;
+		unsigned int isq3 = abs(dX) * 29681 / 51409;
+		unsigned int adY = abs(dY);
+
+		if (adY <= sq3) {
+			// Left or right (bit 3 / bit 1).
+			newMask |= (dX < 0) ? 8 : 2;
+		}
+		if (adY >= isq3) {
+			// Up or down (bit 0 / bit 2).
+			newMask |= (dY < 0) ? 1 : 4;
+		}
+	}
+
+	return newMask;
+}
+
+void TouchControls::FunctionDpad::maskToDpadButtons(uint32 oldMask, uint32 newMask) {
+	static const Common::JoystickButton buttons[] = {
+		Common::JOYSTICK_BUTTON_DPAD_UP, Common::JOYSTICK_BUTTON_DPAD_RIGHT,
+		Common::JOYSTICK_BUTTON_DPAD_DOWN, Common::JOYSTICK_BUTTON_DPAD_LEFT
+	};
+
+	uint32 diff = newMask ^ oldMask;
+
+	for (int i = 0, m = 1; i < ARRAYSIZE(buttons); i++, m <<= 1) {
+		if ((diff & m) && (oldMask & m)) {
+			TouchControls::buttonUp(buttons[i]);
+		}
+	}
+	for (int i = 0, m = 1; i < ARRAYSIZE(buttons); i++, m <<= 1) {
+		if ((diff & m) && (newMask & m)) {
+			TouchControls::buttonDown(buttons[i]);
+		}
+	}
+}
+
+void TouchControls::FunctionDpad::touch(int dX, int dY, Action action) {
+	uint32 newMask = 0;
 	if (action != kActionCancel && action != kActionUp) {
-		// radiusFP maps |offset| == STICK_RADIUS to a full-scale axis value,
-		// in the same fixed-point screen units as dX/dY.
-		int radiusFP = SVG_UNSCALED(STICK_RADIUS) * (int)parent->_scale;
-		int64 sq = (int64)dX * dX + (int64)dY * dY;
-
-		// Clamp the visible knob to the stick radius (circular envelope).
-		if (radiusFP > 0 && sq > (int64)radiusFP * radiusFP) {
-			double d = sqrt((double)sq);
-			kX = (int)(dX * (double)radiusFP / d);
-			kY = (int)(dY * (double)radiusFP / d);
-		} else {
-			kX = dX;
-			kY = dY;
-		}
-
-		unsigned int sqNorm = (unsigned int)(dX * dX) + (unsigned int)(dY * dY);
-		if (radiusFP > 0 && sqNorm >= FUNC_SVG_SQ_SCALED(STICK_DEAD)) {
-			// Per-axis clip (square envelope); good enough for a first pass.
-			newX = (int16)CLIP(dX * Common::JOYAXIS_MAX / radiusFP,
-					(int)Common::JOYAXIS_MIN, (int)Common::JOYAXIS_MAX);
-			newY = (int16)CLIP(dY * Common::JOYAXIS_MAX / radiusFP,
-					(int)Common::JOYAXIS_MIN, (int)Common::JOYAXIS_MAX);
-		}
+		newMask = directionMask(dX, dY);
 	}
-
-	knobX = kX;
-	knobY = kY;
-
-	if (newX != axisX) {
-		TouchControls::axisMotion(Common::JOYSTICK_AXIS_LEFT_STICK_X, newX);
-		axisX = newX;
-	}
-	if (newY != axisY) {
-		TouchControls::axisMotion(Common::JOYSTICK_AXIS_LEFT_STICK_Y, newY);
-		axisY = newY;
+	if (newMask != mask) {
+		maskToDpadButtons(mask, newMask);
+		mask = newMask;
 	}
 }
 
-void TouchControls::FunctionThumb::draw(uint8 baseAlpha, uint8 hlAlpha) {
+void TouchControls::FunctionDpad::draw(uint8 baseAlpha, uint8 hlAlpha) {
 	bool active = (status != kFunctionInactive);
 	int cx = active ? startX : parent->homeX(DIR_HOME_X_PCT);
 	int cy = active ? startY : parent->homeY(DIR_HOME_Y_PCT);
 
-	// Base ring.
+	// Base: D-pad cell (circle + grey arrows).
 	{
-		Common::Rect clip(STICK_BASE_CLIP);
+		Common::Rect clip(DPAD_BASE_CLIP);
 		parent->drawSurface(baseAlpha, cx, cy, -clip.width() / 2, -clip.height() / 2, clip);
 	}
 
-	// Knob follows the finger (centred when inactive); brightened while held.
-	int kx = active ? knobX : 0;
-	int ky = active ? knobY : 0;
-	Common::Rect clip(STICK_KNOB_CLIP);
-	parent->drawSurface(baseAlpha, cx + kx, cy + ky, -clip.width() / 2, -clip.height() / 2, clip);
+	if (!hlAlpha || !mask) {
+		return;
+	}
+
+	// Pressed arrow highlights from col 0 row 1.
+	if (mask & 1) { // up
+		Common::Rect clip(0, DPAD_HL_TOP, DPAD_ARROW_W, DPAD_HL_TOP + DPAD_ARROW_H);
+		parent->drawSurface(hlAlpha, cx, cy, -clip.width() / 2, -clip.height(), clip);
+	}
+	if (mask & 2) { // right
+		Common::Rect clip(DPAD_ARROW_W, DPAD_HL_TOP, 2 * DPAD_ARROW_W, DPAD_HL_TOP + DPAD_ARROW_H);
+		parent->drawSurface(hlAlpha, cx, cy, 0, -clip.height() / 2, clip);
+	}
+	if (mask & 4) { // down
+		Common::Rect clip(0, DPAD_HL_TOP + DPAD_ARROW_H, DPAD_ARROW_W, DPAD_HL_TOP + 2 * DPAD_ARROW_H);
+		parent->drawSurface(hlAlpha, cx, cy, -clip.width() / 2, 0, clip);
+	}
+	if (mask & 8) { // left
+		Common::Rect clip(DPAD_ARROW_W, DPAD_HL_TOP + DPAD_ARROW_H, 2 * DPAD_ARROW_W, DPAD_HL_TOP + 2 * DPAD_ARROW_H);
+		parent->drawSurface(hlAlpha, cx, cy, -clip.width(), -clip.height() / 2, clip);
+	}
+}
+
+// ===========================================================================
+// ScummVM button (top-left, opens the Global Main Menu)
+// ===========================================================================
+
+bool TouchControls::FunctionScummVM::isInside(int x, int y) {
+	int cx = parent->homeX(SCUMM_HOME_X_PCT);
+	int cy = parent->homeY(SCUMM_HOME_Y_PCT);
+	int dX = x - cx;
+	int dY = y - cy;
+	unsigned int sqNorm = (unsigned int)(dX * dX) + (unsigned int)(dY * dY);
+	return sqNorm <= FUNC_SVG_SQ_SCALED(SCUMM_HIT);
+}
+
+void TouchControls::FunctionScummVM::touch(int dX, int dY, Action action) {
+	// Fire the GMM once on press; the press visual lasts until the finger lifts.
+	bool wantPressed = (action != kActionCancel && action != kActionUp);
+	if (wantPressed != pressed) {
+		pressed = wantPressed;
+		if (pressed) {
+			mainMenu();
+		}
+	}
+}
+
+void TouchControls::FunctionScummVM::draw(uint8 baseAlpha, uint8 hlAlpha) {
+	int cx = parent->homeX(SCUMM_HOME_X_PCT);
+	int cy = parent->homeY(SCUMM_HOME_Y_PCT);
+
+	Common::Rect clip(SCUMM_CLIP);
+	parent->drawSurface(baseAlpha, cx, cy, -clip.width() / 2, -clip.height() / 2, clip);
 	if (hlAlpha) {
-		parent->drawSurface(hlAlpha, cx + kx, cy + ky, -clip.width() / 2, -clip.height() / 2, clip);
+		// Brighten the badge while pressed.
+		parent->drawSurface(hlAlpha, cx, cy, -clip.width() / 2, -clip.height() / 2, clip);
 	}
 }
 

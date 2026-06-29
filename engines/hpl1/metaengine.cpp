@@ -98,21 +98,23 @@ Common::Array<Common::Keymap *> Hpl1MetaEngine::initKeymaps(const char *target) 
 	// Left analog stick: walk / strafe.
 	act = createKeyBoardAction("FORWARD", _("Forward"), "w", Common::KEYCODE_w);
 	act->addDefaultInputMapping("JOY_LEFT_STICK_Y-");
+	act->addDefaultInputMapping("JOY_UP");
 	movement->addAction(act);
 	act = createKeyBoardAction("BACKWARD", _("Backward"), "s", Common::KEYCODE_s);
 	act->addDefaultInputMapping("JOY_LEFT_STICK_Y+");
+	act->addDefaultInputMapping("JOY_DOWN");
 	movement->addAction(act);
 	act = createKeyBoardAction("LEFT", _("Strafe left"), "a", Common::KEYCODE_a);
 	act->addDefaultInputMapping("JOY_LEFT_STICK_X-");
+	act->addDefaultInputMapping("JOY_LEFT");
 	movement->addAction(act);
 	act = createKeyBoardAction("RIGHT", _("Strafe right"), "d", Common::KEYCODE_d);
 	act->addDefaultInputMapping("JOY_LEFT_STICK_X+");
+	act->addDefaultInputMapping("JOY_RIGHT");
 	movement->addAction(act);
 	act = createKeyBoardAction("LEAN_LEFT", _("Lean left"), "q", Common::KEYCODE_q);
-	act->addDefaultInputMapping("JOY_LEFT");
 	movement->addAction(act);
 	act = createKeyBoardAction("LEAN_RIGHT", _("Lean right"), "e", Common::KEYCODE_e);
-	act->addDefaultInputMapping("JOY_RIGHT");
 	movement->addAction(act);
 	act = createKeyBoardAction("RUN", _("Run"), "LSHIFT", Common::KEYCODE_LSHIFT);
 	act->addDefaultInputMapping("JOY_LEFT_STICK");
@@ -151,11 +153,9 @@ Common::Array<Common::Keymap *> Hpl1MetaEngine::initKeymaps(const char *target) 
 	act->addDefaultInputMapping("JOY_BACK");
 	misc->addAction(act);
 	act = createKeyBoardAction("NOTEBOOK", _("Notebook"), "n", Common::KEYCODE_n);
-	act->addDefaultInputMapping("JOY_DOWN");
 	misc->addAction(act);
 	misc->addAction(createKeyBoardAction("PERSONAL_NOTES", _("Personal notes"), "p", Common::KEYCODE_p));
 	act = createKeyBoardAction("FLASHLIGHT", _("Flashlight"), "f", Common::KEYCODE_f);
-	act->addDefaultInputMapping("JOY_UP");
 	misc->addAction(act);
 	misc->addAction(createKeyBoardAction("GLOWSTICK", _("Glowstick"), "g", Common::KEYCODE_f));
 	// Esc opens the in-game menu and skips the intro/cutscenes; it is read by the

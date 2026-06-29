@@ -22,17 +22,20 @@
 // On-screen touch gamepad controls for the SDL backend (used by Emscripten).
 //
 // This implements the standard AAA touch-FPS layout in landscape:
-//   - a FLOATING left thumbstick (move) in the bottom-left, recentred under the
-//     finger and rendered as a translucent base ring + a filled knob; it emits
-//     the LEFT_STICK analog axes;
+//   - a visible D-PAD (move) in the bottom-left, recentred under the finger and
+//     rendered as the gamepad.svg D-pad cell glyph; it emits the digital
+//     JOYSTICK_BUTTON_DPAD_UP/DOWN/LEFT/RIGHT buttons (8-way, diagonals fire two);
 //   - DRAG-TO-LOOK on the right half of the screen (the camera): an invisible
 //     region whose finger drag is turned into relative-mouse motion (mirrors the
 //     existing touchpad relmouse scaling), and a short tap there is turned into a
 //     left click;
 //   - a MULTI-TOUCH A/B/X/Y diamond in the bottom-right (each button its own
 //     independent hotspot so several can be held at once);
-//   - L1/R1 shoulders in the top corners (labelled pills) and a small Start
-//     button at the top centre.
+//   - L1/R1 shoulders in the top corners (labelled pills), a small Start button
+//     at the top centre, and a ScummVM "S" button (top-left) that opens the
+//     Global Main Menu.
+//
+// The whole pad is hidden unless the on-screen gamepad is the active touch mode.
 //
 // Synthetic joystick / mouse events are pushed through the generic event
 // manager; the gamepad.svg asset is reused for the face-button and Start glyphs
@@ -150,7 +153,7 @@ private:
 
 	enum FunctionId {
 		kFunctionNone      = -1,
-		kFunctionThumb     = 0, // floating left thumbstick (LEFT_STICK axes)
+		kFunctionDpad      = 0, // visible D-pad (DPAD_UP/DOWN/LEFT/RIGHT buttons)
 		kFunctionButtonY   = 1, // A/B/X/Y diamond (independent hotspots)
 		kFunctionButtonB   = 2,
 		kFunctionButtonA   = 3,
@@ -158,8 +161,9 @@ private:
 		kFunctionShoulderL = 5, // L1 shoulder (top-left)
 		kFunctionShoulderR = 6, // R1 shoulder (top-right)
 		kFunctionStart     = 7, // Start/menu button (top centre)
-		kFunctionLook      = 8, // drag-to-look (right half, invisible)
-		kFunctionCount     = 9
+		kFunctionScummVM   = 8, // ScummVM "S" button (opens the Global Main Menu)
+		kFunctionLook      = 9, // drag-to-look (right half, invisible)
+		kFunctionCount     = 10
 	};
 	FunctionId getFunctionId(int x, int y);
 
@@ -172,6 +176,8 @@ private:
 	static void mouseRelative(int relX, int relY);
 	// Synthetic left click at the current cursor position (tap-to-click).
 	static void mouseClick();
+	// Opens the ScummVM Global Main Menu (pushes EVENT_MAINMENU).
+	static void mainMenu();
 
 	/**
 	 * Draws a part of the joystick surface on the screen
@@ -187,20 +193,40 @@ private:
 
 	// Functions implementations
 
-	// Floating left thumbstick: recentres under the finger and emits the
-	// LEFT_STICK analog axes. Rendered as a translucent base ring + a filled
-	// knob that follows the finger (clamped to the stick radius).
-	struct FunctionThumb : Function {
-		FunctionThumb(const TouchControls *parent) :
-			Function(parent), axisX(0), axisY(0), knobX(0), knobY(0) {}
-		void resetState() override { axisX = axisY = 0; knobX = knobY = 0; }
+	// Floating D-pad: recentres under the finger and emits the digital
+	// JOYSTICK_BUTTON_DPAD_UP/DOWN/LEFT/RIGHT buttons (8-way; diagonals fire two
+	// buttons). Rendered as the gamepad.svg D-pad cell glyph with the pressed
+	// arrows lit while held.
+	struct FunctionDpad : Function {
+		FunctionDpad(const TouchControls *parent) :
+			Function(parent), mask(0) {}
+		void resetState() override { mask = 0; }
 
 		bool isInside(int, int) override;
 		void touch(int, int, Action) override;
 		void draw(uint8 baseAlpha, uint8 hlAlpha) override;
 
-		int16 axisX, axisY; // last emitted axis values
-		int knobX, knobY;   // knob offset from centre (fixed-point px, clamped)
+		// Maps a finger offset to an octant direction mask
+		// (bit 0 up, 1 right, 2 down, 3 left).
+		uint32 directionMask(int dX, int dY) const;
+		// Emits the joystick button up/down transitions between two masks.
+		static void maskToDpadButtons(uint32 oldMask, uint32 newMask);
+
+		uint32 mask; // currently pressed directions (octant bitmask)
+	};
+
+	// ScummVM button: a small fixed hotspot in the top-left corner that opens the
+	// Global Main Menu (GMM) on press. Drawn as an "S" glyph.
+	struct FunctionScummVM : Function {
+		FunctionScummVM(const TouchControls *parent) :
+			Function(parent), pressed(false) {}
+		void resetState() override { pressed = false; }
+
+		bool isInside(int, int) override;
+		void touch(int, int, Action) override;
+		void draw(uint8 baseAlpha, uint8 hlAlpha) override;
+
+		bool pressed;
 	};
 
 	// One face button (Y/B/A/X) of the bottom-right diamond. Each button is its
