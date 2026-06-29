@@ -100,8 +100,8 @@
 #define SCUMM_HIT           24
 
 // L1 / R1 shoulder pills, drawn into the spare row.
-#define L1_CLIP             224, 258, 320, 302
-#define R1_CLIP             224, 306, 320, 350
+#define L1_CLIP             224, 256, 272, 304
+#define R1_CLIP             280, 256, 328, 304
 #define SHOULDER_HIT        32
 
 // Drag-to-look indicator (drawn from primitives into the spare row): a ring
@@ -271,7 +271,7 @@ void TouchControls::renderPrimitives() {
 		}
 	}
 
-	// --- L1 / R1 pills with labels ---
+	// --- L1 / R1 round badges with labels (match the ScummVM "S" badge) ---
 	struct { Common::Rect clip; const char *label; } pills[2] = {
 		{ Common::Rect(L1_CLIP), "L1" },
 		{ Common::Rect(R1_CLIP), "R1" }
@@ -279,11 +279,13 @@ void TouchControls::renderPrimitives() {
 	for (int i = 0; i < 2; i++) {
 		Common::Rect r(SVG_PIXELS(pills[i].clip.left),  SVG_PIXELS(pills[i].clip.top),
 				SVG_PIXELS(pills[i].clip.right), SVG_PIXELS(pills[i].clip.bottom));
-		int arc = r.height() / 2;
-		_svg->drawRoundRect(r, arc, pillFill, true);
-		_svg->drawRoundRect(r, arc, pillEdge, false);
+		int cx = (r.left + r.right) / 2;
+		int cy = (r.top + r.bottom) / 2;
+		int rOut = r.width() / 2 - 1;
+		_svg->drawEllipse(cx - rOut, cy - rOut, cx + rOut, cy + rOut, pillFill, true);
+		_svg->drawEllipse(cx - rOut, cy - rOut, cx + rOut, cy + rOut, pillEdge, false);
 		if (font) {
-			int ty = r.top + (r.height() - font->getFontHeight()) / 2;
+			int ty = cy - font->getFontHeight() / 2;
 			font->drawString(_svg, pills[i].label, r.left, ty, r.width(), textCol,
 					Graphics::kTextAlignCenter);
 		}
