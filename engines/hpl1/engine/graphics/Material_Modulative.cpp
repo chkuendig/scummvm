@@ -90,7 +90,9 @@ cMaterial_Modulative::~cMaterial_Modulative() {
 iGpuProgram *cMaterial_Modulative::getGpuProgram(const eMaterialRenderType aType, const int alPass, iLight3D *apLight) {
 	if (mpRenderSettings->mbFogActive)
 		return _fogShader;
-	return nullptr;
+	// See cMaterial_Alpha::getGpuProgram — nullptr on desktop, mSimpleShader
+	// on GLES2 so the trans pass has something to bind.
+	return mpLowLevelGraphics->GetSimpleShader();
 }
 
 iMaterialProgramSetup *cMaterial_Modulative::getGpuProgramSetup(const eMaterialRenderType aType, const int alPass, iLight3D *apLight) {

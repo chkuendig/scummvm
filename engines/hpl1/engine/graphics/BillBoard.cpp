@@ -26,6 +26,7 @@
  */
 
 #include "hpl1/engine/graphics/BillBoard.h"
+#include "hpl1/opengl.h" // USE_FORCED_GLES2
 
 #include "hpl1/engine/impl/tinyXML/tinyxml.h"
 
@@ -254,8 +255,15 @@ void cBillboard::UpdateGraphics(cCamera3D *apCamera, float afFrameTime, cRenderL
 	if (mbIsHalo == false)
 		return;
 
+	if (mQueryObject.mpQuery == nullptr) {
+		// No backend support for occlusion queries (GLES2 path skips creation
+		// in SetIsHalo). Render the halo at full brightness — it won't dim on
+		// partial occlusion but the porthole case looks correct.
+		SetHaloAlpha(1.0f);
+		return;
+	}
+
 	////////////////////////
-	// Set the alpha
 	float fAlpha = 0;
 
 	if (mlLastRenderCount == apRenderList->GetLastRenderCount()) {
@@ -268,7 +276,6 @@ void cBillboard::UpdateGraphics(cCamera3D *apCamera, float afFrameTime, cRenderL
 	mlLastRenderCount = apRenderList->GetRenderCount();
 
 	////////////////////////
-	// Add the queries
 	if (mbHaloSourceIsParent) {
 		iRenderable *pParent = static_cast<iRenderable *>(GetEntityParent());
 		if (pParent == NULL) {
@@ -342,17 +349,14 @@ cMatrixf *cBillboard::GetModelMatrix(cCamera3D *apCamera) {
 		m_mtxTempTransform.SetTranslation(vPos);
 	}
 
-	// Set right vector
 	m_mtxTempTransform.m[0][0] = vRight.x;
 	m_mtxTempTransform.m[1][0] = vRight.y;
 	m_mtxTempTransform.m[2][0] = vRight.z;
 
-	// Set up vector
 	m_mtxTempTransform.m[0][1] = vUp.x;
 	m_mtxTempTransform.m[1][1] = vUp.y;
 	m_mtxTempTransform.m[2][1] = vUp.z;
 
-	// Set forward vector
 	m_mtxTempTransform.m[0][2] = vForward.x;
 	m_mtxTempTransform.m[1][2] = vForward.y;
 	m_mtxTempTransform.m[2][2] = vForward.z;
@@ -385,7 +389,6 @@ void cBillboard::LoadXMLProperties(const tString asFile) {
 					mfForwardOffset = 0;
 
 				/////////////////
-				// Halo stuff
 				bool bIsHalo = cString::ToBool(pMainElem->Attribute("IsHalo"), false);
 				SetIsHalo(bIsHalo);
 
@@ -402,7 +405,6 @@ void cBillboard::LoadXMLProperties(const tString asFile) {
 				}
 
 				/////////////////
-				// Load material
 				iMaterial *pMat = mpMaterialManager->CreateMaterial(sMaterial);
 				if (pMat) {
 					SetMaterial(pMat);
@@ -437,8 +439,13 @@ void cBillboard::SetIsHalo(bool abX) {
 	mbIsHalo = abX;
 
 	if (mbIsHalo) {
+#if !USE_FORCED_GLES2
+		// WebGL2 only exposes a boolean occlusion query (ANY_SAMPLES_PASSED);
+		// see UpdateGraphics for the alpha=1 fast path that runs in lieu of
+		// the visible/total samples ratio when no query objects exist.
 		mQueryObject.mpQuery = mpLowLevelGraphics->CreateOcclusionQuery();
 		mMaxQueryObject.mpQuery = mpLowLevelGraphics->CreateOcclusionQuery();
+#endif
 
 		mfHaloAlpha = 1; // THis is to make sure that the new alpha is set to the mesh.
 		SetHaloAlpha(0);
