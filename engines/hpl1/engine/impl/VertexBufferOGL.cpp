@@ -30,7 +30,11 @@
 #include "hpl1/engine/math/Math.h"
 #include "hpl1/engine/system/low_level_system.h"
 
-#ifdef HPL1_USE_OPENGL
+// This file implements the legacy fixed-function (glVertexPointer / glBegin /
+// GL_QUADS) vertex buffer fallback for desktop OpenGL. None of that exists in
+// GLES2/WebGL2, so compile it out entirely on the GLES2 build — the SDL
+// renderer never instantiates this class in that configuration anyway.
+#if defined(HPL1_USE_OPENGL) && !USE_FORCED_GLES2
 
 namespace hpl {
 
@@ -507,4 +511,4 @@ void cVertexBufferOGL::SetVertexStates(tVertexFlag aFlags) {
 
 } // namespace hpl
 
-#endif // HPL1_USE_OPENGL
+#endif // defined(HPL1_USE_OPENGL) && !USE_FORCED_GLES2
