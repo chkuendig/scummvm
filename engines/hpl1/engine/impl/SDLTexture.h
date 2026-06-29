@@ -31,12 +31,22 @@
 #include "common/scummsys.h"
 #include "hpl1/engine/graphics/Texture.h"
 #include "hpl1/engine/graphics/bitmap2D.h"
-#include "hpl1/engine/impl/LowLevelGraphicsSDL.h"
 #include "hpl1/opengl.h"
+#if USE_FORCED_GLES2
+#include "hpl1/engine/impl/LowLevelGraphicsGLES.h"
+#else
+#include "hpl1/engine/impl/LowLevelGraphicsSDL.h"
+#endif
 
 #ifdef HPL1_USE_OPENGL
 
 namespace hpl {
+
+#if USE_FORCED_GLES2
+typedef cLowLevelGraphicsGLES cLowLevelGfxImpl;
+#else
+typedef cLowLevelGraphicsSDL cLowLevelGfxImpl;
+#endif
 
 class cSDLTexture : public iTexture {
 public:
@@ -90,7 +100,7 @@ private:
 
 	tUIntVec mvTextureHandles;
 	bool mbContainsData;
-	cLowLevelGraphicsSDL *mpGfxSDL;
+	cLowLevelGfxImpl *mpGfxImpl;
 
 	float mfTimeCount;
 	int mlTextureIndex;
