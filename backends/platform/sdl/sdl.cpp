@@ -60,6 +60,8 @@
 #include "graphics/cursorman.h"
 #include "graphics/renderer.h"
 
+#include "engines/engine.h"	// for g_engine (read-only) in currentTouchContext()
+
 #include <time.h>	// for getTimeAndDate()
 
 #ifdef USE_DETECTLANG
@@ -277,7 +279,12 @@ bool OSystem_SDL::hasTouchscreen() const {
 }
 
 OSystem_SDL::TouchContext OSystem_SDL::currentTouchContext() {
-	if (isOverlayVisible()) {
+	// The overlay is shown both by the launcher and by the in-game GMM/dialogs.
+	// Only treat it as the "menus" context when no game engine is running (i.e.
+	// the launcher). While a game is running, keep reporting the game's 2d/3d
+	// render context so opening the GMM over the game doesn't flip the touch
+	// preset (and make the on-screen gamepad disappear).
+	if (isOverlayVisible() && g_engine == nullptr) {
 		return kTouchContextMenus;
 	}
 	bool is3d = false;
@@ -317,15 +324,15 @@ void OSystem_SDL::applyTouchSettings() {
 		_touchMode = TOUCH_MODE_MOUSE;
 	}
 
-	// A manual cycleTouchMode() choice overrides the per-context preset until the
-	// context itself changes. Without this, the frequent re-applications (every
-	// overlay show/hide and screen change) would silently revert the user's
-	// on-screen gamepad back to the "mouse" menus preset, so the D-pad would stop
-	// emitting events and could no longer navigate the launcher or the GMM.
-	if (_touchModeManual && _touchModeManualContext == context) {
+	// A manual cycleTouchMode() choice overrides the per-context preset and is
+	// sticky across context changes: once the user toggles the on-screen gamepad
+	// it persists into the launcher, the GMM and the game until they cycle again.
+	// Without this, the frequent re-applications (every overlay show/hide and
+	// screen change) would silently revert the user's on-screen gamepad back to a
+	// per-context preset, so the D-pad would stop emitting events and could no
+	// longer navigate the launcher or the GMM.
+	if (_touchModeManual) {
 		_touchMode = _touchModeManualValue;
-	} else {
-		_touchModeManual = false;
 	}
 
 	// The on-screen gamepad is only useful as a fallback: if a physical
