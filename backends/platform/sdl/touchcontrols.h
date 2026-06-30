@@ -31,8 +31,9 @@
 //     left click;
 //   - a MULTI-TOUCH A/B/X/Y diamond in the bottom-right (each button its own
 //     independent hotspot so several can be held at once);
-//   - a compact secondary top-centre row of smaller controls: L1, the ScummVM
-//     "S" button (opens the Global Main Menu), Start and R1.
+//   - a compact secondary top-centre cluster reusing the gamepad.svg "system"
+//     cluster art (a diamond on a grouping circle): the GMM button (opens the
+//     Global Main Menu) on top, R1 on the right, Start at the bottom, L1 on left.
 //
 // The whole pad is hidden unless the on-screen gamepad is the active touch mode.
 //
@@ -110,6 +111,15 @@ private:
 	int homeX(int percent) const { return (int)_screen_width * percent / 100; }
 	int homeY(int percent) const { return (int)_screen_height * percent / 100; }
 
+	// Centre of a top-cluster button placed at the given SVG-px diamond offset from
+	// the cluster centre, in fixed-point screen pixels (offset scaled by the
+	// cluster size so the hotspots sit on the drawn buttons, like the A/B/X/Y one).
+	void auxCenter(int dxSvg, int dySvg, int &cx, int &cy) const;
+
+	// Overlays one top-cluster pressed-highlight crop (col-2 highlight row) on the
+	// cluster centre, offset by half-cells like the A/B/X/Y highlights.
+	void drawSysHighlight(uint8 hlAlpha, const Common::Rect &clip, int hlMulX, int hlMulY) const;
+
 	enum State {
 		kFunctionInactive = 0,
 		kFunctionActive = 1,
@@ -170,6 +180,10 @@ private:
 
 	static void buttonDown(Common::JoystickButton jb);
 	static void buttonUp(Common::JoystickButton jb);
+	// Synthetic keyboard key press/release, used to drive enumerable GUIs (the
+	// launcher and the GMM) keyboard-style from the on-screen pad.
+	static void keyDown(Common::KeyCode kc);
+	static void keyUp(Common::KeyCode kc);
 	static void axisMotion(Common::JoystickAxis axis, int16 value);
 	// Relative-mouse motion for drag-to-look (relX/relY in window pixels).
 	static void mouseRelative(int relX, int relY);
@@ -216,8 +230,8 @@ private:
 		uint32 mask; // currently pressed directions (octant bitmask)
 	};
 
-	// ScummVM button: a small fixed hotspot in the top-left corner that opens the
-	// Global Main Menu (GMM) on press. Drawn as an "S" glyph.
+	// GMM button: the top of the system-cluster diamond (GUIDE glyph). Opens the
+	// Global Main Menu (GMM) on press.
 	struct FunctionScummVM : Function {
 		FunctionScummVM(const TouchControls *parent) :
 			Function(parent), pressed(false) {}
@@ -240,8 +254,8 @@ private:
 				int hlMulX, int hlMulY, bool clusterOwner) :
 			Function(parent), _jb(jb), _dxSvg(dxSvg), _dySvg(dySvg),
 			_hlClip(hl), _hlMulX(hlMulX), _hlMulY(hlMulY),
-			_clusterOwner(clusterOwner), pressed(false) {}
-		void resetState() override { pressed = false; }
+			_clusterOwner(clusterOwner), pressed(false), _menuActivate(false) {}
+		void resetState() override { pressed = false; _menuActivate = false; }
 
 		// Centre of this button in fixed-point screen pixels.
 		void center(int &cx, int &cy) const;
@@ -256,10 +270,13 @@ private:
 		int _hlMulX, _hlMulY;        // highlight offset from cluster centre (half-cells)
 		bool _clusterOwner;          // draws the shared resting cluster glyph
 		bool pressed;
+		// True while this press is acting as a GUI "activate" (Enter) instead of a
+		// gamepad A, decided at press time so the matching release matches it.
+		bool _menuActivate;
 	};
 
-	// L1 / R1 shoulder buttons: fixed hotspots in the top corners, drawn as
-	// labelled pills.
+	// L1 / R1 shoulder buttons: the left (LS) and right (RS) points of the
+	// system-cluster diamond.
 	struct FunctionShoulder : Function {
 		FunctionShoulder(const TouchControls *parent, Common::JoystickButton jb, bool right) :
 			Function(parent), _jb(jb), _right(right), pressed(false) {}
@@ -274,7 +291,7 @@ private:
 		bool pressed;
 	};
 
-	// Start / menu button: a small fixed hotspot at the top centre. Emits
+	// Start button: the bottom (silver lens) of the system-cluster diamond. Emits
 	// JOYSTICK_BUTTON_START (mapped to Esc / menu / skip by the engine keymaps).
 	struct FunctionStart : Function {
 		FunctionStart(const TouchControls *parent) :

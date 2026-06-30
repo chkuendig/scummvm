@@ -27,8 +27,6 @@
 #include "common/system.h"
 #include "common/textconsole.h"
 #include "common/util.h"
-#include "graphics/fontman.h"
-#include "graphics/font.h"
 #include "graphics/managed_surface.h"
 #include "graphics/svg.h"
 
@@ -41,16 +39,18 @@
 //   col 0 row 1 (0,128)   : D-pad pressed arrows (white highlights)
 //   col 1 row 0 (128,0)   : A/B/X/Y resting cluster
 //   col 1 row 1 (128,128) : A/B/X/Y pressed highlights
-//   col 2 row 0 (256,0)   : labelled circles (the menu "lens" reused for Start)
-//   col 2 row 1 (256,128) : (system highlights, unused here)
+//   col 2 row 0 (256,0)   : "system" cluster - GUIDE (top), RS (right), the
+//                           silver Start/menu lens (bottom), LS (left)
+//   col 2 row 1 (256,128) : system pressed highlights (packed in quadrants)
 //
 // A spare row is appended below the 384x256 sheet (SVG y 256..384) into which
-// the ScummVM "S" button, the L1/R1 pills and the drag-to-look ring/knob are
-// drawn from primitives at load time (see renderPrimitives()).
+// the drag-to-look ring/knob are drawn from primitives at load time (see
+// renderPrimitives()).
 // ---------------------------------------------------------------------------
 #define SVG_WIDTH          384
 #define SVG_HEIGHT         256
-// Total height of the backing surface: the sheet plus the spare primitives row.
+// Total height of the backing surface: the sheet plus the spare primitives row
+// (the drag-to-look ring/knob are drawn into it from primitives).
 #define SVG_FULL_HEIGHT    384
 
 // ---------------------------------------------------------------------------
@@ -62,7 +62,8 @@
 // ---------------------------------------------------------------------------
 #define DPAD_SIZE_PCT        68
 #define ABXY_SIZE_PCT        68
-#define AUX_SIZE_PCT         52
+// Top (system) cluster: rendered at 80% of the primary D-pad / A-B-X-Y clusters.
+#define SYS_SIZE_PCT         (ABXY_SIZE_PCT * 80 / 100)   // ~54
 
 // A/B/X/Y: the whole resting cluster glyph (col 1 row 0) is drawn once, cleanly
 // (no per-button cropping), and a per-button pressed-highlight circle (col 1
@@ -81,11 +82,6 @@
 #define ABXY_GLYPH_OFFSET   36
 #define ABXY_HIT            18
 
-// Start/menu glyph reuses the lower labelled circle of column 2 (the silver
-// menu "lens"), a 48x48 region centred on the glyph at SVG (320, 100).
-#define START_CLIP          296, 76, 344, 124
-#define START_HIT           24
-
 // Floating D-pad geometry (SVG px). The base cell fills a 128 cell; the pressed
 // arrow highlights are 64x64 crops of the highlight row (col 0 row 1).
 #define DPAD_BASE_CLIP        0,   0, 128, 128
@@ -94,15 +90,6 @@
 #define DPAD_HL_TOP        128
 #define DPAD_DEAD           21   // direction dead-zone (SVG px)
 #define DPAD_HIT            62   // hit radius for zombie re-touch / inside test
-
-// ScummVM "S" button, drawn from primitives into the spare row. Opens the GMM.
-#define SCUMM_CLIP            0, 256,  48, 304
-#define SCUMM_HIT           24
-
-// L1 / R1 shoulder pills, drawn into the spare row.
-#define L1_CLIP             224, 256, 272, 304
-#define R1_CLIP             280, 256, 328, 304
-#define SHOULDER_HIT        32
 
 // Drag-to-look indicator (drawn from primitives into the spare row): a ring
 // ("base", anchored at the finger-down position) and a filled dot ("knob", at
@@ -130,9 +117,9 @@
 // ---------------------------------------------------------------------------
 // Home (resting) positions of the controls, in percent of the window. AAA
 // touch-FPS layout in landscape: D-pad bottom-left, A/B/X/Y diamond
-// bottom-right, and a compact secondary top-centre row holding (left to right)
-// L1, the ScummVM button, Start and R1. An invisible drag-to-look region fills
-// the rest of the right half. (The mode-toggle icon lives in the top-right
+// bottom-right, and the gamepad.svg "system" cluster top-centre (a diamond of
+// GMM/R1/Start/L1 on its grouping circle). An invisible drag-to-look region
+// fills the rest of the right half. (The mode-toggle icon lives in the top-right
 // corner and is drawn elsewhere.)
 // ---------------------------------------------------------------------------
 #define DIR_HOME_X_PCT       17
@@ -140,13 +127,34 @@
 #define ABXY_HOME_X_PCT      85
 #define ABXY_HOME_Y_PCT      76
 
-// Secondary top-centre cluster: four evenly spaced items centred on 50%.
-#define AUX_Y_PCT             9
-#define AUX_STEP_X_PCT       10
-#define AUX_L1_X_PCT        (50 - 3 * AUX_STEP_X_PCT / 2)   // 35
-#define AUX_SCUMM_X_PCT     (50 - 1 * AUX_STEP_X_PCT / 2)   // 45
-#define AUX_START_X_PCT     (50 + 1 * AUX_STEP_X_PCT / 2)   // 55
-#define AUX_R1_X_PCT        (50 + 3 * AUX_STEP_X_PCT / 2)   // 65
+// Secondary top-centre cluster: the gamepad.svg "system" cluster cell (col 2),
+// a translucent grouping circle with four buttons in a diamond - GUIDE (top),
+// RS (right), the silver Start/menu lens (bottom) and LS (left). Rendered like
+// the A/B/X/Y cluster: the whole resting cell is drawn once, with a per-button
+// pressed highlight from the col-2 highlight row overlaid on press. The diamond
+// positions map to the existing top functions:
+//   top    (GUIDE glyph)  -> ScummVM / GMM button
+//   right  (RS glyph)     -> R1  (right shoulder)
+//   bottom (Start lens)   -> Start
+//   left   (LS glyph)     -> L1  (left shoulder)
+#define AUX_HOME_X_PCT       50
+#define AUX_HOME_Y_PCT       13
+// Diamond offset of each button from the cluster centre (SVG px), matching the
+// cluster art (buttons drawn at +/-36 in the 128 cell, radius ~24).
+#define AUX_GLYPH_OFFSET     36
+
+// Resting cell (col 2 row 0) and the per-button pressed-highlight crops (col 2
+// row 1), packed in quadrants exactly like the A/B/X/Y highlight row.
+#define SYS_CLUSTER_CLIP    256,   0, 384, 128
+#define SYS_HL_GUIDE        256, 128, 320, 192   // top    -> GMM
+#define SYS_HL_RS           320, 128, 384, 192   // right  -> R1
+#define SYS_HL_START        256, 192, 320, 256   // bottom -> Start
+#define SYS_HL_LS           320, 192, 384, 256   // left   -> L1
+
+// Per-button hit radius (SVG px). Scaled by the cluster size (like the button
+// positions) so it tracks the drawn button radius (~24 in the cell) and the four
+// diamond hotspots stay distinct as the cluster size changes.
+#define SYS_HIT             (26 * SYS_SIZE_PCT / 100)
 
 // Fingers left of this (percent of width) and not on a hotspot drive the
 // D-pad; everything else drives drag-to-look.
@@ -244,52 +252,6 @@ void TouchControls::renderPrimitives() {
 	// Clear the spare row to fully transparent.
 	_svg->fillRect(Common::Rect(0, SVG_PIXELS(SVG_HEIGHT), SVG_PIXELS(SVG_WIDTH), SVG_PIXELS(SVG_FULL_HEIGHT)),
 			fmt.ARGBToColor(0, 0, 0, 0));
-
-	const uint32 pillFill = fmt.ARGBToColor(150, 25,  25,  30);
-	const uint32 pillEdge = fmt.ARGBToColor(220, 235, 235, 235);
-	const uint32 textCol  = fmt.ARGBToColor(255, 245, 245, 245);
-
-	const Graphics::Font *font = FontMan.getFontByUsage(Graphics::FontManager::kBigGUIFont);
-	if (!font) {
-		font = FontMan.getFontByUsage(Graphics::FontManager::kGUIFont);
-	}
-
-	// --- ScummVM "S" button (round badge with an "S" glyph) ---
-	{
-		Common::Rect c(SCUMM_CLIP);
-		Common::Rect r(SVG_PIXELS(c.left), SVG_PIXELS(c.top),
-				SVG_PIXELS(c.right), SVG_PIXELS(c.bottom));
-		int cx = (r.left + r.right) / 2;
-		int cy = (r.top + r.bottom) / 2;
-		int rOut = r.width() / 2 - 1;
-		_svg->drawEllipse(cx - rOut, cy - rOut, cx + rOut, cy + rOut, pillFill, true);
-		_svg->drawEllipse(cx - rOut, cy - rOut, cx + rOut, cy + rOut, pillEdge, false);
-		if (font) {
-			int ty = cy - font->getFontHeight() / 2;
-			font->drawString(_svg, "S", r.left, ty, r.width(), textCol,
-					Graphics::kTextAlignCenter);
-		}
-	}
-
-	// --- L1 / R1 round badges with labels (match the ScummVM "S" badge) ---
-	struct { Common::Rect clip; const char *label; } pills[2] = {
-		{ Common::Rect(L1_CLIP), "L1" },
-		{ Common::Rect(R1_CLIP), "R1" }
-	};
-	for (int i = 0; i < 2; i++) {
-		Common::Rect r(SVG_PIXELS(pills[i].clip.left),  SVG_PIXELS(pills[i].clip.top),
-				SVG_PIXELS(pills[i].clip.right), SVG_PIXELS(pills[i].clip.bottom));
-		int cx = (r.left + r.right) / 2;
-		int cy = (r.top + r.bottom) / 2;
-		int rOut = r.width() / 2 - 1;
-		_svg->drawEllipse(cx - rOut, cy - rOut, cx + rOut, cy + rOut, pillFill, true);
-		_svg->drawEllipse(cx - rOut, cy - rOut, cx + rOut, cy + rOut, pillEdge, false);
-		if (font) {
-			int ty = cy - font->getFontHeight() / 2;
-			font->drawString(_svg, pills[i].label, r.left, ty, r.width(), textCol,
-					Graphics::kTextAlignCenter);
-		}
-	}
 
 	// --- Drag-to-look indicator: a ring ("base") and a filled dot ("knob") ---
 	const uint32 ringCol = fmt.ARGBToColor(210, 240, 240, 240);
@@ -462,6 +424,15 @@ void TouchControls::draw() {
 
 	uint32 now = g_system->getMillis(true);
 
+	// Draw the top (system) cluster resting cell once - the grouping circle plus
+	// the GUIDE/RS/Start/LS diamond - just like the A/B/X/Y cluster owner does.
+	// Each top function overlays its own pressed highlight on top while held.
+	{
+		Common::Rect clip(SYS_CLUSTER_CLIP);
+		drawSurface(_baseAlpha, homeX(AUX_HOME_X_PCT), homeY(AUX_HOME_Y_PCT),
+				-clip.width() / 2, -clip.height() / 2, clip, SYS_SIZE_PCT);
+	}
+
 	for (uint i = 0; i < kFunctionCount; i++) {
 		Function *func = _functions[i];
 		uint8 hlAlpha;
@@ -601,6 +572,20 @@ void TouchControls::buttonUp(Common::JoystickButton jb) {
 	dynamic_cast<OSystem_SDL *>(g_system)->pushEvent(ev);
 }
 
+void TouchControls::keyDown(Common::KeyCode kc) {
+	Common::Event ev;
+	ev.type = Common::EVENT_KEYDOWN;
+	ev.kbd = Common::KeyState(kc);
+	dynamic_cast<OSystem_SDL *>(g_system)->pushEvent(ev);
+}
+
+void TouchControls::keyUp(Common::KeyCode kc) {
+	Common::Event ev;
+	ev.type = Common::EVENT_KEYUP;
+	ev.kbd = Common::KeyState(kc);
+	dynamic_cast<OSystem_SDL *>(g_system)->pushEvent(ev);
+}
+
 void TouchControls::axisMotion(Common::JoystickAxis axis, int16 value) {
 	Common::Event ev;
 	ev.type = Common::EVENT_JOYAXIS_MOTION;
@@ -663,6 +648,18 @@ void TouchControls::drawSurface(uint8 alpha, int x, int y, int offX, int offY, c
 	int dx = SCALED_PIXELS(x) + offXpx * sizePct / 100;
 	int dy = SCALED_PIXELS(y) + offYpx * sizePct / 100;
 	_drawer->touchControlDraw(alpha, dx, dy, w, h, clip_);
+}
+
+void TouchControls::auxCenter(int dxSvg, int dySvg, int &cx, int &cy) const {
+	// Diamond offsets scaled like the cluster cell so the hotspots sit on the
+	// drawn buttons (mirrors FunctionButton::center for the A/B/X/Y cluster).
+	cx = homeX(AUX_HOME_X_PCT) + SVG_UNSCALED(dxSvg) * (int)_scale * SYS_SIZE_PCT / 100;
+	cy = homeY(AUX_HOME_Y_PCT) + SVG_UNSCALED(dySvg) * (int)_scale * SYS_SIZE_PCT / 100;
+}
+
+void TouchControls::drawSysHighlight(uint8 hlAlpha, const Common::Rect &clip, int hlMulX, int hlMulY) const {
+	drawSurface(hlAlpha, homeX(AUX_HOME_X_PCT), homeY(AUX_HOME_Y_PCT),
+			hlMulX * clip.width() / 2, hlMulY * clip.height() / 2, clip, SYS_SIZE_PCT);
 }
 
 // ===========================================================================
@@ -774,16 +771,16 @@ void TouchControls::FunctionDpad::draw(uint8 baseAlpha, uint8 hlAlpha) {
 }
 
 // ===========================================================================
-// ScummVM button (top-left, opens the Global Main Menu)
+// ScummVM / GMM button (GUIDE glyph, top of the system cluster diamond)
 // ===========================================================================
 
 bool TouchControls::FunctionScummVM::isInside(int x, int y) {
-	int cx = parent->homeX(AUX_SCUMM_X_PCT);
-	int cy = parent->homeY(AUX_Y_PCT);
+	int cx, cy;
+	parent->auxCenter(0, -AUX_GLYPH_OFFSET, cx, cy); // top
 	int dX = x - cx;
 	int dY = y - cy;
 	unsigned int sqNorm = (unsigned int)(dX * dX) + (unsigned int)(dY * dY);
-	return sqNorm <= FUNC_SVG_SQ_SCALED(SCUMM_HIT);
+	return sqNorm <= FUNC_SVG_SQ_SCALED(SYS_HIT);
 }
 
 void TouchControls::FunctionScummVM::touch(int dX, int dY, Action action) {
@@ -797,15 +794,11 @@ void TouchControls::FunctionScummVM::touch(int dX, int dY, Action action) {
 	}
 }
 
-void TouchControls::FunctionScummVM::draw(uint8 baseAlpha, uint8 hlAlpha) {
-	int cx = parent->homeX(AUX_SCUMM_X_PCT);
-	int cy = parent->homeY(AUX_Y_PCT);
-
-	Common::Rect clip(SCUMM_CLIP);
-	parent->drawSurface(baseAlpha, cx, cy, -clip.width() / 2, -clip.height() / 2, clip, AUX_SIZE_PCT);
-	if (hlAlpha) {
-		// Brighten the badge while pressed.
-		parent->drawSurface(hlAlpha, cx, cy, -clip.width() / 2, -clip.height() / 2, clip, AUX_SIZE_PCT);
+void TouchControls::FunctionScummVM::draw(uint8 /*baseAlpha*/, uint8 hlAlpha) {
+	// Resting art is the shared system-cluster cell (drawn once in draw()); this
+	// only overlays the GUIDE pressed highlight while held (top -> hlMul -1,-2).
+	if (hlAlpha && pressed) {
+		parent->drawSysHighlight(hlAlpha, Common::Rect(SYS_HL_GUIDE), -1, -2);
 	}
 }
 
@@ -833,9 +826,25 @@ void TouchControls::FunctionButton::touch(int dX, int dY, Action action) {
 	if (wantPressed != pressed) {
 		pressed = wantPressed;
 		if (pressed) {
-			buttonDown(_jb);
+			// The launcher and the GMM are enumerable UIs navigated keyboard-style:
+			// the D-pad moves the highlight (JOY_*->arrows) and the A button
+			// confirms by activating the focused widget, i.e. Enter - rather than a
+			// click-at-cursor. Decide this once, at press time, so the matching
+			// release sends the same kind of event (avoids a stuck key/button when
+			// activating launches a game and hides the overlay before the finger
+			// lifts). In-game the A button stays a normal gamepad A.
+			_menuActivate = (_jb == Common::JOYSTICK_BUTTON_A) && g_system->isOverlayVisible();
+			if (_menuActivate) {
+				keyDown(Common::KEYCODE_RETURN);
+			} else {
+				buttonDown(_jb);
+			}
 		} else {
-			buttonUp(_jb);
+			if (_menuActivate) {
+				keyUp(Common::KEYCODE_RETURN);
+			} else {
+				buttonUp(_jb);
+			}
 		}
 	}
 }
@@ -865,12 +874,13 @@ void TouchControls::FunctionButton::draw(uint8 baseAlpha, uint8 hlAlpha) {
 // ===========================================================================
 
 bool TouchControls::FunctionShoulder::isInside(int x, int y) {
-	int cx = parent->homeX(_right ? AUX_R1_X_PCT : AUX_L1_X_PCT);
-	int cy = parent->homeY(AUX_Y_PCT);
+	int cx, cy;
+	// R1 on the right, L1 on the left of the diamond.
+	parent->auxCenter(_right ? AUX_GLYPH_OFFSET : -AUX_GLYPH_OFFSET, 0, cx, cy);
 	int dX = x - cx;
 	int dY = y - cy;
 	unsigned int sqNorm = (unsigned int)(dX * dX) + (unsigned int)(dY * dY);
-	return sqNorm <= FUNC_SVG_SQ_SCALED(SHOULDER_HIT);
+	return sqNorm <= FUNC_SVG_SQ_SCALED(SYS_HIT);
 }
 
 void TouchControls::FunctionShoulder::touch(int dX, int dY, Action action) {
@@ -885,29 +895,29 @@ void TouchControls::FunctionShoulder::touch(int dX, int dY, Action action) {
 	}
 }
 
-void TouchControls::FunctionShoulder::draw(uint8 baseAlpha, uint8 hlAlpha) {
-	int cx = parent->homeX(_right ? AUX_R1_X_PCT : AUX_L1_X_PCT);
-	int cy = parent->homeY(AUX_Y_PCT);
-
-	Common::Rect clip = _right ? Common::Rect(R1_CLIP) : Common::Rect(L1_CLIP);
-	parent->drawSurface(baseAlpha, cx, cy, -clip.width() / 2, -clip.height() / 2, clip, AUX_SIZE_PCT);
-	if (hlAlpha) {
-		// Brighten the pill while pressed.
-		parent->drawSurface(hlAlpha, cx, cy, -clip.width() / 2, -clip.height() / 2, clip, AUX_SIZE_PCT);
+void TouchControls::FunctionShoulder::draw(uint8 /*baseAlpha*/, uint8 hlAlpha) {
+	// Resting art is the shared system-cluster cell; overlay the pressed highlight
+	// only: R1 = RS on the right (hlMul 0,-1), L1 = LS on the left (hlMul -2,-1).
+	if (hlAlpha && pressed) {
+		if (_right) {
+			parent->drawSysHighlight(hlAlpha, Common::Rect(SYS_HL_RS), 0, -1);
+		} else {
+			parent->drawSysHighlight(hlAlpha, Common::Rect(SYS_HL_LS), -2, -1);
+		}
 	}
 }
 
 // ===========================================================================
-// Start / menu button (top centre)
+// Start button (silver lens, bottom of the system cluster diamond)
 // ===========================================================================
 
 bool TouchControls::FunctionStart::isInside(int x, int y) {
-	int cx = parent->homeX(AUX_START_X_PCT);
-	int cy = parent->homeY(AUX_Y_PCT);
+	int cx, cy;
+	parent->auxCenter(0, AUX_GLYPH_OFFSET, cx, cy); // bottom
 	int dX = x - cx;
 	int dY = y - cy;
 	unsigned int sqNorm = (unsigned int)(dX * dX) + (unsigned int)(dY * dY);
-	return sqNorm <= FUNC_SVG_SQ_SCALED(START_HIT);
+	return sqNorm <= FUNC_SVG_SQ_SCALED(SYS_HIT);
 }
 
 void TouchControls::FunctionStart::touch(int dX, int dY, Action action) {
@@ -923,15 +933,11 @@ void TouchControls::FunctionStart::touch(int dX, int dY, Action action) {
 	}
 }
 
-void TouchControls::FunctionStart::draw(uint8 baseAlpha, uint8 hlAlpha) {
-	int cx = parent->homeX(AUX_START_X_PCT);
-	int cy = parent->homeY(AUX_Y_PCT);
-
-	Common::Rect clip(START_CLIP);
-	parent->drawSurface(baseAlpha, cx, cy, -clip.width() / 2, -clip.height() / 2, clip, AUX_SIZE_PCT);
-	if (hlAlpha) {
-		// Brighten the glyph while pressed.
-		parent->drawSurface(hlAlpha, cx, cy, -clip.width() / 2, -clip.height() / 2, clip, AUX_SIZE_PCT);
+void TouchControls::FunctionStart::draw(uint8 /*baseAlpha*/, uint8 hlAlpha) {
+	// Resting art is the shared system-cluster cell; overlay the Start pressed
+	// highlight only (bottom -> hlMul -1,0).
+	if (hlAlpha && pressed) {
+		parent->drawSysHighlight(hlAlpha, Common::Rect(SYS_HL_START), -1, 0);
 	}
 }
 
