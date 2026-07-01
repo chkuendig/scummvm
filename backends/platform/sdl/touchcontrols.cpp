@@ -88,7 +88,7 @@
 #define DPAD_ARROW_W        64
 #define DPAD_ARROW_H        64
 #define DPAD_HL_TOP        128
-#define DPAD_DEAD           21   // direction dead-zone (SVG px)
+#define DPAD_DEAD           27   // direction dead-zone (SVG px); larger = less twitchy walking
 #define DPAD_HIT            62   // hit radius for zombie re-touch / inside test
 
 // Drag-to-look indicator (drawn from primitives into the spare row): a ring
