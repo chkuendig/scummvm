@@ -342,7 +342,7 @@ void VirtualReadStream::updateDownloadProgress(uint64 currentBytes, uint64 total
 
 	// Calculate text positioning for centering both strings
 	Common::String percentText = Common::String::format("%.0f%%", progress * 100);
-	Common::U32String progressMessage = Common::U32String(Common::U32String::format(_("Downloading %s"), _displayName.c_str()));
+	Common::U32String progressMessage = Common::U32String(Common::U32String::format(_("Loading %s"), _displayName.c_str()));
 	if (_numChunks > 1) {
 		progressMessage += Common::U32String::format(" (part #%d/%d)", chunkIndex + 1, _numChunks);
 	}
