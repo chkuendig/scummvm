@@ -2309,8 +2309,13 @@ void cMainMenu::ActivateFocused() {
 		// Load the highlighted save: mirror the list's double-click load path.
 		mpFocusedWidget->OnDoubleClick(eMButton_Left);
 	} else {
+		// Activate like a single click. Crucially, do NOT send a trailing
+		// OnMouseUp: OnMouseDown may start the game (New Game / Continue),
+		// which deactivates the menu and tears down its widgets - leaving this
+		// pointer dangling (use-after-free). The focusable buttons' OnMouseUp
+		// is a no-op anyway, and a real mouse click does not deliver it once
+		// the menu has gone inactive.
 		mpFocusedWidget->OnMouseDown(eMButton_Left);
-		mpFocusedWidget->OnMouseUp(eMButton_Left);
 	}
 }
 
