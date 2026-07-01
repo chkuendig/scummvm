@@ -324,16 +324,9 @@ void OSystem_SDL::applyTouchSettings() {
 		_touchMode = TOUCH_MODE_MOUSE;
 	}
 
-	// A manual cycleTouchMode() choice overrides the per-context preset and is
-	// sticky across context changes: once the user toggles the on-screen gamepad
-	// it persists into the launcher, the GMM and the game until they cycle again.
-	// Without this, the frequent re-applications (every overlay show/hide and
-	// screen change) would silently revert the user's on-screen gamepad back to a
-	// per-context preset, so the D-pad would stop emitting events and could no
-	// longer navigate the launcher or the GMM.
-	if (_touchModeManual) {
-		_touchMode = _touchModeManualValue;
-	}
+	// The manual toggle (cycleTouchMode) is transient: the next applyTouchSettings
+	// re-derives the mode from the per-context preset, so a toggle only holds until
+	// the next overlay show/hide or screen change (matches the iOS behaviour).
 
 	// The on-screen gamepad is only useful as a fallback: if a physical
 	// controller is connected (incl. one exposed via the Web Gamepad API),
@@ -358,13 +351,6 @@ void OSystem_SDL::cycleTouchMode() {
 	_touchMode = (TouchMode)((_touchMode + 1) % TOUCH_MODE_MAX);
 	if (_touchMode == TOUCH_MODE_GAMEPAD && !gamepadAvailable)
 		_touchMode = (TouchMode)((_touchMode + 1) % TOUCH_MODE_MAX);
-
-	// Remember this manual choice so applyTouchSettings() keeps it for the current
-	// context instead of reverting to the per-context preset on the next overlay
-	// show/hide or screen change (see applyTouchSettings).
-	_touchModeManual = true;
-	_touchModeManualValue = _touchMode;
-	_touchModeManualContext = currentTouchContext();
 
 	// Leaving the on-screen gamepad: release any held virtual buttons.
 	if (oldMode == TOUCH_MODE_GAMEPAD && _touchMode != TOUCH_MODE_GAMEPAD) {
