@@ -205,6 +205,14 @@
           document.getElementById('download-modal-progress-fill').style.width = '0%';
         }
       },
+      onRuntimeInitialized: function () {
+        // The wasm has finished downloading, compiling and instantiating; the
+        // loading modal was held at 100% ("Starting ScummVM...") across that
+        // gap by the fetch hook in custom_shell-pre.js. Hide it now.
+        if (typeof httpHideProgressBar === "function") {
+          httpHideProgressBar();
+        }
+      },
       totalDependencies: 0,
       monitorRunDependencies: function (left) {
         this.totalDependencies = Math.max(this.totalDependencies, left);

@@ -99,7 +99,15 @@ fetch = (input, init) => {
 								loadedBytes += value.byteLength;
 								httpUpdateProgressBar(loadedBytes, totalBytes);
 							}
-							httpHideProgressBar();
+							// Download finished. The body reader byte count can differ
+							// from Content-Length when the transfer is compressed (e.g.
+							// LiteSpeed over HTTP/3 leaves the uncompressed length), so
+							// force the bar to 100% here. Keep the modal up - the wasm
+							// still has to be compiled and instantiated (a multi-second
+							// gap on mobile) - and hand off to Module.onRuntimeInitialized
+							// to hide it once the runtime is actually ready.
+							document.getElementById("download-modal-progress-fill").style.width = "100%";
+							document.getElementById("download-modal-title").firstElementChild.innerHTML = "Starting ScummVM... ";
 							controller.close();
 						},
 					},
