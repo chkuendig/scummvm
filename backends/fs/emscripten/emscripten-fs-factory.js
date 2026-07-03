@@ -34,6 +34,20 @@ mergeInto(LibraryManager.library, {
             const settingsPath = UTF8ToString(pathPtr);
             const path = settingsPath.substring(0, settingsPath.lastIndexOf('/'));
 
+            // Request persistent storage before relying on IDBFS, so the
+            // settings + saved games survive automatic eviction. Without this
+            // the origin uses best-effort storage, which browsers (notably iOS
+            // Safari, with its ~7-day script-storage cap) can clear under
+            // pressure. persist() is origin-level and idempotent; best-effort.
+            if (typeof navigator !== 'undefined' && navigator.storage && navigator.storage.persist) {
+                try {
+                    const persisted = await navigator.storage.persist();
+                    console.debug('navigator.storage.persist() ->', persisted);
+                } catch (err) {
+                    console.debug('navigator.storage.persist() failed:', err);
+                }
+            }
+
             // Mount the filesystem.
             FS.mount(IDBFS, { autoPersist: true }, path);
 
