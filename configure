@@ -3395,9 +3395,12 @@ EOF
 		if test "$_midi" != "no" ; then
 			append_var LDFLAGS "--js-library backends/midi/webmidi.js"
 		fi
-		if test "$_dynamic_modules" != "yes" ; then
-			append_var LDFLAGS "-s EXPORTED_FUNCTIONS=[_main,_raise]" # custom_shell-post.js needs raise to send a signal
-		fi
+		# custom_shell-post.js calls Module._raise() on unload to send SIGINT
+		# (releases RetroWave/MIDI devices). Export it in the dynamic-plugin
+		# build too - it was only exported for the static build, so the dynamic
+		# build DCE'd raise (nothing in C references it) and Module._raise was
+		# undefined, throwing on every page unload.
+		append_var LDFLAGS "-s EXPORTED_FUNCTIONS=[_main,_raise]"
 
 		append_var LDFLAGS "-O2"
 		_optimization_level=-O2
