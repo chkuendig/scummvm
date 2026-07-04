@@ -32,7 +32,7 @@ TASKS=()
 CONFIGURE_ARGS=()
 _bundle_games=()
 _verbose=false
-EMSDK_VERSION="${EMSDK_VERSION:-4.0.15}"
+EMSDK_VERSION="${EMSDK_VERSION:-6.0.2}"
 EMSCRIPTEN_VERSION="$EMSDK_VERSION"
 
 usage="\
@@ -331,7 +331,7 @@ if [ "$_libtheoradec" = true ]; then
     wget -nc "https://downloads.xiph.org/releases/theora/libtheora-1.1.1.tar.xz"
     tar -xf libtheora-1.1.1.tar.xz
     cd "$LIBS_FOLDER/libtheora-1.1.1/"
-    CFLAGS="-fPIC -s USE_OGG=1 -Oz" emconfigure ./configure --host=wasm32-unknown-none --build=wasm32-unknown-none --prefix="$LIBS_FOLDER/build/" --disable-asm
+    CFLAGS="-fPIC -s USE_OGG=1 -Oz" emconfigure ./configure --host=wasm32-unknown-none --build=wasm32-unknown-none --prefix="$LIBS_FOLDER/build/" --disable-asm --disable-examples
     emmake make -j 5
     emmake make install
   fi
