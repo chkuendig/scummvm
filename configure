@@ -3375,7 +3375,14 @@ EOF
 		append_var DEFINES "-DEMSCRIPTEN"
 		add_line_to_config_mk 'EMSCRIPTEN = 1'
 		_port_mk="backends/platform/sdl/emscripten/emscripten.mk"
-		append_var LDFLAGS "-s INITIAL_MEMORY=128MB -s STACK_SIZE=8MB -s MAXIMUM_MEMORY=512MB -s ALLOW_MEMORY_GROWTH=1"
+		# GROWABLE_ARRAYBUFFERS=0: emscripten 6.0.2 flipped this default to 1,
+		# making the growable HEAP a resizable ArrayBuffer. Its string-decode
+		# codegen then feeds TextDecoder.decode() a view of that resizable buffer,
+		# which throws by spec (TextDecoder input lacks [AllowResizable]) on every
+		# browser - crashing UTF8ToString. Single-threaded builds hit this (the
+		# guard only covers SharedArrayBuffer). See emscripten issue #27241 / fix
+		# #27242 (6.0.3). Disable until we move to 6.0.3.
+		append_var LDFLAGS "-s INITIAL_MEMORY=128MB -s STACK_SIZE=8MB -s MAXIMUM_MEMORY=512MB -s ALLOW_MEMORY_GROWTH=1 -s GROWABLE_ARRAYBUFFERS=0"
 		append_var LDFLAGS "-s FORCE_FILESYSTEM -lidbfs.js"
 		append_var LDFLAGS "-s ASYNCIFY=1 -s ASYNCIFY_STACK_SIZE=1048576"
 		append_var LDFLAGS "--js-library backends/fs/emscripten/emscripten-fs-factory.js"
