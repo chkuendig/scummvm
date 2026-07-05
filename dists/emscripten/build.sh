@@ -331,11 +331,11 @@ fi
 
 if [ "$_libtheoradec" = true ]; then
   if [[ ! -f "$LIBS_FOLDER/build/lib/libtheora.a" ]]; then
-    echo "build libtheora-1.1.1"
+    echo "build libtheora-1.2.0"
     cd "$LIBS_FOLDER"
-    wget -nc "https://downloads.xiph.org/releases/theora/libtheora-1.1.1.tar.xz"
-    tar -xf libtheora-1.1.1.tar.xz
-    cd "$LIBS_FOLDER/libtheora-1.1.1/"
+    wget -nc "https://downloads.xiph.org/releases/theora/libtheora-1.2.0.tar.xz"
+    tar -xf libtheora-1.2.0.tar.xz
+    cd "$LIBS_FOLDER/libtheora-1.2.0/"
     CFLAGS="-fPIC -s USE_OGG=1 -Oz" emconfigure ./configure --host=wasm32-unknown-none --build=wasm32-unknown-none --prefix="$LIBS_FOLDER/build/" --disable-asm --disable-examples
     emmake make -j 5
     emmake make install
