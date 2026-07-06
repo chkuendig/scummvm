@@ -381,6 +381,37 @@ if [[ "make" =~ $(echo ^\(${TASKS}\)$) || "build" =~ $(echo ^\(${TASKS}\)$) ]]; 
 fi
 
 #################################
+# Regenerate the narrowed plugin ASYNCIFY_IMPORTS list
+#################################
+# Relinks the main module once with -sASYNCIFY_ADVISE, then resolves the
+# advise output (alias-aware, via the wasm export table + name section)
+# against the union of all plugin imports. The result is UNIONED into
+# dists/emscripten/plugin-asyncify-imports.json (additive-only - a missing
+# entry corrupts asyncify state at runtime, an extra one only costs size).
+# REQUIREMENTS: a configured FULL-FEATURE tree (CI-parity flags - see
+# .github/workflows/main.yml) and built plugins. Rebuild plugins afterwards
+# so they pick up the updated list, and re-run 'make' for a clean main link.
+if [[ "asyncify-imports" =~ $(echo ^\(${TASKS}\)$) ]]; then
+  cd "${ROOT_FOLDER}"
+  if [[ ! -f config.mk ]]; then echo "asyncify-imports: run the configure task first"; exit 1; fi
+  if ! ls plugins/*.so >/dev/null 2>&1; then echo "asyncify-imports: build the plugins first (make)"; exit 1; fi
+  echo "Relinking main module with -sASYNCIFY_ADVISE (advise harvest)"
+  rm -f scummvm.js scummvm.wasm scummvm.html
+  num_cpus=$(nproc || grep -c ^processor /proc/cpuinfo || echo 1)
+  EMCC_CFLAGS="-sASYNCIFY_ADVISE ${EMCC_CFLAGS:-}" emmake make -j ${num_cpus} > "${ROOT_FOLDER}/asyncify-advise.log" 2>&1
+  echo "Advise lines harvested: $(grep -c 'can change the state\|can unwind' "${ROOT_FOLDER}/asyncify-advise.log" || true)"
+  node "${ROOT_FOLDER}/dists/emscripten/gen-asyncify-imports.js" \
+    "${ROOT_FOLDER}/asyncify-advise.log" \
+    "${ROOT_FOLDER}/scummvm.wasm" \
+    "${ROOT_FOLDER}/plugins" \
+    "$(dirname "$(which emcc)")/../bin/llvm-cxxfilt" \
+    "${ROOT_FOLDER}/dists/emscripten/plugin-asyncify-imports.json"
+  # advise-linked main is functionally fine but relink clean for good measure
+  rm -f scummvm.js scummvm.wasm scummvm.html
+  echo "asyncify-imports: list updated. Re-run 'make' to relink main and rebuild plugins."
+fi
+
+#################################
 # Bundle everything into a neat package
 #################################
 if [[ "dist" =~ $(echo ^\(${TASKS}\)$) || "build" =~ $(echo ^\(${TASKS}\)$) ]]; then
