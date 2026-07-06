@@ -2236,7 +2236,13 @@ void cMainMenu::DefaultFocus() {
 						mState == eMainMenuState_LoadGameAuto ||
 						mState == eMainMenuState_LoadGameFavorite);
 
+	// On the first-start screen the first focusable widget is the gamma slider,
+	// whose Confirm action nudges gamma. Focus the OK button (the last focusable
+	// widget) instead so a keyboard/controller Confirm dismisses the screen.
+	bool bFirstStart = (mState == eMainMenuState_FirstStart);
+
 	cMainMenuWidget *pFirst = NULL;
+	cMainMenuWidget *pLast = NULL;
 	tMainMenuWidgetListIt it = mvState[mState].begin();
 	for (; it != mvState[mState].end(); ++it) {
 		cMainMenuWidget *pWidget = *it;
@@ -2248,9 +2254,10 @@ void cMainMenu::DefaultFocus() {
 		}
 		if (!pFirst)
 			pFirst = pWidget;
+		pLast = pWidget;
 	}
 
-	SetFocus(pFirst);
+	SetFocus(bFirstStart ? pLast : pFirst);
 }
 
 //-----------------------------------------------------------------------
