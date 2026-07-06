@@ -5214,9 +5214,21 @@ PLUGIN_LDFLAGS		+= -Wl,-T$(srcdir)/backends/plugins/ds/plugin.ld -mthumb -mthumb
 		append_var DEFINES "-DUNCACHED_PLUGINS"
 		append_var CXXFLAGS "-fPIC"
 		append_var LIBS ""
+		# ASYNCIFY_IMPORTS: was ["*"] (every import treated as a suspend point ->
+		# near-total asyncify instrumentation of every plugin). Narrowed to the
+		# main-module functions that can actually suspend (plus the invoke_*
+		# exception/setjmp shims); indirect (virtual) calls are instrumented by
+		# asyncify regardless, so correctness is preserved. Shrinks plugins ~15%
+		# and reduces Safari's wasm-compile-thread memory blowup (WebKit bug
+		# 304810). Regenerate with: ./dists/emscripten/build.sh asyncify-imports
+		# (see dists/emscripten/gen-asyncify-imports.js for the full mechanism;
+		# additive-only union, alias-aware matching). IMPORTANT: harvest from a
+		# FULL-FEATURE (CI-parity) configured tree - a feature-reduced main
+		# (e.g. missing theoradec) lacks entire suspend subgraphs and yields an
+		# incomplete list that corrupts asyncify state in engines using them.
 _mak_plugins='
 PLUGIN_EXTRA_DEPS =
-PLUGIN_LDFLAGS  += -s SIDE_MODULE=1 -s ASYNCIFY=1 -s ASYNCIFY_IMPORTS=["*"] -s EXPORT_ALL=1
+PLUGIN_LDFLAGS  += -s SIDE_MODULE=1 -s ASYNCIFY=1 -s ASYNCIFY_IMPORTS=@$(srcdir)/dists/emscripten/plugin-asyncify-imports.json -s EXPORT_ALL=1
 PRE_OBJS_FLAGS  := -s MAIN_MODULE=1 -s EXPORT_ALL=1
 POST_OBJS_FLAGS :=
 '
