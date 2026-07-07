@@ -30,9 +30,13 @@ DECLARE_SINGLETON(GUI::EventRecorder);
 
 #include "common/debug-channels.h"
 #include "backends/timer/sdl/sdl-timer.h"
+#ifdef __EMSCRIPTEN__
+#include "backends/timer/emscripten/emscripten-timer.h"
+#endif
 #include "backends/mixer/mixer.h"
 #include "common/config-manager.h"
 #include "common/md5.h"
+#include "backends/networking/http/connectionmanager.h"
 #include "gui/gui-manager.h"
 #include "gui/widget.h"
 #include "gui/onscreendialog.h"
@@ -581,10 +585,23 @@ void EventRecorder::registerTimerManager(DefaultTimerManager *timerManager) {
 void EventRecorder::switchTimerManagers() {
 	delete _timerManager;
 	if (_recordMode == kPassthrough) {
+#ifdef __EMSCRIPTEN__
+		// SDL timers don't work in the Emscripten port; its timer manager is
+		// pumped cooperatively from OSystem_Emscripten::delayMillis() instead.
+		_timerManager = new EmscriptenTimerManager();
+#else
 		_timerManager = new SdlTimerManager();
+#endif
 	} else {
 		_timerManager = new DefaultTimerManager();
 	}
+#ifdef __EMSCRIPTEN__
+	// Replacing the timer manager drops any timer procs installed on the old
+	// one. On the web port the HTTP virtual filesystem drives its downloads
+	// from the ConnectionManager's polling timer, so re-arm it on the new
+	// manager; otherwise in-game data loads hang forever while recording.
+	ConnMan.restartTimer();
+#endif
 }
 
 void EventRecorder::updateSubsystems() {
@@ -801,7 +818,12 @@ void EventRecorder::setFileHeader() {
 
 SDL_Surface *EventRecorder::getSurface(int width, int height) {
 	// Create a RGB565 surface of the requested dimensions.
+#if SDL_VERSION_ATLEAST(3, 0, 0)
+	return SDL_CreateSurface(width, height,
+			SDL_GetPixelFormatForMasks(16, 0xF800, 0x07E0, 0x001F, 0x0000));
+#else
 	return SDL_CreateRGBSurface(SDL_SWSURFACE, width, height, 16, 0xF800, 0x07E0, 0x001F, 0x0000);
+#endif
 }
 
 bool EventRecorder::switchMode() {

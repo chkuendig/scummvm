@@ -55,6 +55,9 @@ private:
 	GUI::ButtonWidget *_playbackButton;
 	GUI::ButtonWidget *_nextScreenshotBtn;
 	GUI::ButtonWidget *_prevScreenshotBtn;
+#ifdef EMSCRIPTEN
+	GUI::ButtonWidget *_downloadButton = nullptr;
+#endif
 
 	void updateList();
 	void updateScreenShotsText();

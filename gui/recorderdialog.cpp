@@ -21,6 +21,7 @@
 
 #include "common/algorithm.h"
 #include "common/bufferedstream.h"
+#include "common/config-manager.h"
 #include "common/savefile.h"
 #include "common/system.h"
 #include "graphics/palette.h"
@@ -34,6 +35,9 @@
 #include "gui/ThemeEval.h"
 #include "gui/gui-manager.h"
 #include "gui/recorderdialog.h"
+#ifdef EMSCRIPTEN
+#include "backends/platform/sdl/emscripten/emscripten.h"
+#endif
 
 #define MAX_RECORDS_NAMES 0xFF
 
@@ -47,7 +51,10 @@ enum {
 	kDeleteCmd = 'DEL ',
 	kNextScreenshotCmd = 'NEXT',
 	kPrevScreenshotCmd = 'PREV',
-	kEditRecordCmd = 'EDIT'
+	kEditRecordCmd = 'EDIT',
+#ifdef EMSCRIPTEN
+	kDownloadRecordCmd = 'DLRC'
+#endif
 };
 
 RecorderDialog::RecorderDialog() : Dialog("RecorderDialog"), _list(nullptr), _currentScreenshot(0) {
@@ -69,6 +76,16 @@ RecorderDialog::RecorderDialog() : Dialog("RecorderDialog"), _list(nullptr), _cu
 	_list->setNumberingMode(GUI::kListNumberingOff);
 
 	_deleteButton = new GUI::ButtonWidget(this, "RecorderDialog.Delete", _("Delete"), Common::U32String(), kDeleteCmd);
+#ifdef EMSCRIPTEN
+	// The recording lives in the browser's virtual filesystem, which the user
+	// cannot reach directly. Offer a download so a recorded session can be
+	// exported (e.g. to replay it in a headless profiling harness). The button
+	// reuses the "Delete" slot in the theme layout and is repositioned in code
+	// to sit next to it, avoiding a theme-zip regeneration.
+	_downloadButton = new GUI::ButtonWidget(this, "RecorderDialog.Delete", _("Download"), Common::U32String(), kDownloadRecordCmd);
+	_downloadButton->setPos(_deleteButton->getRelX() + _deleteButton->getWidth() + 8, _deleteButton->getRelY());
+	_downloadButton->setEnabled(false);
+#endif
 	new GUI::ButtonWidget(this, "RecorderDialog.Cancel", _("Cancel"), Common::U32String(), kCloseCmd);
 	new GUI::ButtonWidget(this, "RecorderDialog.Record", _("Record"), Common::U32String(), kRecordCmd);
 	_playbackButton = new GUI::ButtonWidget(this, "RecorderDialog.Playback", _("Playback"), Common::U32String(), kPlaybackCmd);
@@ -220,6 +237,19 @@ void RecorderDialog::handleCommand(CommandSender *sender, uint32 cmd, uint32 dat
 	case GUI::kListSelectionChangedCmd:
 		updateSelection(true);
 		break;
+#ifdef EMSCRIPTEN
+	case kDownloadRecordCmd:
+		if (_list->getSelected() >= 0) {
+			_playbackFile.close();
+			// Records are stored in the savefile directory (savepath); resolve
+			// the full virtual-FS path so the backend can stream it to a
+			// browser download.
+			Common::Path recordPath = ConfMan.getPath("savepath")
+				.appendComponent(_fileHeaders[_list->getSelected()].fileName);
+			dynamic_cast<OSystem_Emscripten *>(g_system)->exportFile(recordPath);
+		}
+		break;
+#endif
 	case kRecordCmd: {
 		TimeDate t;
 		QualifiedGameDescriptor desc = EngineMan.findTarget(_target);
@@ -288,6 +318,10 @@ void RecorderDialog::updateSelection(bool redraw) {
 		_editButton->setEnabled(true);
 		_deleteButton->setEnabled(true);
 		_playbackButton->setEnabled(true);
+#ifdef EMSCRIPTEN
+		if (_downloadButton)
+			_downloadButton->setEnabled(true);
+#endif
 	}
 
 	if (g_gui.xmlEval()->getVar("Globals.RecorderDialog.ExtInfo.Visible") != 1)
