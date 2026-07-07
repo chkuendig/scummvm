@@ -190,14 +190,16 @@ protected:
 
 	// The touch presets are keyed per context (GUI/menus, 2D game, 3D game).
 	// applyTouchSettings() re-reads the preset on every overlay show/hide and
-	// screen change; the on-screen toggle (cycleTouchMode) is transient and only
-	// holds until the next such re-application.
+	// screen change; the on-screen toggle (cycleTouchMode) stores its choice in
+	// the ConfMan session domain so it survives those re-applications until the
+	// application is relaunched.
 	enum TouchContext {
 		kTouchContextMenus = 0,
 		kTouchContext2d = 1,
 		kTouchContext3d = 2
 	};
 	TouchContext currentTouchContext();
+	static const char *touchModeKeyForContext(TouchContext context);
 
 #if defined(USE_OPENGL_GAME) || defined(USE_OPENGL_SHADERS)
 	// Graphics capabilities
