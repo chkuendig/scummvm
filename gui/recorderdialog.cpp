@@ -80,10 +80,9 @@ RecorderDialog::RecorderDialog() : Dialog("RecorderDialog"), _list(nullptr), _cu
 	// The recording lives in the browser's virtual filesystem, which the user
 	// cannot reach directly. Offer a download so a recorded session can be
 	// exported (e.g. to replay it in a headless profiling harness). The button
-	// reuses the "Delete" slot in the theme layout and is repositioned in code
-	// to sit next to it, avoiding a theme-zip regeneration.
-	_downloadButton = new GUI::ButtonWidget(this, "RecorderDialog.Delete", _("Download"), Common::U32String(), kDownloadRecordCmd);
-	_downloadButton->setPos(_deleteButton->getRelX() + _deleteButton->getWidth() + 8, _deleteButton->getRelY());
+	// shares the "Delete" slot in the theme layout; reflowLayout() splits that
+	// slot between the two buttons, avoiding a theme-zip regeneration.
+	_downloadButton = new GUI::ButtonWidget(this, "RecorderDialog.Delete", _("Export"), Common::U32String(), kDownloadRecordCmd);
 	_downloadButton->setEnabled(false);
 #endif
 	new GUI::ButtonWidget(this, "RecorderDialog.Cancel", _("Cancel"), Common::U32String(), kCloseCmd);
@@ -106,6 +105,21 @@ void RecorderDialog::reflowLayout() {
 	addThumbnailContainerButtonsAndText();
 
 	Dialog::reflowLayout();
+
+#ifdef EMSCRIPTEN
+	// The Download button shares the theme slot of the Delete button (the
+	// theme layouts do not know about it), so the reflow above stacked them
+	// on top of each other. Split the slot between the two buttons.
+	if (_downloadButton && _deleteButton) {
+		const int16 dx = _deleteButton->getRelX();
+		const int16 dy = _deleteButton->getRelY();
+		const uint16 dw = _deleteButton->getWidth();
+		const uint16 dh = _deleteButton->getHeight();
+		const uint16 half = (dw - 4) / 2;
+		_deleteButton->resize(dx, dy, half, dh, false);
+		_downloadButton->resize(dx + half + 4, dy, half, dh, false);
+	}
+#endif
 
 	if (g_gui.xmlEval()->getVar("Globals.RecorderDialog.ExtInfo.Visible") == 1) {
 		int16 x, y;
