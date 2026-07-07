@@ -299,24 +299,22 @@ OSystem_SDL::TouchContext OSystem_SDL::currentTouchContext() {
 	return is3d ? kTouchContext3d : kTouchContext2d;
 }
 
+const char *OSystem_SDL::touchModeKeyForContext(TouchContext context) {
+	switch (context) {
+	case kTouchContextMenus:
+		return TOUCH_MODE_MENUS_KEY;
+	case kTouchContext3d:
+		return TOUCH_MODE_3D_GAMES_KEY;
+	default:
+		return TOUCH_MODE_2D_GAMES_KEY;
+	}
+}
+
 void OSystem_SDL::applyTouchSettings() {
 	const TouchMode oldMode = _touchMode;
 	const TouchContext context = currentTouchContext();
 
-	Common::String key;
-	switch (context) {
-	case kTouchContextMenus:
-		key = TOUCH_MODE_MENUS_KEY;
-		break;
-	case kTouchContext3d:
-		key = TOUCH_MODE_3D_GAMES_KEY;
-		break;
-	default:
-		key = TOUCH_MODE_2D_GAMES_KEY;
-		break;
-	}
-
-	_touchMode = Common::parseTouchMode(ConfMan.get(key), Common::kTouchModeMouse);
+	_touchMode = Common::parseTouchMode(ConfMan.get(touchModeKeyForContext(context)), Common::kTouchModeMouse);
 
 	// The on-screen gamepad is only available in games, never in menus. Guard
 	// against legacy or hand-edited configs that request it for the menus context.
@@ -324,9 +322,9 @@ void OSystem_SDL::applyTouchSettings() {
 		_touchMode = Common::kTouchModeMouse;
 	}
 
-	// The manual toggle (cycleTouchMode) is transient: the next applyTouchSettings
-	// re-derives the mode from the per-context preset, so a toggle only holds until
-	// the next overlay show/hide or screen change (matches the iOS behaviour).
+	// The manual toggle (cycleTouchMode) stores its choice in the session domain,
+	// so the re-derivation above returns the toggled mode for the rest of the
+	// session (until relaunch); it is never written to the config file.
 
 	// The on-screen gamepad is only useful as a fallback: if a physical
 	// controller is connected (incl. one exposed via the Web Gamepad API),
@@ -355,6 +353,17 @@ void OSystem_SDL::cycleTouchMode() {
 	// Leaving the on-screen gamepad: release any held virtual buttons.
 	if (oldMode == Common::kTouchModeGamepad && _touchMode != Common::kTouchModeGamepad) {
 		_touchControls.update(kActionCancel, 0, 0, 0);
+	}
+
+	// Remember the choice for the rest of the session: applyTouchSettings()
+	// re-derives the mode from the per-context preset on every overlay
+	// show/hide and screen change (and the event recorder toggles the overlay
+	// every frame while recording), which used to silently revert a manual
+	// toggle almost immediately. The session domain is never saved to disk,
+	// so a fresh launch still starts from the configured presets.
+	if (const char *modeName = Common::touchModeToString(_touchMode)) {
+		ConfMan.set(touchModeKeyForContext(currentTouchContext()), modeName,
+		            Common::ConfigManager::kSessionDomain);
 	}
 #ifdef USE_OSD
 	Common::U32String name;
