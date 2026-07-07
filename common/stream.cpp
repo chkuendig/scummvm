@@ -575,6 +575,17 @@ public:
 
 	bool flush() override { return flushBuffer(); }
 
+	void finalize() override {
+		// The base implementation only flushes our own buffer; it does not
+		// propagate finalize() to the wrapped stream. That matters when the
+		// parent needs an explicit finalize to write trailing data (e.g. a
+		// GZipWriteStream, which only emits its final deflate block and gzip
+		// trailer on finalize). Flush our buffer first, then finalize the
+		// parent, otherwise the wrapped file ends up truncated.
+		flushBuffer();
+		_parentStream->finalize();
+	}
+
 	int64 pos() const override { return _pos + _parentStream->pos(); }
 
 	bool seek(int64 offset, int whence) override {
