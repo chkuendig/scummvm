@@ -19,6 +19,19 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
+# Local / debug builds:
+#   Extra configure flags may be appended after the tasks, e.g. to enable the
+#   event recorder (a local-only debugging/QA aid that is NOT part of the CI
+#   build):
+#
+#     ./dists/emscripten/build.sh configure make --enable-eventrecorder \
+#         <the CI-parity flags used in .github/workflows>
+#
+#   The recorder dialog then offers a Download button to export a recorded
+#   session out of the browser's virtual filesystem. Note: --enable-release
+#   also switches plugin ASYNCIFY_IMPORTS from ["*"] to the narrowed list, so
+#   omit --enable-release for iterating unless you have regenerated the list.
+#
 
 
 

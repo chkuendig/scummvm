@@ -27,6 +27,9 @@
 #include "backends/platform/sdl/emscripten/emscripten.h"
 #include "common/debug.h"
 #include "common/system.h"
+#ifdef ENABLE_EVENTRECORDER
+#include "gui/EventRecorder.h"
+#endif
 
 HttpReadStream::HttpReadStream(const Common::String &url, const Common::String &displayName,
 							   const Common::String &cachePath, uint64 fileSize)
@@ -70,10 +73,23 @@ void HttpReadStream::downloadChunk(uint32 chunkIndex, uint64 chunkStart, uint64 
 
 	startDownloadProgress(chunkIndex, chunkLength);
 	uint32 downloadStartTime = g_system->getMillis();
+#ifdef ENABLE_EVENTRECORDER
+	// Downloading a chunk over HTTP takes a variable amount of real time that
+	// has nothing to do with game logic. Suspend the event recorder around the
+	// busy-wait so that this wall-clock time does not enter the recorded
+	// timeline: while recording it is not captured, and while replaying the
+	// recorder does not advance past it - the game simply performs the real
+	// (variable-latency) download and then resumes deterministic playback.
+	// This is the same mechanism the GUI uses to keep menus out of recordings.
+	g_eventRec.acquireRecording();
+#endif
 	while (request->state() == Networking::RequestState::PROCESSING) {
 		updateDownloadProgress(request->getProgress() * chunkLength, chunkLength, downloadStartTime, chunkIndex);
 		g_system->delayMillis(10);
 	}
+#ifdef ENABLE_EVENTRECORDER
+	g_eventRec.releaseRecording();
+#endif
 	debug(5, "HTTPFilesystemNode::createReadStream() download completed for %s", chunkPath.c_str());
 	if (!request->success()) {
 		error("HttpReadStream: Failed to download chunk %u", chunkIndex + 1);
