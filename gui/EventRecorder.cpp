@@ -620,8 +620,32 @@ bool EventRecorder::notifyEvent(const Common::Event &ev) {
 
 	checkForKeyCode(ev);
 	Common::Event evt = ev;
+#ifdef EMSCRIPTEN
+	// Map the virtual (game) mouse position into overlay coordinates - where the
+	// on-screen control panel lives - the same way OnScreenDialog::reflowLayout()
+	// places the panel: aspect-fit and centered within the overlay. The stock
+	// scaling below assumes the game fills the overlay and, being integer
+	// division, also truncates the scale factor; on a letterboxed display (the
+	// fullscreen browser canvas, or a phone in portrait) that lands the click at
+	// a different overlay point than where the panel is drawn, so the Stop/Edit
+	// buttons never register.
+	{
+		const int overlayW = g_system->getOverlayWidth();
+		const int overlayH = g_system->getOverlayHeight();
+		const int gameW = g_system->getWidth();
+		const int gameH = g_system->getHeight();
+		if (gameW > 0 && gameH > 0) {
+			const float scale = MIN((float)overlayW / gameW, (float)overlayH / gameH);
+			const int offX = (int)((overlayW - gameW * scale) / 2.0f + 0.5f);
+			const int offY = (int)((overlayH - gameH * scale) / 2.0f + 0.5f);
+			evt.mouse.x = offX + (int)(ev.mouse.x * scale + 0.5f);
+			evt.mouse.y = offY + (int)(ev.mouse.y * scale + 0.5f);
+		}
+	}
+#else
 	evt.mouse.x = evt.mouse.x * (g_system->getOverlayWidth() / g_system->getWidth());
 	evt.mouse.y = evt.mouse.y * (g_system->getOverlayHeight() / g_system->getHeight());
+#endif
 
 	if (isImGuiRecorderEnabled()) {
 		if (_recordMode == kRecorderPlaybackPause)

@@ -1011,6 +1011,12 @@ void OptionsDialog::apply() {
 				saveTouchModeSetting(TOUCH_MODE_MENUS_KEY, _domain, _touchModeMenusPopUp->getSelectedTag());
 				saveTouchModeSetting(TOUCH_MODE_2D_GAMES_KEY, _domain, _touchMode2DGamesPopUp->getSelectedTag());
 				saveTouchModeSetting(TOUCH_MODE_3D_GAMES_KEY, _domain, _touchMode3DGamesPopUp->getSelectedTag());
+				// The in-game toggle stores a session-domain override for these
+				// keys; drop it so an explicit preset change here takes effect
+				// immediately instead of being masked until relaunch.
+				ConfMan.removeKey(TOUCH_MODE_MENUS_KEY, Common::ConfigManager::kSessionDomain);
+				ConfMan.removeKey(TOUCH_MODE_2D_GAMES_KEY, Common::ConfigManager::kSessionDomain);
+				ConfMan.removeKey(TOUCH_MODE_3D_GAMES_KEY, Common::ConfigManager::kSessionDomain);
 			}
 		}
 		if (g_system->hasFeature(OSystem::kFeatureKbdMouseSpeed)) {
