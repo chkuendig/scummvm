@@ -5230,12 +5230,23 @@ PLUGIN_LDFLAGS		+= -Wl,-T$(srcdir)/backends/plugins/ds/plugin.ld -mthumb -mthumb
 		# FULL-FEATURE (CI-parity) configured tree - a feature-reduced main
 		# (e.g. missing theoradec) lacks entire suspend subgraphs and yields an
 		# incomplete list that corrupts asyncify state in engines using them.
-_mak_plugins='
+		#
+		# The narrowing is a release-only size/compile-memory optimization: it
+		# is only applied for --enable-release. Debug/dev builds keep the
+		# always-correct ASYNCIFY_IMPORTS=["*"] so an out-of-date list can never
+		# corrupt asyncify state while iterating (and so features not covered by
+		# a CI-parity harvest, e.g. --enable-eventrecorder, are unaffected).
+		if test "$_release_build" = yes ; then
+			_emscripten_asyncify_imports='@$(srcdir)/dists/emscripten/plugin-asyncify-imports.json'
+		else
+			_emscripten_asyncify_imports='["*"]'
+		fi
+_mak_plugins="
 PLUGIN_EXTRA_DEPS =
-PLUGIN_LDFLAGS  += -s SIDE_MODULE=1 -s ASYNCIFY=1 -s ASYNCIFY_IMPORTS=@$(srcdir)/dists/emscripten/plugin-asyncify-imports.json -s EXPORT_ALL=1
+PLUGIN_LDFLAGS  += -s SIDE_MODULE=1 -s ASYNCIFY=1 -s ASYNCIFY_IMPORTS=${_emscripten_asyncify_imports} -s EXPORT_ALL=1
 PRE_OBJS_FLAGS  := -s MAIN_MODULE=1 -s EXPORT_ALL=1
 POST_OBJS_FLAGS :=
-'
+"
 		;;
 	freebsd* | openbsd*)
 		_plugin_prefix="lib"
