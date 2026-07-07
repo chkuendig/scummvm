@@ -732,6 +732,11 @@ void PlaybackFile::updateHeader() {
 		readedSize = _readStream->read(_tmpBuffer.data(), kRecordBuffSize);
 		_writeStream->write(_tmpBuffer.data(), readedSize);
 	} while (readedSize != 0);
+	// Flush the compressed (gzip) stream, otherwise the final deflate block and
+	// gzip trailer are never written and the resulting file is a truncated
+	// archive that fails to load on playback. close() finalizes its own stream
+	// the same way.
+	_writeStream->finalize();
 	delete _writeStream;
 	_writeStream = NULL;
 	delete _readStream;
