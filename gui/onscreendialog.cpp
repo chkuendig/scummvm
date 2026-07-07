@@ -52,7 +52,27 @@ enum {
 void OnScreenDialog::reflowLayout() {
 	Dialog::reflowLayout();
 
-	_x = _y = 0;
+	// Position the panel inside the *game* draw area instead of the window
+	// corner. On backends that letterbox the game into a larger window (e.g.
+	// a fullscreen browser canvas or a phone in portrait), the pointer is
+	// clipped to the game rect, so a panel placed in the black bars would be
+	// visible but unreachable. The game rect is not exposed to the GUI, so
+	// estimate it: the backends center the aspect-fit game area within the
+	// window. Place the panel at the top-center of that area — the center
+	// column is inside the game rect for any letterboxing.
+	const int overlayW = g_system->getOverlayWidth();
+	const int overlayH = g_system->getOverlayHeight();
+	const int gameW = g_system->getWidth();
+	const int gameH = g_system->getHeight();
+	_x = MAX(0, (overlayW - _w) / 2);
+	_y = 0;
+	if (gameW > 0 && gameH > 0) {
+		// Aspect-fit height of the game area within the overlay/window.
+		int fitH = overlayH;
+		if ((int64)overlayW * gameH < (int64)overlayH * gameW)
+			fitH = (int)(((int64)overlayW * gameH) / gameW);
+		_y = MAX(0, (overlayH - fitH) / 2);
+	}
 }
 
 void OnScreenDialog::releaseFocus() {
