@@ -495,7 +495,15 @@ void OSystem_SDL::initBackend() {
 #ifdef ENABLE_EVENTRECORDER
 	g_eventRec.registerMixerManager(_mixerManager);
 
-	g_eventRec.registerTimerManager(new SdlTimerManager());
+	// Platforms like Emscripten pre-create a specialized DefaultTimerManager
+	// subclass (SDL timers don't work there); hand that one to the recorder
+	// instead of unconditionally creating an SdlTimerManager.
+	if (_timerManager != nullptr) {
+		g_eventRec.registerTimerManager(dynamic_cast<DefaultTimerManager *>(_timerManager));
+		_timerManager = nullptr;
+	} else {
+		g_eventRec.registerTimerManager(new SdlTimerManager());
+	}
 #else
 	if (_timerManager == nullptr)
 		_timerManager = new SdlTimerManager();
@@ -1069,7 +1077,13 @@ MixerManager *OSystem_SDL::getMixerManager() {
 
 Common::TimerManager *OSystem_SDL::getTimerManager() {
 #ifdef ENABLE_EVENTRECORDER
-	return g_eventRec.getTimerManager();
+	// The recorder only receives its timer manager in initBackend(). Platforms
+	// that need timers earlier (Emscripten pumps its network filesystem via
+	// timers during init()) fall back to the backend's own manager until then.
+	Common::TimerManager *timerManager = g_eventRec.getTimerManager();
+	if (timerManager)
+		return timerManager;
+	return _timerManager;
 #else
 	return _timerManager;
 #endif
