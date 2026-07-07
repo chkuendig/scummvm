@@ -99,6 +99,17 @@ public:
 	 */
 	Request *addRequest(Request *request, RequestCallback callback = nullptr);
 
+	/**
+	 * Re-arm the polling timer on the current TimerManager.
+	 *
+	 * Our timer proc is installed on whatever TimerManager was active when the
+	 * first request arrived. If that TimerManager is later replaced (e.g. the
+	 * event recorder swaps it in and out), the proc is silently dropped and
+	 * pending requests would never be processed. Call this after such a swap to
+	 * reinstall the timer; it is a no-op tick if there is nothing to do.
+	 */
+	void restartTimer();
+
 	static uint32 getCloudRequestsPeriodInMicroseconds();
 };
 
