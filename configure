@@ -3382,7 +3382,11 @@ EOF
 		# browser - crashing UTF8ToString. Single-threaded builds hit this (the
 		# guard only covers SharedArrayBuffer). See emscripten issue #27241 / fix
 		# #27242 (6.0.3). Disable until we move to 6.0.3.
-		append_var LDFLAGS "-s INITIAL_MEMORY=128MB -s STACK_SIZE=8MB -s MAXIMUM_MEMORY=512MB -s ALLOW_MEMORY_GROWTH=1 -s GROWABLE_ARRAYBUFFERS=0"
+		# MAXIMUM_MEMORY: 512MB made large demos (wintermute:ritter needs ~537MB)
+		# abort cleanly but unplayably; a real-device trace showed ~640MB total
+		# was fine on iOS, while 1GB is known to get the tab jetsamed (iOS
+		# reserves against the declared max). 640MB is the measured sweet spot.
+		append_var LDFLAGS "-s INITIAL_MEMORY=128MB -s STACK_SIZE=8MB -s MAXIMUM_MEMORY=640MB -s ALLOW_MEMORY_GROWTH=1 -s GROWABLE_ARRAYBUFFERS=0"
 		append_var LDFLAGS "-s FORCE_FILESYSTEM -lidbfs.js"
 		append_var LDFLAGS "-s ASYNCIFY=1 -s ASYNCIFY_STACK_SIZE=1048576"
 		append_var LDFLAGS "--js-library backends/fs/emscripten/emscripten-fs-factory.js"
