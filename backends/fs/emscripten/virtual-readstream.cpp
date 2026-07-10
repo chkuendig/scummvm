@@ -20,9 +20,14 @@
  */
 
 #ifdef EMSCRIPTEN
+#define FORBIDDEN_SYMBOL_EXCEPTION_unlink
+
+#include <unistd.h>
+
 #include "backends/fs/emscripten/virtual-readstream.h"
 #include "backends/fs/posix/posix-iostream.h"
 #include "backends/platform/sdl/emscripten/emscripten.h"
+#include "common/config-manager.h"
 #include "common/debug.h"
 #include "common/file.h"
 #include "common/fs.h"
@@ -68,12 +73,96 @@ VirtualReadStream::VirtualReadStream(const Common::String &displayName, const Co
 		_downloadedChunks[i] = isChunkDownloaded(i);
 		if (_downloadedChunks[i]) {
 			debug(5, "VirtualReadStream: Chunk %u already exists", i + 1);
+			// Account pre-existing chunks (e.g. from an earlier stream on the
+			// same file) in the session-wide cache registry.
+			Common::String chunkPath = getChunkPath(i);
+			Common::SeekableReadStream *chunk = PosixIoStream::makeFromPath(chunkPath, StdioStream::WriteMode_Read);
+			if (chunk) {
+				chunkCache().noteChunk(chunkPath, (uint64)chunk->size());
+				delete chunk;
+			}
 		}
 	}
 }
 
 VirtualReadStream::~VirtualReadStream() {
 	// Nothing special to clean up
+}
+
+VirtualReadStream::ChunkCacheRegistry &VirtualReadStream::chunkCache() {
+	static ChunkCacheRegistry registry;
+	return registry;
+}
+
+uint64 VirtualReadStream::ChunkCacheRegistry::cacheLimit() const {
+	// Default cap for the MEMFS chunk cache. Overridable (in megabytes) via
+	// the config file for testing or constrained deployments; 0 disables
+	// eviction entirely.
+	static const uint64 kDefaultLimit = 96 * 1024 * 1024;
+	if (ConfMan.hasKey("vfs_cache_limit"))
+		return (uint64)ConfMan.getInt("vfs_cache_limit") * 1024 * 1024;
+	return kDefaultLimit;
+}
+
+void VirtualReadStream::ChunkCacheRegistry::noteChunk(const Common::String &path, uint64 size) {
+	for (uint i = 0; i < _entries.size(); i++) {
+		if (_entries[i].path == path) {
+			_totalSize += size - _entries[i].size;
+			_entries[i].size = size;
+			_entries[i].lastUse = ++_tick;
+			enforceCap(path);
+			return;
+		}
+	}
+	Entry e;
+	e.path = path;
+	e.size = size;
+	e.lastUse = ++_tick;
+	_entries.push_back(e);
+	_totalSize += size;
+	enforceCap(path);
+}
+
+void VirtualReadStream::ChunkCacheRegistry::touch(const Common::String &path) {
+	for (uint i = 0; i < _entries.size(); i++) {
+		if (_entries[i].path == path) {
+			_entries[i].lastUse = ++_tick;
+			return;
+		}
+	}
+}
+
+void VirtualReadStream::ChunkCacheRegistry::forget(const Common::String &path) {
+	for (uint i = 0; i < _entries.size(); i++) {
+		if (_entries[i].path == path) {
+			_totalSize -= _entries[i].size;
+			_entries.remove_at(i);
+			return;
+		}
+	}
+}
+
+void VirtualReadStream::ChunkCacheRegistry::enforceCap(const Common::String &protectPath) {
+	const uint64 limit = cacheLimit();
+	if (limit == 0)
+		return;
+	while (_totalSize > limit) {
+		// Find the least-recently-used chunk, never the one just written/read.
+		int victim = -1;
+		for (uint i = 0; i < _entries.size(); i++) {
+			if (_entries[i].path == protectPath)
+				continue;
+			if (victim < 0 || _entries[i].lastUse < _entries[(uint)victim].lastUse)
+				victim = (int)i;
+		}
+		if (victim < 0)
+			return; // Nothing evictable (single oversized chunk).
+		debug(2, "VirtualReadStream: cache over limit (%llu > %llu), evicting %s (%llu bytes)",
+			  _totalSize, limit, _entries[(uint)victim].path.c_str(), _entries[(uint)victim].size);
+		unlink(_entries[(uint)victim].path.c_str());
+		_totalSize -= _entries[(uint)victim].size;
+		_entries.remove_at((uint)victim);
+	}
 }
 
 uint32 VirtualReadStream::getChunkIndex(uint64 pos) const {
@@ -142,6 +231,7 @@ void VirtualReadStream::ensureChunkDownloaded(uint32 chunkIndex) {
 
 			if (actualSize == chunkLength) {
 				_downloadedChunks[chunkIndex] = true;
+				chunkCache().noteChunk(chunkPath, actualSize);
 				debug(5, "VirtualReadStream: Chunk %u completed successfully (%llu bytes)", chunkIndex + 1, actualSize);
 			} else if (actualSize == _size) {
 				// Server sent the full file instead of just the chunk
@@ -150,6 +240,7 @@ void VirtualReadStream::ensureChunkDownloaded(uint32 chunkIndex) {
 				// Rename the chunk file to the full file path
 				Common::String fullPath = _baseCachePath;
 				rename(chunkPath.c_str(), fullPath.c_str());
+				chunkCache().forget(chunkPath);
 				_singleFullFile = true;
 				debug(5, "VirtualReadStream: Marked as single full file download");
 			} else if (actualSize == chunkLength) {
@@ -198,6 +289,7 @@ uint32 VirtualReadStream::read(void *dataPtr, uint32 dataSize) {
 	}
 
 	uint32 bytesRead = 0;
+	uint32 retriedChunk = (uint32)-1; // one re-download retry per chunk per call
 	uint8 *outputPtr = (uint8 *)dataPtr;
 	while (bytesRead < dataSize) {
 		// Figure out which chunk we need
@@ -215,9 +307,18 @@ uint32 VirtualReadStream::read(void *dataPtr, uint32 dataSize) {
 		Common::String chunkPath = getChunkPath(chunkIndex);
 		Common::SeekableReadStream *chunkStream = PosixIoStream::makeFromPath(chunkPath, StdioStream::WriteMode_Read);
 		if (!chunkStream) {
+			// The chunk may have been evicted by the cache LRU since this
+			// stream last saw it; clear the flag and retry (re-download) once.
+			if (_downloadedChunks[chunkIndex] && chunkIndex != retriedChunk) {
+				debug(2, "VirtualReadStream: chunk %u missing (evicted?), re-downloading", chunkIndex + 1);
+				_downloadedChunks[chunkIndex] = false;
+				retriedChunk = chunkIndex;
+				continue;
+			}
 			warning("VirtualReadStream: Failed to open chunk file: %s", chunkPath.c_str());
 			break;
 		}
+		chunkCache().touch(chunkPath);
 		// Seek to the correct position in the chunk
 		if (!chunkStream->seek(offsetInChunk)) {
 			warning("VirtualReadStream: Failed to seek in chunk file");

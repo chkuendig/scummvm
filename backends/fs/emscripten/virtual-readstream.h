@@ -67,6 +67,41 @@ protected:
 	bool isFullFileDownloaded() const;
 	void ensureChunkDownloaded(uint32 chunkIndex);
 
+	/**
+	 * Session-wide LRU accounting for downloaded chunk files. The chunk cache
+	 * lives in MEMFS (i.e. on the wasm heap), so without a bound a long session
+	 * streaming a large game (voice files alone can be several hundred MB)
+	 * grows the heap towards MAXIMUM_MEMORY and eventually OOMs the tab.
+	 * Chunks are only opened for the duration of a single read(), so evicted
+	 * chunks are simply re-downloaded on the next access (see read()).
+	 * Full-file downloads are not tracked: they only occur for files smaller
+	 * than CHUNK_SIZE or servers without range support, and evicting them
+	 * could not be recovered mid-stream.
+	 */
+	class ChunkCacheRegistry {
+	public:
+		/** Record (or refresh) a chunk file and enforce the cache cap. */
+		void noteChunk(const Common::String &path, uint64 size);
+		/** Mark a chunk as recently used. */
+		void touch(const Common::String &path);
+		/** Forget a path without unlinking (e.g. chunk renamed to full file). */
+		void forget(const Common::String &path);
+
+	private:
+		struct Entry {
+			Common::String path;
+			uint64 size;
+			uint32 lastUse;
+		};
+		void enforceCap(const Common::String &protectPath);
+		uint64 cacheLimit() const;
+
+		Common::Array<Entry> _entries;
+		uint64 _totalSize = 0;
+		uint32 _tick = 0;
+	};
+	static ChunkCacheRegistry &chunkCache();
+
 	// Abstract method to be implemented by subclasses
 	virtual void downloadChunk(uint32 chunkIndex, uint64 chunkStart, uint64 chunkLength) = 0;
 
