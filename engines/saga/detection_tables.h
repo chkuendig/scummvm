@@ -1378,7 +1378,12 @@ static const SAGAGameDescription gameDescriptions[] = {
 				{"musicfm.res",	GAME_MUSICFILE_FM,					"0439083e3dfdc51b486071d45872ae52", AD_NO_SIZE},
 				{"musicgm.res",	GAME_MUSICFILE_GM,					"80f875a1fb384160d1f4b27166eef583", AD_NO_SIZE},
 				{"scream.res",	GAME_RESOURCEFILE,					"46bbdc65d164ba7e89836a0935eec8e6", 79211140},
-				{"patch.re_",	GAME_PATCHFILE | GAME_RESOURCEFILE,	"58b79e61594779513c7f2d35509fa89e", AD_NO_SIZE},
+				// patch.re_ is intentionally not required here. The internal patch only
+				// redirects 10 resources to byte-identical copies already present in
+				// scream.res, i.e. it is a no-op (verified against the redump USA disc,
+				// whose scream.res md5 matches this entry). Re-releases such as the
+				// GOG/Steam Unity repackage ship without the file; the original CD still
+				// ships it and it is loaded optionally at runtime (Resource::createContexts).
 				{"scripts.res",	GAME_SCRIPTFILE,					"be38bbc5a26be809dbf39f13befebd01", AD_NO_SIZE},
 				//{"sfx.res",		GAME_SOUNDFILE,						"1c610d543f32ec8b525e3f652536f269", AD_NO_SIZE},
 				// There are two English versions of the game, each one with a different sfx.res file

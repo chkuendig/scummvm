@@ -320,8 +320,16 @@ bool Resource::createContexts() {
 
 	for (const ADGameFileDescription *gameFileDescription = _vm->getFilesDescriptions();
 		gameFileDescription->fileName; gameFileDescription++) {
-		if (gameFileDescription->fileType > 0)
-			addContext(gameFileDescription->fileName, gameFileDescription->fileType);
+		if (gameFileDescription->fileType > 0) {
+			// The IHNM internal patch (patch.re_/patch.res) is optional: it only
+			// redirects resources to copies already present in the resource file,
+			// so a missing patch just means no redirect is applied. Skip it when
+			// absent instead of failing to load - re-releases such as the
+			// GOG/Steam Unity repackage of IHNM ship without it.
+			if (!(gameFileDescription->fileType & GAME_PATCHFILE) ||
+			    Common::File::exists(gameFileDescription->fileName))
+				addContext(gameFileDescription->fileName, gameFileDescription->fileType);
+		}
 		if ((gameFileDescription->fileType & GAME_RESOURCEFILE) && _vm->getPlatform() == Common::kPlatformAmiga && _vm->getGameId() == GID_ITE)
 			addContext(gameFileDescription->fileName, (gameFileDescription->fileType & ~GAME_RESOURCEFILE) | GAME_SCRIPTFILE | GAME_SWAPENDIAN);
 		if ((gameFileDescription->fileType & GAME_RESOURCEFILE) && _vm->getPlatform() == Common::kPlatformAmiga && _vm->getGameId() == GID_ITE)
