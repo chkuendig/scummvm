@@ -391,6 +391,22 @@ if [[ "make" =~ $(echo ^\(${TASKS}\)$) || "build" =~ $(echo ^\(${TASKS}\)$) ]]; 
   echo "Running make"
   num_cpus=$(nproc || grep -c ^processor /proc/cpuinfo || echo 1)
   emmake make -j ${num_cpus}
+
+  # SDL3's emscripten audio backend arms a setInterval("silence_callback")
+  # while the AudioContext is autoplay-blocked (always the case on mobile
+  # before the first user gesture) that dynCall()s into wasm on every tick.
+  # If such a tick fires while ASYNCIFY has the main stack unwound (e.g. the
+  # HTTP virtual-fs busy-wait during a chunk download), the raw re-entry
+  # corrupts the asyncify state and traps ("call_indirect to a signature that
+  # does not match" / "Unreachable code should not be executed" in doRewind -
+  # observed on iOS Safari). Guard the callback to skip ticks while asyncify
+  # is not in its normal state. The SDL port source ships inside the emsdk
+  # cache, so patch the generated JS post-link instead (idempotent; anchors
+  # on the SDL EM_ASM text carried verbatim into scummvm.js).
+  if [[ -f "${ROOT_FOLDER}/scummvm.js" ]] && ! grep -q 'silence_callback = function() { if (typeof Asyncify' "${ROOT_FOLDER}/scummvm.js"; then
+    sed -i 's/var silence_callback = function() {/var silence_callback = function() { if (typeof Asyncify !== "undefined" \&\& Asyncify.state !== Asyncify.State.Normal) return;/g' "${ROOT_FOLDER}/scummvm.js"
+    echo "Patched asyncify guard into silence_callback ($(grep -c 'Asyncify.State.Normal) return;' "${ROOT_FOLDER}/scummvm.js") site(s))"
+  fi
 fi
 
 #################################
