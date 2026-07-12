@@ -30,7 +30,6 @@ MODULE_OBJS := \
 ifdef USE_HTTP
 MODULE_OBJS += \
 	networking/http/connectionmanager.o \
-	networking/http/networkreadstream.o \
 	networking/http/httpjsonrequest.o \
 	networking/http/httprequest.o \
 	networking/http/postrequest.o \
@@ -101,18 +100,24 @@ endif
 
 ifdef EMSCRIPTEN
 MODULE_OBJS += \
+	fs/emscripten/dragdrop-fs.o \
+	fs/emscripten/dragdrop-readstream.o \
 	fs/emscripten/emscripten-fs-factory.o \
 	fs/emscripten/emscripten-posix-fs.o \
 	fs/emscripten/http-fs.o \
-	midi/webmidi.o 
+	fs/emscripten/http-readstream.o \
+	fs/emscripten/virtual-fs.o \
+	fs/emscripten/virtual-readstream.o \
+	midi/webmidi.o \
+	mixer/emscriptensdl/emscriptensdl-mixer.o \
+	networking/http/emscripten/connectionmanager-emscripten.o \
+	networking/http/emscripten/networkreadstream-emscripten.o \
+	printing/emscripten/emscripten-printman.o \
+	timer/emscripten/emscripten-timer.o
 ifdef USE_CLOUD
 MODULE_OBJS += \
-	fs/emscripten/cloud-fs.o
-endif
-ifdef USE_HTTP
-MODULE_OBJS += \
-	networking/http/emscripten/connectionmanager-emscripten.o \
-	networking/http/emscripten/networkreadstream-emscripten.o
+	fs/emscripten/cloud-fs.o \
+	fs/emscripten/cloud-readstream.o
 endif
 ifdef USE_TTS
 MODULE_OBJS += \
@@ -170,8 +175,10 @@ endif
 ifdef USE_ELF_LOADER
 MODULE_OBJS += \
 	plugins/elf/arm-loader.o \
+	plugins/elf/cxa-atexit.o \
 	plugins/elf/elf-loader.o \
 	plugins/elf/elf-provider.o \
+	plugins/elf/m68k-loader.o \
 	plugins/elf/memory-manager.o \
 	plugins/elf/mips-loader.o \
 	plugins/elf/ppc-loader.o \
@@ -236,7 +243,13 @@ endif
 
 ifndef RISCOS
 ifndef KOLIBRIOS
+ifdef USE_ATARI_PLUGIN_PROVIDER
+MODULE_OBJS += plugins/atari/atari-provider.o
+else ifdef USE_FIREBEE_PLUGIN_PROVIDER
+MODULE_OBJS += plugins/firebee/firebee-provider.o
+else
 MODULE_OBJS += plugins/sdl/sdl-provider.o
+endif
 endif
 endif
 
@@ -299,8 +312,13 @@ MODULE_OBJS += \
 	taskbar/macosx/macosx-taskbar.o
 
 ifdef USE_TTS
+ifdef USE_NS_SPEECH_SYNTHESIZER
 MODULE_OBJS += \
 	text-to-speech/macosx/macosx-text-to-speech.o
+else
+MODULE_OBJS += \
+	text-to-speech/avfaudio/avfaudio-text-to-speech.o
+endif
 endif
 
 ifdef SDL_BACKEND
@@ -318,6 +336,7 @@ MODULE_OBJS += \
 	fs/windows/windows-fs-factory.o \
 	midi/windows.o \
 	plugins/win32/win32-provider.o \
+	printing/win32/win32-printman.o \
 	saves/windows/windows-saves.o \
 	updates/win32/win32-updates.o \
 	taskbar/win32/win32-taskbar.o
@@ -340,6 +359,7 @@ MODULE_OBJS += \
 	fs/android/android-posix-fs.o \
 	fs/android/android-saf-fs.o \
 	graphics/android/android-graphics.o \
+	mixer/android/android-mixer.o \
 	mutex/pthread/pthread-mutex.o \
 	networking/basic/android/jni.o \
 	networking/basic/android/socket.o \
@@ -350,6 +370,10 @@ MODULE_OBJS += \
 	networking/http/android/connectionmanager-android.o \
 	networking/http/android/networkreadstream-android.o
 endif
+
+# Oboe headers need C++14...
+$(MODULE)/mixer/android/android-mixer.o: CXXFLAGS += "-std=c++14"
+
 endif
 
 ifdef AMIGAOS
@@ -404,6 +428,7 @@ endif
 
 ifeq ($(BACKEND),atari)
 MODULE_OBJS += \
+	audiocd/atari/atari-audiocd.o \
 	events/atari/atari-events.o \
 	fs/atari/atari-fs.o \
 	fs/atari/atari-fs-factory.o \
@@ -416,6 +441,10 @@ MODULE_OBJS += \
 	graphics/atari/atari-supervidel.o \
 	graphics/atari/atari-surface.o \
 	mixer/atari/atari-mixer.o
+ifdef USE_ELF_LOADER
+MODULE_OBJS += \
+	plugins/atari/atari-provider.o
+endif
 endif
 
 ifeq ($(BACKEND),ds)
@@ -433,9 +462,16 @@ endif
 
 ifdef IPHONE
 MODULE_OBJS += \
+	midi/coremidi.o \
 	mutex/pthread/pthread-mutex.o \
 	graphics/ios/ios-graphics.o \
 	graphics/ios/renderbuffer.o
+
+ifdef USE_TTS
+MODULE_OBJS += \
+	text-to-speech/avfaudio/avfaudio-text-to-speech.o
+endif
+
 endif
 
 ifeq ($(BACKEND),maemo)

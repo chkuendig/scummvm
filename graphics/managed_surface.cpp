@@ -306,15 +306,15 @@ void ManagedSurface::convertToInPlace(const PixelFormat &dstFormat) {
 		_innerSurface.convertToInPlace(dstFormat);
 }
 
-Graphics::ManagedSurface *ManagedSurface::scale(int16 newWidth, int16 newHeight, bool filtering) const {
+Graphics::ManagedSurface *ManagedSurface::scale(int16 newWidth, int16 newHeight, bool filtering, byte flip) const {
 	Graphics::ManagedSurface *target = new Graphics::ManagedSurface();
 
 	target->create(newWidth, newHeight, format);
 
 	if (filtering) {
-		scaleBlitBilinear((byte *)target->getPixels(), (const byte *)getPixels(), target->pitch, pitch, target->w, target->h, w, h, format);
+		scaleBlitBilinear((byte *)target->getPixels(), (const byte *)getPixels(), target->pitch, pitch, target->w, target->h, w, h, format, flip);
 	} else {
-		scaleBlit((byte *)target->getPixels(), (const byte *)getPixels(), target->pitch, pitch, target->w, target->h, w, h, format);
+		scaleBlit((byte *)target->getPixels(), (const byte *)getPixels(), target->pitch, pitch, target->w, target->h, w, h, format, flip);
 	}
 
 	// Copy miscellaneous properties
@@ -398,7 +398,8 @@ void ManagedSurface::simpleBlitFromInner(const Surface &src, const Common::Rect 
 	Common::Rect dstRectC = srcRect;
 
 	dstRectC.moveTo(destPos.x, destPos.y);
-	clip(srcRectC, dstRectC, src.w, src.h, flip);
+	if (!clip(srcRectC, dstRectC, src.w, src.h, flip))
+		return;
 
 	const byte *srcPtr = (const byte *)src.getBasePtr(srcRectC.left, srcRectC.top);
 	byte *dstPtr = (byte *)getBasePtr(dstRectC.left, dstRectC.top);
@@ -498,7 +499,8 @@ void ManagedSurface::maskBlitFromInner(const Surface &src, const Surface &mask,
 	Common::Rect dstRectC = srcRect;
 
 	dstRectC.moveTo(destPos.x, destPos.y);
-	clip(srcRectC, dstRectC, src.w, src.h, flip);
+	if (!clip(srcRectC, dstRectC, src.w, src.h, flip))
+		return;
 
 	const byte *srcPtr = (const byte *)src.getBasePtr(srcRectC.left, srcRectC.top);
 	const byte *maskPtr = (const byte *)mask.getBasePtr(srcRectC.left, srcRectC.top);

@@ -31,14 +31,21 @@ namespace Alcachofa {
 Player::Player()
 	: _activeCharacter(&g_engine->world().mortadelo())
 	, _semaphore("player") {
-	const auto &cursorPath = g_engine->world().getGlobalAnimationName(GlobalAnimationKind::Cursor);
-	_cursorAnimation.reset(new Animation(cursorPath));
+	const auto &cursorRef = g_engine->world().getGlobalAnimation(GlobalAnimationKind::Cursor);
+	_cursorAnimation.reset(new Animation(cursorRef));
 	_cursorAnimation->load();
 }
 
 void Player::preUpdate() {
 	_selectedObject = nullptr;
 	_cursorFrameI = 0;
+
+	if (g_engine->input().wasSubtitlesKeyPressed()) {
+		auto &config = g_engine->config();
+		config.subtitles() = !config.subtitles();
+		config.saveToScummVM();
+		debug(1, "Toggled subtitles to %s", config.subtitles() ? "on" : "off");
+	}
 }
 
 void Player::postUpdate() {
@@ -51,7 +58,9 @@ void Player::resetCursor() {
 }
 
 void Player::updateCursor() {
-	if (g_engine->menu().isOpen() || !_isGameLoaded)
+	if (g_engine->isV2())
+		_cursorFrameI = g_engine->config().cursor();
+	else if (g_engine->isV1() || g_engine->menu().isOpen())
 		_cursorFrameI = 0;
 	else if (_selectedObject == nullptr)
 		_cursorFrameI = !g_engine->input().isMouseLeftDown() || _pressedObject != nullptr ? 6 : 7;
@@ -107,7 +116,9 @@ void Player::drawCursor(bool forceDefaultCursor) {
 }
 
 void Player::changeRoom(const Common::String &targetRoomName, bool resetCamera, bool isTemporary) {
-	debugC(1, kDebugGameplay, "Change room to %s", targetRoomName.c_str());
+	debugC(1, kDebugGameplay, "Change room from %s%s to %s%s",
+		_currentRoom == nullptr ? "<none>" : _currentRoom->name().c_str(), _isInTemporaryRoom ? " (temp)" : "",
+		targetRoomName.c_str(), isTemporary ? " (temp)" : "");
 
 	// original would be to always free all resources from globalRoom, inventory, GlobalUI
 	// We don't do that, it is unnecessary, all resources would be loaded right after
@@ -117,6 +128,9 @@ void Player::changeRoom(const Common::String &targetRoomName, bool resetCamera, 
 		_currentRoom = nullptr;
 		return; // exiting game entirely
 	}
+	auto nextRoom = g_engine->world().getRoomByName(targetRoomName.c_str());
+	if (nextRoom == nullptr) // no good way to recover, leaving-the-room actions might already prevent further progress
+		error("Invalid room name: %s", targetRoomName.c_str());
 
 	if (_currentRoom != nullptr) {
 		g_engine->scheduler().killProcessByName("ACTUALIZAR_" + _currentRoom->name());
@@ -136,12 +150,11 @@ void Player::changeRoom(const Common::String &targetRoomName, bool resetCamera, 
 	// this fixes a bug with all original games where changing the room in the inventory (e.g. iFOTO in aventura de cine)
 	// would overwrite the actual game room thus returning from the inventory one would be stuck in the temporary room
 	// If we know that a transition is temporary we prevent that and only remember the real game room
+	if (isTemporary && _roomBeforeInventory == nextRoom)
+		isTemporary = false; // this only looked like a temporary room change, but is not
 	_isInTemporaryRoom = isTemporary;
 
-	_currentRoom = g_engine->world().getRoomByName(targetRoomName.c_str());
-	if (_currentRoom == nullptr) // no good way to recover, leaving-the-room actions might already prevent further progress
-		error("Invalid room name: %s", targetRoomName.c_str());
-
+	_currentRoom = nextRoom;
 	if (!_didLoadGlobalRooms) {
 		_didLoadGlobalRooms = true;
 		g_engine->world().inventory().loadResources();
@@ -149,11 +162,7 @@ void Player::changeRoom(const Common::String &targetRoomName, bool resetCamera, 
 	}
 	_currentRoom->loadResources(); // if we kept resources we loop over a couple noops, that is fine.
 
-	if (resetCamera)
-		g_engine->camera().resetRotationAndScale();
-	WalkingCharacter *followTarget = g_engine->camera().followTarget();
-	if (followTarget != nullptr)
-		g_engine->camera().setFollow(followTarget, true);
+	g_engine->camera().onChangedRoom(resetCamera);
 	_pressedObject = _selectedObject = nullptr;
 }
 
@@ -203,10 +212,9 @@ void Player::triggerObject(ObjectBase *object, const char *action) {
 	_activeCharacter->currentlyUsing() = nullptr;
 	if (scumm_stricmp(action, "MIRAR") == 0)
 		script.createProcess(activeCharacterKind(), "DefectoMirar");
-	//else if (action[0] == 'i' && object->name()[0] == 'i')
-	// This case can happen if you combine two objects without procedure, the original engine
-	// would attempt to start the procedure "DefectoObjeto" which does not exist
-	// (this should be revised when working on further games)
+	else if (action[0] == 'i' && object->name()[0] == 'i' && script.hasProcedure("DefectoObjeto"))
+		// This case can happen if you combine two objects without procedure. This does not happen in all games
+		script.createProcess(activeCharacterKind(), "DefectoObjeto");
 	else
 		script.createProcess(activeCharacterKind(), "DefectoUsar");
 }
@@ -244,12 +252,12 @@ struct DoorTask final : public Task {
 		_player.changeRoom(_targetRoom->name(), true); //-V779
 
 		if (_targetRoom->fixedCameraOnEntering())
-			g_engine->camera().setPosition(as2D(_targetObject->interactionPoint()));
+			g_engine->camera().onTriggeredDoor(_targetObject->interactionPoint());
 		else {
 			_character->room() = _targetRoom;
 			_character->setPosition(_targetObject->interactionPoint());
 			_character->stopWalking(_targetDirection);
-			g_engine->camera().setFollow(_character, true);
+			g_engine->camera().onTriggeredDoor(_character);
 		}
 
 		g_engine->sounds().setMusicToRoom(_targetRoom->musicID());
@@ -347,11 +355,23 @@ void Player::setActiveCharacter(MainCharacterKind kind) {
 
 bool Player::isAllowedToOpenMenu() {
 	return
-		isGameLoaded() &&
 		!g_engine->menu().isOpen() &&
-		g_engine->sounds().musicSemaphore().isReleased() &&
-		!g_engine->script().variable("prohibirESC") &&
-		!_isInTemporaryRoom; // we cannot reliably store this state across multiple room changes
+		!g_engine->isInSpecialGameLoop() &&
+		!_isInTemporaryRoom && // we cannot reliably store this state across multiple room changes
+		g_engine->game().isAllowedToOpenMenu();
+}
+
+Room *Player::lastGameRoom() const {
+	// save from in-game menu
+	if (g_engine->menu().isOpen() && g_engine->menu().previousRoom() != nullptr)
+		return g_engine->menu().previousRoom();
+
+	// save from ScummVM while in inventory
+	if (currentRoom() == &g_engine->world().inventory() && _roomBeforeInventory != nullptr)
+		return _roomBeforeInventory;
+
+	// save from ScumnmVM global menu or autosave in normal gameplay
+	return currentRoom(); // this *could* still return nullptr but only at the very start of the engine	
 }
 
 void Player::syncGame(Serializer &s) {
@@ -373,10 +393,8 @@ void Player::syncGame(Serializer &s) {
 
 	String roomName;
 	if (s.isSaving()) {
-		roomName =
-			g_engine->menu().isOpen() ? g_engine->menu().previousRoom()->name() // save from in-game menu
-			: _roomBeforeInventory != nullptr ? _roomBeforeInventory->name() // save from ScummVM while in inventory
-			: currentRoom()->name(); // save from ScumnmVM global menu or autosave in normal gameplay
+		// only call lastGameRoom if we are saving, a load-on-start might not have a current room yet
+		roomName = lastGameRoom()->name();
 	}
 	s.syncString(roomName);
 	if (s.isLoading()) {
@@ -384,7 +402,6 @@ void Player::syncGame(Serializer &s) {
 		_pressedObject = nullptr;
 		_heldItem = nullptr;
 		_nextLastDialogCharacter = 0;
-		_isGameLoaded = true;
 		_roomBeforeInventory = nullptr;
 		_isInTemporaryRoom = false;
 		fill(_lastDialogCharacters, _lastDialogCharacters + kMaxLastDialogCharacters, nullptr);

@@ -40,8 +40,8 @@ static Image::ImageDecoder *loadImage(const tString &filepath, Image::ImageDecod
 	return decoder;
 }
 
-Image::JPEGDecoder *setupJPEGDecoder(Image::JPEGDecoder *jpeg) {
-	jpeg->setOutputPixelFormat(Graphics::PixelFormat::createFormatRGBA32());
+Image::JPEGDecoder *setupJPEGDecoder(Image::JPEGDecoder *jpeg, const Graphics::PixelFormat &desiredFormat) {
+	jpeg->setOutputPixelFormat(desiredFormat);
 	return jpeg;
 }
 
@@ -54,7 +54,7 @@ Bitmap2D::Bitmap2D(const tString &filepath, const tString &type, const Graphics:
 	else if (type == "tga")
 		_decoder.reset(loadImage(filepath, new Image::TGADecoder));
 	else if (type == "jpg" || type == "jpeg")
-		_decoder.reset(loadImage(filepath, setupJPEGDecoder(new Image::JPEGDecoder)));
+		_decoder.reset(loadImage(filepath, setupJPEGDecoder(new Image::JPEGDecoder, desiredFormat)));
 #ifdef USE_GIF
 	else if (type == "gif")
 		_decoder.reset(loadImage(filepath, new Image::GIFDecoder));
@@ -114,7 +114,7 @@ void Bitmap2D::fillRect(const cRect2l &rect, const cColor &color) {
 		rect.x,
 		rect.y,
 		rect.w <= 0 ? rect.x + _surface.w : rect.x + rect.w,
-		rect.h <= 0 ? rect.y + _surface.w : rect.y + rect.h);
+		rect.h <= 0 ? rect.y + _surface.h : rect.y + rect.h);
 	_surface.fillRect(surfaceRect, qcol);
 }
 

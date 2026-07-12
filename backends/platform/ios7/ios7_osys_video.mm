@@ -27,6 +27,8 @@
 
 #include "backends/platform/ios7/ios7_app_delegate.h"
 
+#include "common/config-manager.h"
+
 #define UIViewParentController(__view) ({ \
 	UIResponder *__responder = __view; \
 	while ([__responder isKindOfClass:[UIView class]]) \
@@ -87,7 +89,7 @@ static inline void execute_on_main_thread(void (^block)(void)) {
 }
 
 void OSystem_iOS7::engineInit() {
-	EventsBaseBackend::engineInit();
+	BaseBackend::engineInit();
 	// Prevent the device going to sleep during game play (and in particular cut scenes)
 	dispatch_async(dispatch_get_main_queue(), ^{
 		[[UIApplication sharedApplication] setIdleTimerDisabled:YES];
@@ -111,7 +113,7 @@ void OSystem_iOS7::engineInit() {
 }
 
 void OSystem_iOS7::engineDone() {
-	EventsBaseBackend::engineDone();
+	BaseBackend::engineDone();
 	// Allow the device going to sleep if idle while in the Launcher
 	dispatch_async(dispatch_get_main_queue(), ^{
 		[[UIApplication sharedApplication] setIdleTimerDisabled:NO];
@@ -130,7 +132,7 @@ void OSystem_iOS7::engineDone() {
 }
 
 void OSystem_iOS7::taskStarted(Task task) {
-	EventsBaseBackend::taskStarted(task);
+	BaseBackend::taskStarted(task);
 	if (_runningTasks++ == 0) {
 		// Prevent the device going to sleep while a task is running
 		dispatch_async(dispatch_get_main_queue(), ^{
@@ -139,7 +141,7 @@ void OSystem_iOS7::taskStarted(Task task) {
 	}
 }
 void OSystem_iOS7::taskFinished(Task task) {
-	EventsBaseBackend::taskFinished(task);
+	BaseBackend::taskFinished(task);
 	if (--_runningTasks == 0) {
 		dispatch_async(dispatch_get_main_queue(), ^{
 			[[UIApplication sharedApplication] setIdleTimerDisabled:NO];
@@ -155,6 +157,12 @@ void OSystem_iOS7::updateOutputSurface() {
 
 void OSystem_iOS7::updateTouchMode() {
 #if TARGET_OS_IOS
+	// Keep the native on-screen virtual controller in sync with the resolved
+	// touch mode: connected in the gamepad touch mode, or when the user enabled
+	// it independently via the gamepad_controller setting. This is the single
+	// place the virtual controller is (dis)connected as the touch mode changes.
+	virtualController(_currentTouchMode == Common::kTouchModeGamepad || ConfMan.getBool("gamepad_controller"));
+
 	execute_on_main_thread(^ {
 		[[iOS7AppDelegate iPhoneView] updateTouchMode];
 	});
@@ -169,9 +177,11 @@ void OSystem_iOS7::virtualController(bool connect) {
 
 bool OSystem_iOS7::isiOSAppOnMac() const {
 	__block bool isiOSAppOnMac = false;
+#if TARGET_OS_IOS
 	execute_on_main_thread(^ {
 		isiOSAppOnMac = [[iOS7AppDelegate iPhoneView] isiOSAppOnMac];
 	});
+#endif
 	return isiOSAppOnMac;
 }
 

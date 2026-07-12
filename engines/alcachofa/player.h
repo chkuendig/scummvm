@@ -39,8 +39,6 @@ public:
 	MainCharacter *inactiveCharacter() const;
 	FakeSemaphore &semaphoreFor(MainCharacterKind kind);
 
-	inline bool &isGameLoaded() { return _isGameLoaded; }
-
 	inline MainCharacterKind activeCharacterKind() const {
 		return _activeCharacter == nullptr ? MainCharacterKind::None : _activeCharacter->kind();
 	}
@@ -58,6 +56,7 @@ public:
 	void stopLastDialogCharacters();
 	void setActiveCharacter(MainCharacterKind kind);
 	bool isAllowedToOpenMenu();
+	Room *lastGameRoom() const; // used for saves and music chapter
 	void syncGame(Common::Serializer &s);
 
 private:
@@ -72,9 +71,7 @@ private:
 	void *_pressedObject = nullptr; // terrible but GlobalUI wants to store a Graphic pointer
 	Item *_heldItem = nullptr;
 	int32 _cursorFrameI = 0;
-	bool
-		_isGameLoaded = true,
-		_didLoadGlobalRooms = false,
+	bool _didLoadGlobalRooms = false,
 		_isInTemporaryRoom = false;
 	Character *_lastDialogCharacters[kMaxLastDialogCharacters] = { nullptr };
 	int _nextLastDialogCharacter = 0;

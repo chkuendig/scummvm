@@ -91,7 +91,11 @@ public:
 	uint16 _objectID;
 	Math::Vector3d _origin, _size, _rotation;
 	Math::AABB _boundingBox;
+	Math::AABB _occlusionBox;
 	Object *_partOfGroup = nullptr;
+	// Position in the object file, used to seed the renderer's depth sort in the
+	// same order the original game iterates its object list (see Area::draw).
+	uint16 _loadIndex = 0xFFFF;
 };
 
 } // End of namespace Freescape

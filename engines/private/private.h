@@ -229,6 +229,17 @@ typedef Common::Array<DiaryPage> DiaryPages;
 
 typedef Common::HashMap<Common::String, bool> PlayedMediaTable;
 
+enum SubtitleType {
+	kSubtitleAudio,
+	kSubtitleVideo
+};
+
+struct SubtitleSlot {
+	Audio::SoundHandle handle;
+	Video::Subtitles *subs;
+
+	SubtitleSlot() : subs(nullptr) {}
+};
 
 class PrivateEngine : public Engine {
 private:
@@ -237,9 +248,16 @@ private:
 	Image::ImageDecoder *_image;
 	int _screenW, _screenH;
 
+	// helper to generate the correct subtitle path
+	Common::Path getSubtitlePath(const Common::String &soundName);
+
+	bool isSfxSubtitle(const Video::Subtitles *subs);
+	bool isSlotActive(const SubtitleSlot &slot);
+
 public:
 	bool _shouldHighlightMasks;
 	bool _highlightMasks;
+	bool _readingMaterialContrast;
 	PrivateEngine(OSystem *syst, const ADGameDescription *gd);
 	~PrivateEngine();
 
@@ -302,11 +320,14 @@ public:
 	void skipVideo();
 	void destroyVideo();
 
-	void loadSubtitles(const Common::Path &path, Sound *sound = nullptr);
+	void loadSubtitles(const Common::Path &path, SubtitleType type, Sound *sound = nullptr);
+	// use to clean up sounds which have finished playing once
+	void updateSubtitles();
 	void destroySubtitles();
 	void adjustSubtitleSize();
-	Video::Subtitles *_subtitles;
-	Sound *_subtitledSound;
+	Video::Subtitles *_videoSubtitles;
+	SubtitleSlot _voiceSlot; // high priority (speech)
+	SubtitleSlot _sfxSlot;   // low priority (sfxs)
 	bool _useSubtitles;
 	bool _sfxSubtitles;
 
@@ -315,6 +336,7 @@ public:
 	void remapImage(uint16 ncolors, const Graphics::Surface *oldImage, const byte *oldPalette, Graphics::Surface *newImage, const byte *currentPalette);
 	static uint32 findMaskTransparentColor(const byte *palette, uint32 defaultColor);
 	static void swapImageColors(Graphics::Surface *image, byte *palette, uint32 a, uint32 b);
+	void setPaperScanFiltering(bool enabled);
 	void loadImage(const Common::String &file, int x, int y);
 	void drawScreenFrame(const byte *videoPalette);
 
@@ -345,6 +367,8 @@ public:
 	Common::Point _origin;
 	void drawScreen();
 	bool _needToDrawScreenFrame;
+	bool _paperScanFilteringActive;
+	bool _paperScanPreviousFiltering;
 
 	// settings
 	Common::String _nextSetting;

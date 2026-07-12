@@ -948,7 +948,7 @@ inline void MapWindow::drawActor(const Actor *actor) {
 			drawTile(tile, wrapped_x, actor->y - cur_y, false);
 			drawTile(tile, wrapped_x, actor->y - cur_y, true);
 			if (game->get_clock()->get_timer(GAMECLOCK_TIMER_U6_INFRAVISION) != 0) {
-				const Std::list<Obj *> &surrounding_objs = actor->get_surrounding_obj_list();
+				const Common::List<Obj *> &surrounding_objs = actor->get_surrounding_obj_list();
 				for (Obj *obj : surrounding_objs) {
 					const Tile *t = tile_manager->get_original_tile(obj_manager->get_obj_tile_num(obj->obj_n) + obj->frame_n);
 					uint16 wrapped_obj_x = WRAP_VIEWP(cur_x, obj->x, map_width);
@@ -1725,7 +1725,7 @@ CanDropOrMoveMsg MapWindow::can_drop_or_move_obj(uint16 x, uint16 y, Actor *acto
 	return MSG_NOT_POSSIBLE;
 }
 
-void MapWindow::display_can_drop_or_move_msg(CanDropOrMoveMsg msg, string msg_text) {
+void MapWindow::display_can_drop_or_move_msg(CanDropOrMoveMsg msg, Common::String msg_text) {
 	if (msg == MSG_NOT_POSSIBLE)
 		msg_text += "Not possible\n";
 	else if (msg == MSG_BLOCKED)
@@ -1945,7 +1945,7 @@ bool MapWindow::move_on_drop(Obj *obj) {
 }
 
 void MapWindow::set_interface() {
-	Std::string interface_str;
+	Common::String interface_str;
 	config->value("config/input/interface", interface_str, "normal");
 	if (interface_str == "ignore_block" ||  Game::get_game()->using_hackmove()) // game variable is not initialized
 		interface = INTERFACE_IGNORE_BLOCK;

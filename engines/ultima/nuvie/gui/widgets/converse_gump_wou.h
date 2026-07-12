@@ -26,12 +26,10 @@
 #include "ultima/nuvie/gui/widgets/gui_widget.h"
 #include "ultima/nuvie/fonts/font.h"
 #include "ultima/shared/std/containers.h"
-#include "ultima/shared/std/string.h"
+#include "common/str.h"
 
 namespace Ultima {
 namespace Nuvie {
-
-using Std::list;
 
 class Configuration;
 class Font;
@@ -94,7 +92,7 @@ public:
 
 protected:
 
-	void input_add_string(Std::string token_str);
+	void input_add_string(Common::String token_str);
 	void process_page_break() override;
 	uint8 get_input_font_color() const override {
 		return FONT_COLOR_WOU_CONVERSE_INPUT;

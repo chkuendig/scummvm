@@ -8,8 +8,10 @@ MODULE_OBJS := \
 	ini-file.o \
 	json.o \
 	markdown.o \
+	po_parser.o \
 	prodos.o \
 	quicktime.o \
+	spectrum_tape.o \
 	winexe.o \
 	winexe_ne.o \
 	winexe_pe.o \

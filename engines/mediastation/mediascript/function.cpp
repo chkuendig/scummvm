@@ -19,30 +19,77 @@
  *
  */
 
+#include "common/memstream.h"
+#include "common/str.h"
+
 #include "mediastation/mediascript/function.h"
 #include "mediastation/debugchannels.h"
 #include "mediastation/mediastation.h"
 
 namespace MediaStation {
+
+// For exact argument count.
+#define FUNCARGCHECK(n) \
+	if (args.size() != (n)) { \
+		warning("%s: expected %d argument%s, got %d", builtInFunctionToStr(functionId), (n), ((n) == 1 ? "" : "s"), args.size()); \
+	}
+
+// For a range of valid argument counts (min to max).
+#define FUNCARGRANGE(min, max) \
+	if (args.size() < (min) || args.size() > (max)) { \
+		warning("%s: expected %d to %d argument, got %d", builtInFunctionToStr(functionId), (min), (max), args.size()); \
+	}
+
+// For minimum argument count (no maximum).
+#define FUNCARGMIN(min) \
+	if (args.size() < (min)) { \
+		warning("%s: expected at least %d argument%s, got %d", builtInFunctionToStr(functionId), (min), ((min) == 1 ? "" : "s"), args.size()); \
+	}
+
 ScriptFunction::ScriptFunction(Chunk &chunk) {
 	_contextId = chunk.readTypedUint16();
-	// In PROFILE._ST (only present in some titles), the function ID is reported
-	// with 19900 added, so function 100 would be reported as 20000. But in
-	// bytecode, the zero-based ID is used, so that's what we'll store here.
 	_id = chunk.readTypedUint16();
-	_code = new CodeChunk(chunk);
+	_bytecodeSize = chunk.readTypedUint32();
+	debugC(5, kDebugLoading, "%s: Context %d, function %d [%d bytes]",
+		__func__, _contextId, _id, _bytecodeSize);
+
+	// Store bytecode as a flat buffer rather than a stream, so we can create
+	// fresh streams for each execution (necessary for recursive function calls).
+	_bytecodeBuffer = static_cast<byte *>(malloc(_bytecodeSize));
+	chunk.read(_bytecodeBuffer, _bytecodeSize);
 }
 
 ScriptFunction::~ScriptFunction() {
-	delete _code;
-	_code = nullptr;
+	free(_bytecodeBuffer);
+	_bytecodeBuffer = nullptr;
 }
 
 ScriptValue ScriptFunction::execute(Common::Array<ScriptValue> &args) {
-	debugC(5, kDebugScript, "\n********** SCRIPT FUNCTION %d **********", _id);
-	ScriptValue returnValue = _code->execute(&args);
-	debugC(5, kDebugScript, "********** END SCRIPT FUNCTION **********");
+	Common::String name = g_engine->formatFunctionName(_id);
+	debugC(5, kDebugScript, "\n********** SCRIPT FUNCTION %s **********", name.c_str());
+
+	// Create a new stream for this execution to avoid conflicts with recursive calls.
+	Common::SeekableReadStream *baseStream = new Common::MemoryReadStream(_bytecodeBuffer, _bytecodeSize, DisposeAfterUse::NO);
+	ParameterReadStream *bytecodeStream = static_cast<ParameterReadStream *>(baseStream);
+	CodeChunk code(bytecodeStream);
+	ScriptValue returnValue = code.executeWithArguments(&args);
+	delete bytecodeStream;
+
+	debugC(5, kDebugScript, "********** END SCRIPT FUNCTION %s **********", name.c_str());
 	return returnValue;
+}
+
+Common::String ScriptFunction::decompile() const {
+	Common::String functionName = g_engine->formatFunctionName(_id, false);
+	Common::String result = "Function " + functionName + "\n";
+	Common::SeekableReadStream *baseStream = new Common::MemoryReadStream(_bytecodeBuffer, _bytecodeSize, DisposeAfterUse::NO);
+	ParameterReadStream *bytecodeStream = static_cast<ParameterReadStream *>(baseStream);
+	// The decompiled code will be put in an indented block, so start with one level of indentation.
+	CodeChunkDecompiler decompiler(bytecodeStream, 1);
+	result += decompiler.decompileNextBlock();
+	delete baseStream;
+	result += "End // " + functionName + "\n";
+	return result;
 }
 
 FunctionManager::~FunctionManager() {
@@ -86,12 +133,13 @@ ScriptValue FunctionManager::call(uint functionId, Common::Array<ScriptValue> &a
 	switch (functionId) {
 	case kRandomFunction:
 	case kLegacy_RandomFunction:
-		assert(args.size() == 2);
+		FUNCARGCHECK(2);
 		script_Random(args, returnValue);
 		break;
 
 	case kTimeOfDayFunction:
 	case kLegacy_TimeOfDayFunction:
+		FUNCARGCHECK(0);
 		script_TimeOfDay(args, returnValue);
 		break;
 
@@ -107,45 +155,55 @@ ScriptValue FunctionManager::call(uint functionId, Common::Array<ScriptValue> &a
 
 	case kPlatformFunction:
 	case kLegacy_PlatformFunction:
-		assert(args.empty());
+		FUNCARGCHECK(0);
 		script_GetPlatform(args, returnValue);
 		break;
 
 	case kSquareRootFunction:
 	case kLegacy_SquareRootFunction:
-		assert(args.size() == 1);
+		FUNCARGCHECK(1);
 		script_SquareRoot(args, returnValue);
 		break;
 
 	case kGetUniqueRandomFunction:
 	case kLegacy_GetUniqueRandomFunction:
-		assert(args.size() >= 2);
+		FUNCARGMIN(2);
 		script_GetUniqueRandom(args, returnValue);
 		break;
 
 	case kCurrentRunTimeFunction:
+	case kLegacy_GetCurrentRunTimeFunction:
+		FUNCARGCHECK(0);
 		script_CurrentRunTime(args, returnValue);
 		break;
 
 	case kSetGammaCorrectionFunction:
+	case kLegacy_SetGammaCorrectionFunction:
+		FUNCARGRANGE(1, 3);
 		script_SetGammaCorrection(args, returnValue);
 		break;
 
 	case kGetDefaultGammaCorrectionFunction:
+	case kLegacy_GetDefaultGammaCorrectionFunction:
+		FUNCARGCHECK(0);
 		script_GetDefaultGammaCorrection(args, returnValue);
 		break;
 
 	case kGetCurrentGammaCorrectionFunction:
+	case kLegacy_GetCurrentGammaCorrectionFunction:
+		FUNCARGCHECK(0);
 		script_GetCurrentGammaCorrection(args, returnValue);
 		break;
 
 	case kSetAudioVolumeFunction:
-		assert(args.size() == 1);
+	case kLegacy_SetAudioVolumeFunction:
+		FUNCARGCHECK(1);
 		script_SetAudioVolume(args, returnValue);
 		break;
 
 	case kGetAudioVolumeFunction:
-		assert(args.empty());
+	case kLegacy_GetAudioVolumeFunction:
+		FUNCARGCHECK(0);
 		script_GetAudioVolume(args, returnValue);
 		break;
 
@@ -159,6 +217,7 @@ ScriptValue FunctionManager::call(uint functionId, Common::Array<ScriptValue> &a
 		break;
 
 	case kGetRegistryFunction:
+		FUNCARGCHECK(3);
 		script_GetRegistry(args, returnValue);
 		break;
 
@@ -190,7 +249,12 @@ ScriptValue FunctionManager::call(uint functionId, Common::Array<ScriptValue> &a
 		script_Drawing(args, returnValue);
 		break;
 
+	case kCheckersFunction:
+		script_Checkers(args, returnValue);
+		break;
+
 	case kLegacy_DebugPrintFunction:
+		// We don't need to check arg counts here. This just prints however many args we have.
 		script_DebugPrint(args, returnValue);
 		break;
 
@@ -203,6 +267,10 @@ ScriptValue FunctionManager::call(uint functionId, Common::Array<ScriptValue> &a
 	}
 
 	return returnValue;
+}
+
+ScriptFunction *FunctionManager::getFunctionById(uint functionId) {
+	return _functions.getValOrDefault(functionId, nullptr);
 }
 
 void FunctionManager::script_GetPlatform(Common::Array<ScriptValue> &args, ScriptValue &returnValue) {
@@ -298,7 +366,11 @@ void FunctionManager::script_Random(Common::Array<ScriptValue> &args, ScriptValu
 }
 
 void FunctionManager::script_TimeOfDay(Common::Array<ScriptValue> &args, ScriptValue &returnValue) {
-	warning("STUB: TimeOfDay");
+	TimeDate timeDate;
+	// Calculate seconds since midnight.
+	g_system->getTimeAndDate(timeDate);
+	uint32 secondsSinceMidnight = (timeDate.tm_hour * 60 + timeDate.tm_min) * 60 + timeDate.tm_sec;
+	returnValue.setToTime(static_cast<double>(secondsSinceMidnight));
 }
 
 void FunctionManager::script_SquareRoot(Common::Array<ScriptValue> &args, ScriptValue &returnValue) {
@@ -339,10 +411,9 @@ void FunctionManager::script_GetUniqueRandom(Common::Array<ScriptValue> &args, S
 		SWAP(top, bottom);
 	}
 
-	// Build list of unused (non-excluded) numbers in the range. For this numeric type,
-	// everything is treated as an integer (even though it's stored as a double).
+	// Build list of unused (non-excluded) integers in the range.
 	Common::Array<double> unusedNumbers;
-	for (double currentValue = bottom; currentValue < top; currentValue += 1.0) {
+	for (double currentValue = bottom; currentValue <= top; currentValue += 1.0) {
 		// Check if this value appears in the exclusion list (args 2 onwards).
 		bool isExcluded = false;
 		for (uint i = 2; i < args.size(); i++) {
@@ -358,7 +429,7 @@ void FunctionManager::script_GetUniqueRandom(Common::Array<ScriptValue> &args, S
 	}
 
 	if (unusedNumbers.size() > 0) {
-		uint randomIndex = g_engine->_randomSource.getRandomNumberRng(0, unusedNumbers.size());
+		uint randomIndex = g_engine->_randomSource.getRandomNumberRng(0, unusedNumbers.size() - 1);
 		returnValue.setToFloat(unusedNumbers[randomIndex]);
 	} else {
 		warning("%s: No unused numbers to choose from", __func__);
@@ -367,17 +438,12 @@ void FunctionManager::script_GetUniqueRandom(Common::Array<ScriptValue> &args, S
 
 void FunctionManager::script_CurrentRunTime(Common::Array<ScriptValue> &args, ScriptValue &returnValue) {
 	// The current runtime is expected to be returned in seconds.
-	const uint MILLISECONDS_IN_ONE_SECOND = 1000;
-	double runtimeInSeconds = g_system->getMillis() / MILLISECONDS_IN_ONE_SECOND;
+	const uint32 MILLISECONDS_IN_ONE_SECOND = 1000;
+	double runtimeInSeconds = g_system->getMillis() / static_cast<double>(MILLISECONDS_IN_ONE_SECOND);
 	returnValue.setToFloat(runtimeInSeconds);
 }
 
 void FunctionManager::script_SetGammaCorrection(Common::Array<ScriptValue> &args, ScriptValue &returnValue) {
-	if (args.size() != 1 && args.size() != 3) {
-		warning("%s: Expected 1 or 3 arguments, got %u", __func__, args.size());
-		return;
-	}
-
 	double red = 1.0;
 	double green = 1.0;
 	double blue = 1.0;
@@ -399,7 +465,7 @@ void FunctionManager::script_SetGammaCorrection(Common::Array<ScriptValue> &args
 			return;
 		}
 
-		Common::SharedPtr<Collection> collection = args[0].asCollection();
+		Collection *collection = args[0].asCollection();
 		if (collection->size() != 3) {
 			warning("%s: Collection must contain exactly 3 elements, got %u", __func__, collection->size());
 			return;
@@ -429,7 +495,7 @@ void FunctionManager::script_GetDefaultGammaCorrection(Common::Array<ScriptValue
 	double red, green, blue;
 	g_engine->getDisplayManager()->getDefaultGammaValues(red, green, blue);
 
-	Common::SharedPtr<Collection> collection = Common::SharedPtr<Collection>(new Collection());
+	Collection *collection = new Collection();
 	ScriptValue redValue;
 	redValue.setToFloat(red);
 	collection->push_back(redValue);
@@ -453,7 +519,7 @@ void FunctionManager::script_GetCurrentGammaCorrection(Common::Array<ScriptValue
 
 	double red, green, blue;
 	g_engine->getDisplayManager()->getGammaValues(red, green, blue);
-	Common::SharedPtr<Collection> collection = Common::SharedPtr<Collection>(new Collection());
+	Collection *collection = new Collection();
 
 	ScriptValue redValue;
 	redValue.setToFloat(red);
@@ -492,19 +558,25 @@ void FunctionManager::script_GetAudioVolume(Common::Array<ScriptValue> &args, Sc
 }
 
 void FunctionManager::script_SystemLanguagePreference(Common::Array<ScriptValue> &args, ScriptValue &returnValue) {
-	warning("STUB: SystemLanguagePreference");
+	warning("STUB: %s", __func__);
 }
 
 void FunctionManager::script_SetRegistry(Common::Array<ScriptValue> &args, ScriptValue &returnValue) {
-	warning("STUB: SetRegistry");
+	warning("STUB: %s", __func__);
 }
 
 void FunctionManager::script_GetRegistry(Common::Array<ScriptValue> &args, ScriptValue &returnValue) {
-	warning("STUB: GetRegistry");
+	// Even though this is basically still stubbed out, we need to set a return value or we will get errors.
+	returnValue = args[2];
+	Common::String registryName = args[0].asString();
+	if (registryName.size() != 0) {
+		// TODO: Get the registry (saved game content) with this name.
+		warning("STUB: %s: %s", __func__, registryName.c_str());
+	}
 }
 
 void FunctionManager::script_SetProfile(Common::Array<ScriptValue> &args, ScriptValue &returnValue) {
-	warning("STUB: SetProfile");
+	warning("STUB: %s", __func__);
 }
 
 void FunctionManager::script_DebugPrint(Common::Array<ScriptValue> &args, ScriptValue &returnValue) {
@@ -524,27 +596,31 @@ void FunctionManager::script_DebugPrint(Common::Array<ScriptValue> &args, Script
 }
 
 void FunctionManager::script_MazeGenerate(Common::Array<ScriptValue> &args, ScriptValue &returnValue) {
-	warning("STUB: MazeGenerate");
+	warning("STUB: %s", __func__);
 }
 
 void FunctionManager::script_MazeApplyMoveMask(Common::Array<ScriptValue> &args, ScriptValue &returnValue) {
-	warning("STUB: MazeApplyMoveMask");
+	warning("STUB: %s", __func__);
 }
 
 void FunctionManager::script_MazeSolve(Common::Array<ScriptValue> &args, ScriptValue &returnValue) {
-	warning("STUB: MazeSolve");
+	warning("STUB: %s", __func__);
 }
 
 void FunctionManager::script_BeginTimedInterval(Common::Array<ScriptValue> &args, ScriptValue &returnValue) {
-	warning("STUB: BeginTimedInterval");
+	warning("STUB: %s", __func__);
 }
 
 void FunctionManager::script_EndTimedInterval(Common::Array<ScriptValue> &args, ScriptValue &returnValue) {
-	warning("STUB: EndTimedInterval");
+	warning("STUB: %s", __func__);
+}
+
+void FunctionManager::script_Checkers(Common::Array<ScriptValue> &args, ScriptValue &returnValue) {
+	warning("STUB: %s", __func__);
 }
 
 void FunctionManager::script_Drawing(Common::Array<ScriptValue> &args, ScriptValue &returnValue) {
-	warning("STUB: Drawing");
+	warning("STUB: %s", __func__);
 }
 
 void FunctionManager::deleteFunctionsForContext(uint contextId) {

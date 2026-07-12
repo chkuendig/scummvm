@@ -58,6 +58,14 @@
 #include <cstring>
 #include <ctime>
 
+// We can't use the common/util.h header here, since create_project
+// is a standalone tool, and may be built individually from the rest
+// of the devtools.
+#ifdef ARRAYSIZE
+#undef ARRAYSIZE
+#endif
+#define ARRAYSIZE(x) ((int)(sizeof(x) / sizeof(x[0])))
+
 namespace {
 /**
  * Converts the given path to only use slashes as
@@ -459,6 +467,15 @@ int main(int argc, char *argv[]) {
 			setup.defines.push_back("SCUMMVM_NEON");
 		} else {
 			setup.defines.push_back("MACOSX");
+			// We have two TTS backends, one that is deprecated in macOS 11 and a newer one
+			// that requires macOS 10.14 minimum. Use the new one when compiling for ARM, and
+			// otherwise (PPC, Intel) use the old one. We assume the current arch to compile
+			// create_project is also the one we will be compiling ScummVM for.
+#if !defined(__aarch64__)
+			if (getFeatureBuildState("tts", setup.features)) {
+				setup.defines.push_back("USE_NS_SPEECH_SYNTHESIZER");
+			}
+#endif
 		}
 	} else if (projectType == kProjectMSVC || projectType == kProjectCodeBlocks) {
 		setup.defines.push_back("WIN32");
@@ -1186,6 +1203,7 @@ const Feature s_features[] = {
 	{    "sdlnet",     "USE_SDL_NET", true, true,  "SDL_net support" },
 	{   "discord",     "USE_DISCORD", true, false, "Discord support" },
 	{ "retrowave",   "USE_RETROWAVE", true, false, "RetroWave OPL3 support" },
+	{       "nFM",         "USE_NFM", true, false, "Nokturnal nFM OPL2/OPL3 support" },
 	{       "a52",         "USE_A52", true, false, "ATSC A/52 support" },
 	{       "mpc",      "USE_MPCDEC", true, false, "Musepack support" },
 
@@ -1212,6 +1230,7 @@ const Feature s_features[] = {
 	{        "translation",               "USE_TRANSLATION", false, true,  "Translation support" },
 	{             "vkeybd",                 "ENABLE_VKEYBD", false, false, "Virtual keyboard support"},
 	{      "eventrecorder",          "ENABLE_EVENTRECORDER", false, false, "Event recorder support"},
+	{           "printing",           "USE_SYSTEM_PRINTING", false, true,  "Printing support"},
 	{            "updates",                   "USE_UPDATES", false, false, "Updates support"},
 	{            "dialogs",                "USE_SYSDIALOGS", false, true,  "System dialogs support"},
 	{         "langdetect",                "USE_DETECTLANG", false, true,  "System language detection support" }, // This feature actually depends on "translation", there
@@ -1290,7 +1309,7 @@ std::string getMSVCConfigName(MSVC_Architecture arch) {
 }
 
 FeatureList getAllFeatures() {
-	const size_t featureCount = sizeof(s_features) / sizeof(s_features[0]);
+	const size_t featureCount = ARRAYSIZE(s_features);
 
 	FeatureList features;
 	for (size_t i = 0; i < featureCount; ++i)
@@ -1513,7 +1532,7 @@ BuildSetup removeFeatureFromSetup(BuildSetup setup, const std::string &feature) 
 }
 
 ToolList getAllTools() {
-	const size_t toolCount = sizeof(s_tools) / sizeof(s_tools[0]);
+	const size_t toolCount = ARRAYSIZE(s_tools);
 
 	ToolList tools;
 	for (size_t i = 0; i < toolCount; ++i)
@@ -1523,7 +1542,7 @@ ToolList getAllTools() {
 }
 
 MSVCList getAllMSVCVersions() {
-	const size_t msvcCount = sizeof(s_msvc) / sizeof(s_msvc[0]);
+	const size_t msvcCount = ARRAYSIZE(s_msvc);
 
 	MSVCList msvcVersions;
 	for (size_t i = 0; i < msvcCount; ++i)
@@ -1533,7 +1552,7 @@ MSVCList getAllMSVCVersions() {
 }
 
 const MSVCVersion *getMSVCVersion(int version) {
-	const size_t msvcCount = sizeof(s_msvc) / sizeof(s_msvc[0]);
+	const size_t msvcCount = ARRAYSIZE(s_msvc);
 
 	for (size_t i = 0; i < msvcCount; ++i) {
 		if (s_msvc[i].version == version)
@@ -2406,47 +2425,53 @@ void ProjectProvider::createModuleList(const std::string &moduleDir, const Strin
 			++i;
 
 			while (i != tokens.end()) {
-				// Read input
-				std::string folder = unifyPath(*i);
+				if (*i == "\\") {
+					std::getline(moduleMk, line);
+					tokens = tokenize(line);
+					i = tokens.begin();
+				} else {
+					// Read input
+					std::string folder = unifyPath(*i);
 
-				// Get include folder
-				const std::string source_dir = "$(srcdir)/";
-				const std::string selector = getLastPathComponent(folder);
-				const std::string module = getLastPathComponent(moduleDir);
+					// Get include folder
+					const std::string source_dir = "$(srcdir)/";
+					const std::string selector = getLastPathComponent(folder);
+					const std::string module = getLastPathComponent(moduleDir);
 
-				folder.replace(folder.find(source_dir), source_dir.length(), "");
-				folder.replace(folder.find(selector), selector.length(), "");
-				folder.replace(folder.find(module), module.length(), moduleDir);
+					folder.replace(folder.find(source_dir), source_dir.length(), "");
+					folder.replace(folder.find(selector), selector.length(), "");
+					folder.replace(folder.find(module), module.length(), moduleDir);
 
-				// Scan all files in the include folder
-				FileList files = listDirectory(folder);
+					// Scan all files in the include folder
+					FileList files = listDirectory(folder);
 
-				// Add to list of test folders
-				if (shouldInclude.top()) {
-					testDirs.push_back(folder);
-				}
-
-				for (FileList::const_iterator f = files.begin(); f != files.end(); ++f) {
-					if (f->isDirectory)
-						continue;
-
-					std::string filename = folder + f->name;
-
+					// Add to list of test folders
 					if (shouldInclude.top()) {
-						// In case we should include a file, we need to make
-						// sure it is not in the exclude list already. If it
-						// is we just drop it from the exclude list.
-						excludeList.remove(filename);
-
-						includeList.push_back(filename);
-					} else if (std::find(includeList.begin(), includeList.end(), filename) == includeList.end()) {
-						// We only add the file to the exclude list in case it
-						// has not yet been added to the include list.
-						excludeList.push_back(filename);
+						testDirs.push_back(folder);
 					}
-				}
 
-				++i;
+					for (FileList::const_iterator f = files.begin(); f != files.end(); ++f) {
+						if (f->isDirectory)
+							continue;
+
+						std::string filename = folder + f->name;
+
+						if (shouldInclude.top()) {
+							// In case we should include a file, we need to make
+							// sure it is not in the exclude list already. If it
+							// is we just drop it from the exclude list.
+							excludeList.remove(filename);
+
+							includeList.push_back(filename);
+						} else if (std::find(includeList.begin(), includeList.end(), filename) == includeList.end()) {
+							// We only add the file to the exclude list in case it
+							// has not yet been added to the include list.
+							excludeList.push_back(filename);
+						}
+					}
+
+					++i;
+				}
 			}
 		} else if (*i == "ifdef") {
 			if (tokens.size() < 2)

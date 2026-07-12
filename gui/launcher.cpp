@@ -48,6 +48,8 @@
 #include "gui/unknown-game-dialog.h"
 #include "gui/widgets/edittext.h"
 #include "gui/widgets/groupedlist.h"
+#include "gui/widgets/scrollcontainer.h"
+#include "gui/widget.h"
 #include "gui/widgets/tab.h"
 #include "gui/widgets/popup.h"
 #include "gui/widgets/grid.h"
@@ -255,7 +257,7 @@ void LauncherDialog::build() {
 		_logo = new GraphicsWidget(this, _title + ".Logo");
 		_logo->setGfxFromTheme(ThemeEngine::kImageLogo);
 
-		new StaticTextWidget(this, _title + ".Version", Common::U32String(gScummVMVersionDate));
+		new StaticTextWidget(this, _title + ".Version", Common::U32String(gScummVMFullVersion));
 	} else
 #endif
 		new StaticTextWidget(this, _title + ".Version", Common::U32String(gScummVMFullVersion));
@@ -269,6 +271,11 @@ void LauncherDialog::build() {
 
 	// I18N: Button About ScummVM program. b is the shortcut, Ctrl+b, put it in parens for non-latin (~b~)
 	new ButtonWidget(this, _title + ".AboutButton", _("A~b~out"), _("About ScummVM"), kAboutCmd);
+
+	_mainHelpButton = nullptr;
+	if (g_gui.xmlEval()->getVar("Globals.Launcher.ShowMainHelp") == 1)
+		_mainHelpButton = new ButtonWidget(this, _title + ".MainHelpButton", _("Help"), _("General help"), kHelpCmd);
+
 	// I18N: Button caption. O is the shortcut, Ctrl+O, put it in parens for non-latin (~O~)
 	new ButtonWidget(this, _title + ".OptionsButton", _("Global ~O~ptions..."), _("Change global ScummVM options"), kOptionsCmd, 0, _c("Global ~O~pts...", "lowres"));
 
@@ -314,7 +321,7 @@ void LauncherDialog::build() {
 	_browser = new BrowserDialog(_("Select directory with game data"), true);
 
 	// Create Load dialog
-	_loadDialog = new SaveLoadChooser(_("Load game:"), _("Load"), false);
+	_loadDialog = new SaveLoadChooser(false);
 }
 
 void LauncherDialog::clean() {
@@ -454,6 +461,10 @@ void LauncherDialog::removeGame(int item) {
 		// This will be used to select the next item.
 		// If grouping method is None then updateListing() will
 		// ignore selPos and use the current selection instead.
+		int selPos = -1;
+		if (_groupBy != kGroupByNone) {
+			selPos = getItemPos(item);
+		}
 
 		// Remove the currently selected game from the list
 		assert(item >= 0);
@@ -471,7 +482,7 @@ void LauncherDialog::removeGame(int item) {
 		ConfMan.flushToDisk();
 
 		// Update the ListWidget/GridWidget and force a redraw
-		updateListing();
+		updateListing(selPos);
 		g_gui.scheduleTopDialogRedraw();
 	}
 }
@@ -662,7 +673,11 @@ void LauncherDialog::handleOtherEvent(const Common::Event &evt) {
 		Common::Path path = evt.path;
 		Common::FSNode node(path);
 		if (!node.isDirectory())
+#ifndef EMSCRIPTEN 
 			path = node.getParent().getPath();
+#else
+			return; // if somebody drops a file in emscripten, do nothing 
+#endif
 		doGameDetection(path);
 	}
 }
@@ -877,7 +892,7 @@ void LauncherDialog::reflowLayout() {
 		StaticTextWidget *ver = (StaticTextWidget *)findWidget(Common::String(_title + ".Version").c_str());
 		if (ver) {
 			ver->setAlign(g_gui.xmlEval()->getWidgetTextHAlign(_title + ".Version"));
-			ver->setLabel(Common::U32String(gScummVMVersionDate));
+			ver->setLabel(Common::U32String(gScummVMFullVersion));
 		}
 
 		if (!_logo)
@@ -942,6 +957,18 @@ void LauncherDialog::reflowLayout() {
 	g_gui.addToTrash(_searchClearButton, this);
 	_searchClearButton = addClearButton(this, _title + ".SearchClearButton", kSearchClearCmd);
 #endif
+
+	if (g_gui.xmlEval()->getVar("Globals.Launcher.ShowMainHelp") == 1) {
+		if (!_mainHelpButton)
+			_mainHelpButton = new ButtonWidget(this, _title + ".MainHelpButton", _("Help"), _("General help"), kHelpCmd);
+	} else {
+		if (_mainHelpButton) {
+			removeWidget(_mainHelpButton);
+			g_gui.addToTrash(_mainHelpButton, this);
+			_mainHelpButton = nullptr;
+		}
+	}
+
 #ifndef DISABLE_LAUNCHERDISPLAY_GRID
 	addLayoutChooserButtons();
 #endif
@@ -978,7 +1005,7 @@ ButtonWidget *LauncherDialog::createSwitchButton(const Common::String &name, con
 #ifndef DISABLE_FANCY_THEMES
 	if (g_gui.xmlEval()->getVar("Globals.ShowChooserPics") == 1 && g_gui.theme()->supportsImages()) {
 		button = new PicButtonWidget(this, name, tooltip, cmd);
-		((PicButtonWidget *)button)->setGfxFromTheme(image, kPicButtonStateEnabled, false);
+		((PicButtonWidget *)button)->setGfxFromTheme(image);
 	} else
 #endif
 		button = new ButtonWidget(this, name, desc, tooltip, cmd);
@@ -1026,9 +1053,9 @@ public:
 
 	LauncherDisplayType getType() const override { return kLauncherDisplayGrid; }
 
-public:
-	void removeSelectedGames();
 protected:
+	void updateSelectionAfterRemoval() override;
+	const Common::Array<bool>& getSelectedItems() const override;
 	void updateListing(int selPos = -1) override;
 	int getItemPos(int item) override;
 	void groupEntries(const Common::Array<LauncherEntry> &metadata);
@@ -1040,7 +1067,6 @@ private:
 	GridWidget       *_grid;
 	SliderWidget     *_gridItemSizeSlider;
 	StaticTextWidget *_gridItemSizeLabel;
-	Common::StringArray _domainTitles; // Store game titles for each domain
 };
 #endif // !DISABLE_LAUNCHERDISPLAY_GRID
 
@@ -1077,7 +1103,30 @@ int LauncherChooser::runModal() {
 	do {
 		ret = _impl->run();
 		if (ret == kSwitchLauncherDialog) {
+			Common::StringArray selectedDomains;
+			const Common::Array<bool> &selections = _impl->getSelectedItems();
+			const Common::StringArray &domains = _impl->getDomains();
+			for (uint i = 0; i < selections.size() && i < domains.size(); ++i) {
+				if (selections[i]) {
+					selectedDomains.push_back(domains[i]);
+				}
+			}
+
 			selectLauncher();
+
+			if (_impl && !selectedDomains.empty()) {
+				const Common::StringArray &newDomains = _impl->getDomains();
+				Common::Array<bool> &newSelections = const_cast<Common::Array<bool>&>(_impl->getSelectedItems());
+				for (const auto &domain : selectedDomains) {
+					for (uint i = 0; i < newDomains.size(); ++i) {
+						if (newDomains[i] == domain) {
+							if (i < newSelections.size())
+								newSelections[i] = true;
+							break;
+						}
+					}
+				}
+			}
 		}
 	} while (ret < -1);
 	return ret;
@@ -1085,9 +1134,11 @@ int LauncherChooser::runModal() {
 
 #pragma mark -
 
+static const int kSelPosGroupingChange = -2;
+
 LauncherSimple::LauncherSimple(const Common::String &title)
 	: LauncherDialog(title),
-	_list(nullptr) {
+	_list(nullptr), _listInitialized(false) {
 	build();
 }
 
@@ -1109,6 +1160,10 @@ void LauncherSimple::selectTarget(const Common::String &target) {
 }
 
 int LauncherSimple::getSelected() { return _list->getSelected(); }
+
+const Common::Array<bool>& LauncherSimple::getSelectedItems() const {
+	return _list->getSelectedItems();
+}
 
 void LauncherSimple::build() {
 	LauncherDialog::build();
@@ -1152,6 +1207,7 @@ void LauncherSimple::updateListing(int selPos) {
 
 	// Retrieve a list of all games defined in the config file
 	_domains.clear();
+	_domainTitles.clear();
 	const Common::ConfigManager::DomainMap &domains = ConfMan.getGameDomains();
 	const bool scanEntries = (numEntries == -1) || ((int)domains.size() <= numEntries);
 
@@ -1214,27 +1270,47 @@ void LauncherSimple::updateListing(int selPos) {
 
 		l.push_back(gameDesc);
 		_domains.push_back(curDomain.key);
+		_domainTitles.push_back(curDomain.description);
 	}
 
 	const int oldSel = _list->getSelected();
+
+	Common::Array<bool> savedSelection;
+	const bool restoringGroupedSelection = (selPos == kSelPosGroupingChange);
+
+	if (restoringGroupedSelection) {
+		savedSelection = _list->saveSelection();
+	}
+
+	/* Preserve the current collapsed groups before rebuilding the grouped list
+	 * Skip this on the very first call as it would overwrite the config state
+	 * saved by the previous view's destructor */
+	if (_groupBy != kGroupByNone && _listInitialized) {
+		_list->saveClosedGroups(Common::U32String(groupingModes[_groupBy].name));
+	}
+	_listInitialized = true;
+
 	_list->setList(l);
 
 	groupEntries(domainList);
 
-	// Close groups that the user closed earlier
+	// Restore collapsed groups after rebuilding
 	_list->loadClosedGroups(Common::U32String(groupingModes[_groupBy].name));
 
 	// Update the filter settings, those are lost when "setList"
 	// is called.
 	_list->setFilter(_searchWidget->getEditString());
 
-	if (_groupBy != kGroupByNone && selPos != -1) {
+	if (restoringGroupedSelection) {
+		_list->loadSelection(savedSelection);
+	} else if (_groupBy != kGroupByNone && selPos != -1) {
 		_list->setSelected(_list->getNewSel(selPos));
-	} else if (oldSel < (int)l.size() && oldSel >= 0)
+	} else if (oldSel < (int)l.size() && oldSel >= 0) {
 		_list->setSelected(oldSel);	// Restore the old selection
-	else if (oldSel != -1)
+	} else if (oldSel != -1) {
 		// Select the last entry if the list has been reduced
 		_list->setSelected(_list->getList().size() - 1);
+	}
 	updateButtons();
 }
 
@@ -1365,6 +1441,15 @@ void LauncherSimple::handleKeyDown(Common::KeyState state) {
 	updateButtons();
 }
 
+bool LauncherDialog::hasAnySelection(const Common::Array<bool> &selectedItems) const {
+	for (const auto &item : selectedItems) {
+		if (item) {
+			return true;
+		}
+	}
+	return false;
+}
+
 void LauncherSimple::handleCommand(CommandSender *sender, uint32 cmd, uint32 data) {
 
 	switch (cmd) {
@@ -1373,13 +1458,8 @@ void LauncherSimple::handleCommand(CommandSender *sender, uint32 cmd, uint32 dat
 		LauncherDialog::handleCommand(sender, kStartCmd, 0);
 		break;
 	case kListItemRemovalRequestCmd: {
-		const Common::Array<int> &selectedItems = _list->getSelectedItems();
-		if (selectedItems.size() > 1) {
-			// Multi-selection removal: show confirmation dialog with list of games
-			removeMultipleGames(selectedItems);
-		} else {
-			LauncherDialog::handleCommand(sender, kRemoveGameCmd, 0);
-		}
+		// Remove games if we have any selection
+		confirmRemoveGames(getSelectedItems());
 		break;
 	}
 	case kListSelectionChangedCmd:
@@ -1408,20 +1488,13 @@ void LauncherSimple::handleCommand(CommandSender *sender, uint32 cmd, uint32 dat
 				}
 				++mode;
 			}
-			updateListing();
+			updateListing(kSelPosGroupingChange);
 		}
 		break;
 	}
 	case kRemoveGameCmd: {
-		// Handle multi-selection removal
-		const Common::Array<int> &selectedItems = _list->getSelectedItems();
-		if (selectedItems.size() > 1) {
-			// Multi-selection removal: show confirmation dialog with list of games
-			removeMultipleGames(selectedItems);
-		} else {
-			// Single selection removal
-			LauncherDialog::handleCommand(sender, cmd, data);
-		}
+		// Remove games if we have any selection
+		confirmRemoveGames(getSelectedItems());
 		break;
 	}
 	default:
@@ -1429,68 +1502,50 @@ void LauncherSimple::handleCommand(CommandSender *sender, uint32 cmd, uint32 dat
 	}
 }
 
-void LauncherSimple::removeMultipleGames(const Common::Array<int> &selectedItems) {
-	// Build confirmation message with list of games to remove
-	Common::U32String confirmMsg = _("Do you really want to remove the following game configurations?\n\n");
 
-	for (const int &idx : selectedItems) {
-		if (idx >= 0 && idx < (int)_domains.size()) {
-			// Get the game title from the list
-			confirmMsg += _list->getList()[idx];
-			confirmMsg += Common::U32String("\n");
-		}
-	}
-
-	MessageDialog alert(confirmMsg, _("Yes"), _("No"));
-
-	if (alert.runModal() == GUI::kMessageOK) {
-		// Remove all selected games in reverse order to avoid index shifting issues
-		Common::Array<int> sortedItems = selectedItems;
-		Common::sort(sortedItems.begin(), sortedItems.end(), Common::Greater<int>());
-
-		int selPos = -1;
-		Common::StringArray domainsToRemove;
-		for (const int &idx : sortedItems) {
-			if (idx >= 0 && idx < (int)_domains.size()) {
-				// Get position of game item if grouping is enabled
-				if (_groupBy != kGroupByNone) {
-					selPos = getItemPos(idx);
-				}
-				domainsToRemove.push_back(_domains[idx]);
-			}
-		}
-
-		// Remove games and addons
-		removeGamesWithAddons(domainsToRemove);
-
-		// Clear the selection and update the listing
+void LauncherSimple::updateSelectionAfterRemoval() {
+	if (_list) {
 		_list->clearSelection();
-		updateListing(selPos);
-		updateButtons();
-		g_gui.scheduleTopDialogRedraw();
+		const Common::Array<bool> &selectedItems = getSelectedItems();
+
+		// Get the real data index of the last selected item and adjust with bounds
+		int lastSelectedDataItem = MIN((int)selectedItems.size() - 1, _list->getSelected());
+		// Convert real data index to visual index for marking
+		_list->markSelectedItem(_list->getVisualPos(lastSelectedDataItem), true);
 	}
 }
 
 void LauncherSimple::updateButtons() {
 	int item = _list->getSelected();
-	const Common::Array<int> &selectedItems = _list->getSelectedItems();
-	bool hasMultiSelection = selectedItems.size() > 1;
-
+	const Common::Array<bool> &selectedItems = getSelectedItems();
+	// Count selected items (early exit once we know there's multi-selection)
+	int selectedCount = 0;
+	for (int i = 0; i < (int)selectedItems.size(); ++i) {
+		if (selectedItems[i]) selectedCount++;
+		if (selectedCount > 1) break;
+	}
+	bool hasMultiSelection = selectedCount > 1;
+	// Check if at least one entry is selected
+	bool hasSelection = selectedCount > 0;
 	bool isAddOn = false;
 	if (item >= 0) {
 		const Common::ConfigManager::Domain *domain = ConfMan.getDomain(_domains[item]);
 		isAddOn = domain && domain->contains("parent");
 	}
 
-	bool enable = (item >= 0 && !isAddOn && !hasMultiSelection);
+	// Enable Start/Edit buttons only if a single game is selected (not add-on)
+	bool enable = (item >= 0 && !isAddOn && !hasMultiSelection && hasSelection);
 
 	_startButton->setEnabled(enable);
 	_editButton->setEnabled(enable);
-	_removeButton->setEnabled(item >= 0 || hasMultiSelection);
+
+	// Enable Remove button if at least one game is selected
+	_removeButton->setEnabled(hasSelection);
 
 	bool en = enable;
 
-	if (item >= 0 && !isAddOn && !hasMultiSelection)
+	// Enable Load button only if a single is game selected, unless the game disables it via GUI options
+	if (item >= 0 && !isAddOn && !hasMultiSelection && hasSelection)
 		en = !(Common::checkGameGUIOption(GUIO_NOLAUNCHLOAD, ConfMan.get("guioptions", _domains[item])));
 
 	_loadButton->setEnabled(en);
@@ -1515,7 +1570,7 @@ void LauncherGrid::groupEntries(const Common::Array<LauncherEntry> &metadata) {
 	switch (_groupBy) {
 	case kGroupByFirstLetter: {
 		for (const auto &entry : metadata) {
-			attrs.push_back(entry.title.substr(0, 1));
+			attrs.push_back(entry.description.substr(0, 1));
 		}
 		_grid->setGroupHeaderFormat(Common::U32String(""), Common::U32String("..."));
 		break;
@@ -1649,12 +1704,8 @@ void LauncherGrid::handleCommand(CommandSender *sender, uint32 cmd, uint32 data)
 		LauncherDialog::handleCommand(sender, kLoadGameCmd, 0);
 		break;
 	case kRemoveGameCmd:
-		// Handle multi-selection removal
-		if (_grid && _grid->getSelectedEntries().size() > 1) {
-			removeSelectedGames();
-		} else {
-			LauncherDialog::handleCommand(sender, cmd, data);
-		}
+		// Remove games if we have any selection
+		confirmRemoveGames(getSelectedItems());
 		break;
 	case kItemClicked:
 		updateButtons();
@@ -1683,7 +1734,7 @@ void LauncherGrid::handleCommand(CommandSender *sender, uint32 cmd, uint32 data)
 				}
 				++mode;
 			}
-			updateListing();
+			updateListing(kSelPosGroupingChange);
 		}
 		break;
 	}
@@ -1721,25 +1772,35 @@ void LauncherGrid::updateListing(int selPos) {
 		Common::String platform;
 		Common::String extra;
 		Common::String path;
+		Common::String guioptions;
 		bool valid_path = false;
+		bool canLoad;
 		curDomain.domain->tryGetVal("engineid", engineid);
 		curDomain.domain->tryGetVal("language", language);
 		curDomain.domain->tryGetVal("platform", platform);
 		curDomain.domain->tryGetVal("extra", extra);
+		curDomain.domain->tryGetVal("guioptions", guioptions);
 		valid_path = (!curDomain.domain->tryGetVal("path", path) || !Common::FSNode(Common::Path::fromConfig(path)).isDirectory()) ? false : true;
-		gridList.push_back(GridItemInfo(k++, engineid, gameid, curDomain.description, curDomain.title, extra, Common::parseLanguage(language), Common::parsePlatform(platform), valid_path));
+		canLoad = !Common::checkGameGUIOption(GUIO_NOLAUNCHLOAD, guioptions);
+		gridList.push_back(GridItemInfo(k++, engineid, gameid, curDomain.description, curDomain.title, extra, Common::parseLanguage(language), Common::parsePlatform(platform), valid_path, canLoad));
 		_domains.push_back(curDomain.key);
 		_domainTitles.push_back(curDomain.description); // Store the game description (user's name for it)
 	}
 
 	const int oldSel = _grid->getSelected();
 
+	Common::Array<bool> savedSelection;
+	const bool restoringGroupedSelection = (selPos == kSelPosGroupingChange);
+	if (restoringGroupedSelection)
+		savedSelection = _grid->getSelectedItems();
 	_grid->setEntryList(&gridList);
 	groupEntries(domainList);
 
-	if (_groupBy != kGroupByNone && selPos != -1) {
+	if (restoringGroupedSelection)
+		const_cast<Common::Array<bool>&>(_grid->getSelectedItems()) = savedSelection;
+	else if (_groupBy != kGroupByNone && selPos != -1)
 		_grid->setSelected(_grid->getNewSel(selPos));
-	} else if (oldSel < (int)gridList.size() && oldSel >= 0)
+	else if (oldSel < (int)gridList.size() && oldSel >= 0)
 		_grid->setSelected(oldSel);	// Restore the old selection
 	else if (oldSel != -1)
 		// Select the last entry if the list has been reduced
@@ -1756,8 +1817,10 @@ int LauncherGrid::getItemPos(int item) {
 void LauncherGrid::updateButtons() {
     LauncherDialog::updateButtons();
     // Enable remove button if at least one entry is selected
-    bool hasSelection = _grid && !_grid->getSelectedEntries().empty();
-    _removeButton->setEnabled(hasSelection);
+    if (_grid) {
+        const Common::Array<bool> &selectedItems = getSelectedItems();
+        _removeButton->setEnabled(hasAnySelection(selectedItems));
+    }
 }
 
 void LauncherGrid::selectTarget(const Common::String &target) {
@@ -1775,6 +1838,10 @@ void LauncherGrid::selectTarget(const Common::String &target) {
 
 int LauncherGrid::getSelected() { return _grid->getSelected(); }
 
+const Common::Array<bool>& LauncherGrid::getSelectedItems() const {
+	return _grid->getSelectedItems();
+}
+
 void LauncherGrid::build() {
 	LauncherDialog::build();
 
@@ -1789,6 +1856,8 @@ void LauncherGrid::build() {
 	// Add list with game titles
 	_grid = new GridWidget(this, "LauncherGrid.IconArea");
 	_grid->setMultiSelectEnabled(true);
+	_grid->setFilterMatcher(LauncherFilterMatcher, this);
+
 	// Populate the list
 	updateListing();
 
@@ -1800,37 +1869,200 @@ void LauncherGrid::build() {
 	updateButtons();
 }
 
-void LauncherGrid::removeSelectedGames() {
-	if (!_grid)
-		return;
-	const Common::Array<int> &selectedEntries = _grid->getSelectedEntries();
-	if (selectedEntries.empty())
-		return;
+void LauncherGrid::updateSelectionAfterRemoval() {
+	if (_grid) {
+		_grid->clearSelection();
 
-	Common::U32String message = _("Do you really want to remove the following game configurations?\n\n");
-	Common::StringArray domainsToRemove;
+		// Select at the same index as before, or the last item if out of bounds
+		_grid->_lastSelectedEntryID = MIN((int)getSelectedItems().size() - 1, _grid->_lastSelectedEntryID);
+		_grid->markSelectedItem(_grid->_lastSelectedEntryID, true);
+	}
+}
 
-	for (int entryID : selectedEntries) {
-		// entryID is the index in _domains and _domainTitles
-		if (entryID >= 0 && entryID < (int)_domains.size()) {
-			Common::String domainName = _domains[entryID];
-			Common::String gameTitle = (entryID < (int)_domainTitles.size()) ? _domainTitles[entryID] : domainName;
-			domainsToRemove.push_back(domainName);
-			message += Common::U32String(gameTitle) + "\n";
+#endif // !DISABLE_LAUNCHERDISPLAY_GRID
+
+void LauncherDialog::confirmRemoveGames(const Common::Array<bool> &selectedItems) {
+	// Count selected items
+	int selectedCount = 0;
+	for (int i = 0; i < (int)selectedItems.size(); ++i) {
+		if (selectedItems[i]) {
+			selectedCount++;
 		}
 	}
 
-	MessageDialog alert(message, Common::U32String(_("Yes")), Common::U32String(_("No")));
-	if (alert.runModal() == GUI::kMessageOK) {
-		// Remove games and addons
-		removeGamesWithAddons(domainsToRemove);
-		_grid->_selectedEntries.clear();
-		_grid->_selectedEntries.push_back(_grid->_lastSelectedEntryID);
-		updateListing();
-		updateButtons();
-		g_gui.scheduleTopDialogRedraw();
+	// Validate that at least one item is selected
+	if (selectedCount == 0) {
+		return;
+	}
+
+	// Use standard message box if only one item is selected
+	if (selectedCount == 1) {
+		removeGame(getSelected());
+		return;
+	}
+	// Build the confirmation message with count
+	Common::U32String message = Common::U32String::format(
+		_("Do you really want to remove the following %d game configurations?\n\n"),
+		selectedCount);
+
+	// Build array of game titles to display
+	Common::StringArray gameTitles;
+	for (int i = 0; i < (int)selectedItems.size(); ++i) {
+		if (selectedItems[i]) {
+			// i is the index in _domains and _domainTitles
+			if (i >= 0 && i < (int)_domains.size()) {
+				Common::String gameTitle = (i < (int)_domainTitles.size()) ? _domainTitles[i] : _domains[i];
+				gameTitles.push_back(gameTitle);
+			}
+		}
+	}
+
+	RemovalConfirmationDialog alert(message, gameTitles);
+	if (alert.runModal() == RemovalConfirmationDialog::kRemovalYes) {
+		removeGames(selectedItems, getType() == kLauncherDisplayGrid);
 	}
 }
-#endif // !DISABLE_LAUNCHERDISPLAY_GRID
+
+void LauncherDialog::removeGames(const Common::Array<bool> &selectedItems, bool isGrid) {
+	// Check if any items are selected
+	if (!hasAnySelection(selectedItems))
+		return;
+
+	int selPos = -1;
+	Common::StringArray domainsToRemove;
+
+	for (int idx = selectedItems.size() - 1; idx >= 0; --idx) {
+		if (selectedItems[idx]) {
+			if (idx >= 0 && idx < (int)_domains.size()) {
+				if (_groupBy != kGroupByNone && !isGrid) {
+					selPos = getItemPos(idx);
+				}
+				domainsToRemove.push_back(_domains[idx]);
+			}
+		}
+	}
+
+	// Remove games and addons
+	removeGamesWithAddons(domainsToRemove);
+
+	updateListing(selPos);
+	// Update UI - each subclass handles its own selection update
+	updateSelectionAfterRemoval();
+	updateButtons();
+	g_gui.scheduleTopDialogRedraw();
+}
+
+RemovalConfirmationDialog::RemovalConfirmationDialog(const Common::U32String &message, const Common::StringArray &gameTitles)
+	: Dialog(""),
+	  _message(message),
+	  _gameTitles(gameTitles),
+	  _scrollContainer(nullptr),
+	  _buttonWidth(g_gui.xmlEval()->getVar("Globals.Button.Width", 0)),
+	  _buttonHeight(g_gui.xmlEval()->getVar("Globals.Button.Height", 0)),
+	  _scrollbarWidth(g_gui.xmlEval()->getVar("Globals.Scrollbar.Width", 0)) {
+
+	// Create scroll container with bogus size (will be sized in reflowLayout)
+	_scrollContainer = new ScrollContainerWidget(this, 10, 10, 20, 20);
+	_scrollContainer->setBackgroundType(ThemeEngine::kWidgetBackgroundPlain);
+
+	// Create Game Widgets with bogus size (will be sized in reflowLayout)
+	for (uint i = 0; i < _gameTitles.size(); ++i) {
+		_gameNameWidgets.push_back(new StaticTextWidget(_scrollContainer, 0, 0, 0, 0, _gameTitles[i], Graphics::kTextAlignLeft));
+	}
+
+	// Create Button Widgets with bogus size (will be sized in reflowLayout)
+	_buttons.push_back(new ButtonWidget(this, 0, 0, 0, 0, Common::U32String(_("Yes")), Common::U32String(), kRemovalYes, Common::ASCII_RETURN));
+	_buttons.push_back(new ButtonWidget(this, 0, 0, 0, 0, Common::U32String(_("No")), Common::U32String(), kRemovalNo, Common::ASCII_ESCAPE));
+
+	reflowLayout();
+}
+
+RemovalConfirmationDialog::~RemovalConfirmationDialog() {
+}
+
+void RemovalConfirmationDialog::reflowLayout() {
+	int16 screenW, screenH;
+	const Common::Rect safeArea = g_system->getSafeOverlayArea(&screenW, &screenH);
+
+	const int buttonCount = _buttons.size();
+	const int buttonsTotalWidth = buttonCount * _buttonWidth + (buttonCount - 1) * kButtonSpacing;
+
+	_maxlineWidth = g_gui.getFont().wordWrapText(_message, safeArea.width() - 2 * kHorizontalMargin, _messageLines);
+
+	// Calculate desired dialog size
+	_w = MAX(_maxlineWidth, buttonsTotalWidth) + 2 * kHorizontalMargin;
+	_w = MIN((uint16)_w, (uint16)safeArea.width());
+
+	int curY = 10;
+
+	// restrict the overall container height to max of 18 lines
+	_h = MIN((int)safeArea.height(), (int)(kLineHeight * (18 + 2) + curY + 5 + _buttonHeight));
+
+	// Center the dialog
+	_x = (screenW - _w) / 2;
+	_y = (screenH - _h) / 2;
+
+	safeArea.constrain(_x, _y, _w, _h);
+
+	int gameListHeight = _h;
+	gameListHeight -= curY;
+	gameListHeight -= (int)_messageWidgets.size() * kLineHeight;
+	gameListHeight -= 5;
+	gameListHeight -= kLineHeight;
+	gameListHeight -= _buttonHeight;
+
+	// Cleanup message line widgets
+	if (_messageWidgets.size() > 0) {
+		for (uint i = 0; i < _messageWidgets.size(); ++i) {
+			removeWidget(_messageWidgets[i]);
+			delete _messageWidgets[i];
+		}
+	}
+	_messageWidgets.clear();
+
+	for (uint i = 0; i < _messageLines.size(); ++i) {
+		_messageWidgets.push_back(new StaticTextWidget(this, kHorizontalMargin, curY, _w - 2 * kHorizontalMargin, kLineHeight, _messageLines[i], Graphics::kTextAlignCenter));
+		curY += kLineHeight;
+	}
+	_messageLines.clear();
+
+	curY -= kLineHeight;
+	curY += 5;
+
+	// Position scroll container
+	_scrollContainer->setPos(kHorizontalMargin, curY);
+	_scrollContainer->setSize(_w - 2 * kHorizontalMargin - _scrollbarWidth, gameListHeight);
+
+	// Size and Position game line widgets
+	int gameY = kGamePadding;
+	for (uint i = 0; i < _gameNameWidgets.size(); ++i) {
+		_gameNameWidgets[i]->setPos(kGamePadding, gameY);
+		_gameNameWidgets[i]->setSize(_scrollContainer->getWidth() - 2 * kGamePadding - _scrollbarWidth, kLineHeight);
+		gameY += kLineHeight;
+	}
+
+	curY += gameListHeight + kLineHeight;
+
+	// Size and Position button widgets
+	if (buttonCount) {
+		int buttonPos = (_w - buttonsTotalWidth) / 2;
+		for (int i = 0; i < buttonCount; ++i) {
+			_buttons[i]->setPos(buttonPos, curY);
+			_buttons[i]->setSize(_buttonWidth, _buttonHeight);
+			buttonPos += _buttonWidth + kButtonSpacing;
+		}
+	}
+
+	Dialog::reflowLayout();
+}
+
+void RemovalConfirmationDialog::handleCommand(CommandSender *sender, uint32 cmd, uint32 data) {
+	if (cmd == kRemovalYes || cmd == kRemovalNo) {
+		setResult(cmd);
+		close();
+	} else {
+		Dialog::handleCommand(sender, cmd, data);
+	}
+}
 
 } // End of namespace GUI

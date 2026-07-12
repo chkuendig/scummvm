@@ -25,10 +25,8 @@
 
 #include "graphics/surface.h"
 #include "m4/m4_types.h"
-#include "m4/graphics/gr_buff.h"
 #include "m4/gui/gui_menu_items.h"
 #include "m4/gui/game_menu.h"
-#include "m4/gui/gui_univ.h"
 
 namespace M4 {
 namespace Burger {
@@ -106,7 +104,6 @@ extern void CreateF3LoadMenu(RGB8 *myPalette);
 
 // Routines used by the main menu
 void CreateLoadMenuFromMain(RGB8 *myPalette);
-void CreateGameMenuFromMain(RGB8 *myPalette);
 
 } // namespace GUI
 } // namespace Burger

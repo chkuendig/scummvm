@@ -82,6 +82,14 @@ bool iOS7_fetchEvent(InternalEvent *event) {
 	return fetched;
 }
 
+bool iOS7_isControllerConnected() {
+	__block bool connected;
+	execute_on_main_thread(^{
+		connected = [[iOS7AppDelegate iPhoneView] isControllerConnected];
+	});
+	return connected;
+}
+
 @implementation iPhoneView {
 #if TARGET_OS_IOS
 	UIButton *_menuButton;
@@ -438,12 +446,14 @@ bool iOS7_fetchEvent(InternalEvent *event) {
 - (void)updateTouchMode {
 	UIImage *btnImage;
 	TouchMode currentTouchMode = iOS7_getCurrentTouchMode();
-	bool isEnabled = ConfMan.getBool("onscreen_control");
+	bool isEnabled = ConfMan.getBool(ONSCREEN_CONTROL_KEY);
 
-	if (currentTouchMode == kTouchModeDirect) {
+	if (currentTouchMode == Common::kTouchModeMouse) {
 		btnImage = [UIImage imageNamed:@"ic_action_mouse"];
-	} else if (currentTouchMode == kTouchModeTouchpad) {
+	} else if (currentTouchMode == Common::kTouchModeTouchpad) {
 		btnImage = [UIImage imageNamed:@"ic_action_touchpad"];
+	} else if (currentTouchMode == Common::kTouchModeGamepad) {
+		btnImage = [UIImage imageNamed:@"ic_action_gamepad"];
 	} else {
 		return;
 	}
@@ -601,6 +611,15 @@ bool iOS7_fetchEvent(InternalEvent *event) {
 			}
 		}
 	}
+}
+
+- (BOOL)isControllerConnected {
+	for (GameController *c : _controllers) {
+		if ([c isKindOfClass:GamepadController.class]) {
+			return [(GamepadController*)c isPhysicalControllerConnected];
+		}
+	}
+	return NO;
 }
 
 #if TARGET_OS_IOS

@@ -33,6 +33,7 @@
 #include "director/castmember/digitalvideo.h"
 #include "director/castmember/filmloop.h"
 #include "director/castmember/movie.h"
+#include "director/castmember/text.h"
 
 #include "graphics/macgui/mactext.h"
 #include "graphics/macgui/macbutton.h"
@@ -60,7 +61,10 @@ Channel::Channel(Score *sc, Sprite *sp, int priority) {
 	_filmLoopFrame = 0;
 
 	_visible = true;
-	_dirty = true;
+	_widgetDirty = true;
+	_needsDraw = false;
+	_hideFromStage = false;
+	_lastTrail = false;
 
 	if (sp) {
 		_startFrame = sp->_spriteInfo.startFrame;
@@ -93,7 +97,8 @@ Channel& Channel::operator=(const Channel &channel) {
 	_filmLoopFrame = channel._filmLoopFrame;
 
 	_visible = channel._visible;
-	_dirty = channel._dirty;
+	_widgetDirty = channel._widgetDirty;
+	_hideFromStage = channel._hideFromStage;
 
 	_startFrame = channel._startFrame;
 	_endFrame = channel._endFrame;
@@ -103,6 +108,14 @@ Channel& Channel::operator=(const Channel &channel) {
 
 
 Channel::~Channel() {
+	// A digital video cast member can outlive this channel.
+	if (_score && _sprite && _sprite->_cast && _sprite->_cast->_type == kCastDigitalVideo) {
+		DigitalVideoCastMember *video = (DigitalVideoCastMember *)_sprite->_cast;
+		if (video->_channel == this) {
+			video->setChannel(nullptr);
+		}
+	}
+
 	if (_widget) {
 		delete _widget;
 	}
@@ -133,6 +146,28 @@ DirectorPlotData Channel::getPlotData() {
 		pd.applyColor = false;
 	} else {
 		pd.setApplyColor();
+	}
+
+	pd.srfMask = nullptr;
+	if (_sprite->_cast && _sprite->_cast->_type == kCastText) {
+		// kInkTypeCopy -- no mask, default rendering
+
+		if (_sprite->_ink == kInkTypeMatte || _sprite->_ink == kInkTypeNotCopy
+			|| _sprite->_ink == kInkTypeNotTrans || _sprite->_ink == kInkTypeNotReverse
+			|| _sprite->_ink == kInkTypeNotGhost || _sprite->_ink == kInkTypeAdd
+			|| _sprite->_ink == kInkTypeAddPin || _sprite->_ink == kInkTypeSub
+			|| _sprite->_ink == kInkTypeSubPin || _sprite->_ink == kInkTypeLight
+			|| _sprite->_ink == kInkTypeBlend) {
+			Graphics::MacText *widget = ((TextCastMember *)_sprite->_cast)->getWidget();
+			if (widget)
+				pd.srfMask = widget->getCharBoxMask();
+		} else if (_sprite->_ink == kInkTypeTransparent || _sprite->_ink == kInkTypeBackgndTrans
+				|| _sprite->_ink == kInkTypeReverse || _sprite->_ink == kInkTypeGhost
+				|| _sprite->_ink == kInkTypeMask || _sprite->_ink == kInkTypeDark) {
+			Graphics::MacText *widget = ((TextCastMember *)_sprite->_cast)->getWidget();
+			if (widget)
+				pd.srfMask = widget->getGlyphMask();
+		}
 	}
 
 	return pd;
@@ -256,7 +291,7 @@ bool Channel::isDirty(Sprite *nextSprite) {
 	if (!nextSprite)
 		return false;
 
-	bool isDirtyFlag = _dirty ||
+	bool isDirtyFlag = _widgetDirty ||
 		(_sprite->_cast && _sprite->_cast->isModified());
 
 	if (_sprite && !_sprite->_puppet && !_sprite->_autoPuppet) {
@@ -346,6 +381,32 @@ bool Channel::isMatteIntersect(Channel *channel) {
 	return false;
 }
 
+bool Channel::isMatteBoxIntersect(Channel *channel) {
+	Common::Rect myBbox = getBbox();
+	Common::Rect yourBbox = channel->getBbox();
+	Common::Rect intersectRect = myBbox.findIntersectingRect(yourBbox);
+
+	if (intersectRect.isEmpty())
+		return false;
+	Graphics::Surface *myMatte = nullptr;
+
+	if (_sprite->_cast && _sprite->_cast->_type == kCastBitmap)
+		myMatte = ((BitmapCastMember *)_sprite->_cast)->getMatte(myBbox);
+
+	if (myMatte) {
+		for (int i = intersectRect.top; i < intersectRect.bottom; i++) {
+			const byte *my = (const byte *)myMatte->getBasePtr(intersectRect.left - myBbox.left, i - myBbox.top);
+
+			for (int j = intersectRect.left; j < intersectRect.right; j++, my++)
+				if (*my)
+					return true;
+		}
+	}
+
+	return false;
+}
+
+
 // this contains channel. i.e. myBox contain yourBox
 bool Channel::isMatteWithin(Channel *channel) {
 	Common::Rect myBbox = getBbox();
@@ -403,6 +464,10 @@ void Channel::setCast(CastMemberID memberID) {
 		_sprite->_cast->releaseWidget();
 
 	bool hasChanged = _sprite->_castId != memberID;
+
+	// Save bbox before swapping cast so we can restore visual position afterward.
+	Common::Rect oldBbox = getBbox();
+
 	// Replace the cast member in the sprite.
 	// Only change the dimensions if the "stretch" flag is set,
 	// indicating that the sprite has already been warped away from cast
@@ -410,6 +475,14 @@ void Channel::setCast(CastMemberID memberID) {
 	// dimensions of the sprite, -then- change the cast ID, and expect
 	// those custom dimensions to stick around.
 	_sprite->setCast(memberID, !_sprite->_stretch);
+
+	// If the new cast member is a film loop, adjust _startPoint so the sprite
+	// stays at the same visual position regardless of registration offset changes.
+	if (hasChanged && _sprite->_cast && _sprite->_cast->_type == kCastFilmLoop) {
+		Common::Rect newBbox = getBbox();
+		_sprite->_startPoint.x += oldBbox.left - newBbox.left;
+		_sprite->_startPoint.y += oldBbox.top - newBbox.top;
+	}
 
 	// Duplicate of the special cases in setClean.
 	// Maybe it makes sense to force setClean to use setCast instead?
@@ -432,6 +505,7 @@ void Channel::setCast(CastMemberID memberID) {
 
 	// Based on Director in a Nutshell, page 15
 	_sprite->setAutoPuppet(kAPCast, true);
+	setNeedsDraw();
 }
 
 void Channel::setClean(Sprite *nextSprite, bool partial) {
@@ -451,19 +525,6 @@ void Channel::setClean(Sprite *nextSprite, bool partial) {
 	bool spriteTypeChanged = _sprite->_spriteType != nextSprite->_spriteType;
 
 	if (nextSprite) {
-		if (nextSprite->_cast && (_dirty || _sprite->_castId != nextSprite->_castId)) {
-			if (_sprite->_castId != nextSprite->_castId && nextSprite->_cast->_type == kCastDigitalVideo) {
-				if (((DigitalVideoCastMember *)nextSprite->_cast)->loadVideoFromCast()) {
-					_movieTime = 0;
-					((DigitalVideoCastMember *)nextSprite->_cast)->setChannel(this);
-					((DigitalVideoCastMember *)nextSprite->_cast)->startVideo();
-				}
-			} else if (nextSprite->_cast->_type == kCastFilmLoop || nextSprite->_cast->_type == kCastMovie) {
-				// brand new film loop, reset the frame counter.
-				_filmLoopFrame = 1;
-			}
-		}
-
 		// for the non-puppet QDShape, since we won't use isDirty to check whether the QDShape is changed.
 		// so we may always keep the sprite info because we need it to draw QDShape.
 		if (_sprite->_puppet || _sprite->_autoPuppet || (!nextSprite->isQDShape() && partial)) {
@@ -489,7 +550,7 @@ void Channel::setClean(Sprite *nextSprite, bool partial) {
 	if (_stopTime && (!_sprite->_cast || (_sprite->_cast && _sprite->_cast->_type != kCastDigitalVideo)))
 		_stopTime = 0;
 
-	_dirty = false;
+	_widgetDirty = false;
 }
 
 void Channel::setStretch(bool enabled) {
@@ -497,8 +558,7 @@ void Channel::setStretch(bool enabled) {
 		// when the stretch flag is manually disabled,
 		// revert whatever dimensions the sprite has to
 		// the default in the cast
-		g_director->getCurrentWindow()->addDirtyRect(getBbox());
-		_dirty = true;
+		setDirty();
 
 		if (_sprite->_cast) {
 			Common::Rect bbox = _sprite->_cast->getBbox();
@@ -523,7 +583,7 @@ void Channel::updateTextCast() {
 		if (!textWidget->getFixDims() && (_sprite->_width != _widget->_dims.width() || _sprite->_height != _widget->_dims.height())) {
 			_sprite->_width = _widget->_dims.width();
 			_sprite->_height = _widget->_dims.height();
-			g_director->getCurrentWindow()->addDirtyRect(_widget->_dims);
+			setDirty();
 		}
 	}
 }
@@ -573,43 +633,42 @@ void Channel::replaceSprite(Sprite *nextSprite) {
 	if (!nextSprite)
 		return;
 
-	bool widgetKeeped = _sprite->_cast && _widget;
-
-	// if there's a video in the old sprite that's different, stop it before we continue
-	if (_sprite->_castId != nextSprite->_castId && _sprite->_cast && _sprite->_cast->_type == kCastDigitalVideo) {
-		((DigitalVideoCastMember *)_sprite->_cast)->setChannel(nullptr);
-		((DigitalVideoCastMember *)_sprite->_cast)->stopVideo();
-		((DigitalVideoCastMember *)_sprite->_cast)->rewindVideo();
-	}
-
-	// update the _sprite we stored in channel, and point the originalSprite to the new one
+	bool hasWidget = _sprite->_cast && _widget;
 	// release the widget, because we may having the new one
 	if (_sprite->_cast && !canKeepWidget(_sprite, nextSprite)) {
-		widgetKeeped = false;
 		_sprite->_cast->releaseWidget();
+		hasWidget = false;
+	}
+	int16 width = _sprite->_width;
+	int16 height = _sprite->_height;
+
+	if (!(_sprite->_puppet || _sprite->getAutoPuppet(kAPCast)) && (_sprite->_castId != nextSprite->_castId)) {
+		// if there's a video in the old sprite that's different, stop it before we continue
+		if (_sprite->_cast && _sprite->_cast->_type == kCastDigitalVideo) {
+			((DigitalVideoCastMember *)_sprite->_cast)->setChannel(nullptr);
+			((DigitalVideoCastMember *)_sprite->_cast)->stopVideo();
+			((DigitalVideoCastMember *)_sprite->_cast)->rewindVideo();
+		}
+		// if there's a video in the new sprite that's different, start it before we continue
+		if (nextSprite->_cast && nextSprite->_cast->_type == kCastDigitalVideo) {
+			if (((DigitalVideoCastMember *)nextSprite->_cast)->loadVideoFromCast()) {
+				_movieTime = 0;
+				((DigitalVideoCastMember *)nextSprite->_cast)->setChannel(this);
+				((DigitalVideoCastMember *)nextSprite->_cast)->startVideo();
+			}
+		}
+		// if there's a brand new film loop in the new sprite, reset the frame counter
+		if (nextSprite->_cast && nextSprite->_cast->_type == kCastFilmLoop) {
+			_filmLoopFrame = 1;
+		}
 	}
 
-	// If the cast member is the same, persist the editable flag
-	bool editable = nextSprite->_editable;
-	if (_sprite->_castId == nextSprite->_castId) {
-		editable = _sprite->_editable;
-	}
-
-	int width = _sprite->_width;
-	int height = _sprite->_height;
-	bool immediate = _sprite->_immediate;
-
-	*_sprite = *nextSprite;
-
-	// Persist the immediate flag
-	_sprite->_immediate = immediate;
-
-	_sprite->_editable = editable;
+	_sprite->replaceFrom(nextSprite);
 
 	// TODO: auto expand text size is meaning less for us, not all text
 	// since we are using initialRect for the text cast member now, then the sprite size is meaning less for us.
 	// thus, we keep the _sprite size here
-	if (hasTextCastMember(_sprite) && widgetKeeped) {
+	if (hasTextCastMember(_sprite) && hasWidget) {
 		_sprite->_width = width;
 		_sprite->_height = height;
 	}
@@ -618,6 +677,10 @@ void Channel::replaceSprite(Sprite *nextSprite) {
 		_startFrame = _sprite->_spriteInfo.startFrame;
 		_endFrame = _sprite->_spriteInfo.endFrame;
 	}
+}
+
+void Channel::setDirty() {
+	_widgetDirty = true;
 }
 
 void Channel::setPosition(int x, int y, bool force) {
@@ -714,7 +777,9 @@ bool Channel::updateWidget() {
 }
 
 bool Channel::isTrail() {
-	return _sprite->_trails;
+	return _sprite->_trails || (_sprite->_cast &&
+			(_sprite->_cast->_type == kCastDigitalVideo) &&
+			(((DigitalVideoCastMember *)_sprite->_cast)->_directToStage));
 }
 
 int Channel::getMouseChar(int x, int y) {
@@ -804,6 +869,12 @@ CastMemberID Channel::getSubChannelSound2() {
 	}
 	warning("Channel doesn't have any sub-channels");
 	return CastMemberID();
+}
+
+Common::String Channel::formatInfo() {
+	return Common::String::format("[sprite: %s], visible: %d, constraint: %d, movieRate: %f, movieTime: %d (%f), filmLoopFrame: %d",
+		_sprite->formatInfo().c_str(), _visible,
+		_constraint, _movieRate, _movieTime, (float)(_movieTime/60.0f), _filmLoopFrame);
 }
 
 } // End of namespace Director

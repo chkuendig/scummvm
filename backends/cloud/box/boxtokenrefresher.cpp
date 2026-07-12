@@ -104,7 +104,14 @@ void BoxTokenRefresher::finishJson(const Common::JSONValue *json) {
 }
 
 void BoxTokenRefresher::finishError(const Networking::ErrorResponse &error, Networking::RequestState state) {
-	if (error.httpResponseCode == 401) { // invalid_token
+	if (error.httpResponseCode == 401 
+#ifdef EMSCRIPTEN
+		// Box.com seems to return 401 without the required CORS headers, so response code is 0, see also
+		// https://pulse.box.com/forums/909778-help-shape-the-future-of-box/suggestions/48576179-fix-missing-access-control-allow-origin-header-for
+		|| error.httpResponseCode == 0 
+#endif
+	) { // invalid_token 
+		warning("BoxTokenRefresher: received 401 Unauthorized, refreshing token");
 		pause();
 		_parentStorage->refreshAccessToken(new Common::Callback<BoxTokenRefresher, const Storage::BoolResponse &>(this, &BoxTokenRefresher::tokenRefreshed));
 		return;

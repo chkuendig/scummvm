@@ -167,7 +167,7 @@ void ScrollView::frame() {
 void ScrollView::fill() {
 	Graphics::ManagedSurface s = getSurface();
 	s.fillRect(Common::Rect(FRAME_BORDER_SIZE, FRAME_BORDER_SIZE,
-		s.w - FRAME_BORDER_SIZE, s.h - FRAME_BORDER_SIZE), 0);
+		s.w - FRAME_BORDER_SIZE, s.h - FRAME_BORDER_SIZE), SCROLL_BG_COLOR);
 }
 
 void ScrollView::writeSymbol(int symbolId) {
@@ -182,6 +182,11 @@ bool ScrollView::msgFocus(const FocusMessage &msg) {
 }
 
 bool ScrollView::msgMouseDown(const MouseDownMessage &msg) {
+	if (msg._button == MouseMessage::MB_RIGHT) {
+		_selectedButton = -1;
+		return true;
+	}
+
 	_selectedButton = getButtonAt(msg._pos);
 	if (_selectedButton != -1) {
 		draw();
@@ -192,6 +197,15 @@ bool ScrollView::msgMouseDown(const MouseDownMessage &msg) {
 }
 
 bool ScrollView::msgMouseUp(const MouseUpMessage &msg) {
+	if (msg._button == MouseMessage::MB_RIGHT) {
+		int oldSelection = _selectedButton;
+		_selectedButton = -1;
+		if (oldSelection != -1)
+			draw();
+
+		return msgAction(ActionMessage(KEYBIND_ESCAPE));
+	}
+
 	int oldSelection = _selectedButton;
 	_selectedButton = -1;
 	if (oldSelection != -1)

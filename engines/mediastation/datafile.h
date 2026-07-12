@@ -38,8 +38,6 @@ struct VersionInfo {
 	uint16 patch = 0;
 };
 
-typedef Common::Array<Common::Point> Polygon;
-
 // A Media Station datafile consists of one or more RIFF-style "subfiles". Aside
 // from some oddness at the start of the subfile, each subfile is basically
 // standard sequence of chunks inside a LIST chunk, like you'd see in any RIFF
@@ -93,7 +91,6 @@ public:
 	Common::String readTypedString();
 	VersionInfo readTypedVersion();
 	uint32 readTypedChannelIdent();
-	Polygon readTypedPolygon();
 
 private:
 	void readAndVerifyType(DatumType type);
@@ -105,6 +102,7 @@ public:
 	Chunk(Common::SeekableReadStream *stream);
 
 	uint32 bytesRemaining();
+	uint32 startPos() const { return _dataStartOffset; }
 
 	uint32 _id = 0;
 	uint32 _length = 0;

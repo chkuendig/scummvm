@@ -67,14 +67,14 @@ Common::Error Window::loadInitialMovie() {
 	}
 	loadINIStream();
 	Common::Path path = findPath(movie);
-	Archive *mainArchive = g_director->openArchive(path);
+	Common::SharedPtr<Archive> mainArchive = g_director->openArchive(path);
 
 	if (!mainArchive) {
 		warning("Window::loadInitialMovie: Cannot open main movie");
 		return Common::kNoGameDataFoundError;
 	}
 	g_director->setMainArchive(mainArchive);
-	probeResources(mainArchive);
+	probeResources(mainArchive.get());
 
 	// Load multiple-resources based executable file (Projector)
 	Common::String rawEXE = _vm->getRawEXEName();
@@ -163,8 +163,8 @@ void Window::probeResources(Archive *archive) {
 		}
 
 		if (archive->hasResource(MKTAG('S', 'T', 'R', '#'), 0)) {
-			if (_currentMovie)
-				_currentMovie->setArchive(archive);
+			//if (_currentMovie)
+			//	_currentMovie->setArchive(archive);
 
 			Common::SeekableReadStreamEndian *name = archive->getResource(MKTAG('S', 'T', 'R', '#'), 0);
 			int num = name->readUint16();
@@ -186,9 +186,9 @@ void Window::probeResources(Archive *archive) {
 					_currentMovie = nullptr;
 				}
 
-				Archive *subMovie = g_director->openArchive(moviePath);
+				Common::SharedPtr<Archive> subMovie = g_director->openArchive(moviePath);
 				if (subMovie) {
-					probeResources(subMovie);
+					probeResources(subMovie.get());
 				}
 			} else {
 				warning("Window::probeResources: Couldn't find score with name: %s", sname.c_str());
@@ -198,6 +198,9 @@ void Window::probeResources(Archive *archive) {
 	}
 
 	if (g_director->getPlatform() == Common::kPlatformMacintosh) {
+		// Load any fonts from the projector resource fork
+		_vm->_wm->_fontMan->loadFonts(archive->getPathName());
+
 		// On Macintosh, you can add additional chunks to the resource
 		// fork of the file to state which XObject or HyperCard XCMD/XFCNs
 		// need to be loaded in.
@@ -241,7 +244,7 @@ void DirectorEngine::addArchiveToOpenList(const Common::Path &path) {
 	_allOpenResFiles.push_front(path);
 }
 
-Archive *DirectorEngine::openArchive(const Common::Path &path) {
+Common::SharedPtr<Archive> DirectorEngine::openArchive(const Common::Path &path) {
 	debug(1, "DirectorEngine::openArchive(\"%s\")", path.toString().c_str());
 
 	// If the archive is already open, don't reopen it;
@@ -266,11 +269,12 @@ Archive *DirectorEngine::openArchive(const Common::Path &path) {
 		}
 	}
 	result->setPathName(path);
-	_allSeenResFiles.setVal(path, result);
+	Common::SharedPtr<Archive> arch(result);
+	_allSeenResFiles.setVal(path, arch);
 
 	addArchiveToOpenList(path);
 
-	return result;
+	return arch;
 }
 
 void Window::loadINIStream() {
@@ -601,6 +605,7 @@ void Window::loadXtrasFromPath() {
 	// and they'll still be recognized.
 	Common::ArchiveMemberList targets;
 	SearchMan.listMatchingMembers(targets, Common::Path("xtras/*"), true);
+	SearchMan.listMatchingMembers(targets, Common::Path("*/xtras/*"), false);
 	for (auto &it : targets) {
 		if (it->isDirectory())
 			continue;

@@ -57,10 +57,9 @@ public:
 	virtual ~Screen();
 
 	virtual void loadFont(int16 fontId) = 0;
-	virtual void loadFontArr(Common::ReadStream &in) = 0;
 
-	int16    fontHeight() const;
-	int16    stringLength(const char *s) const;
+	virtual int16 fontHeight() const = 0;
+	virtual int16 stringLength(const char *s) const = 0;
 
 	void     displayBackground();
 	virtual void displayFrame(const int sx, const int sy, Seq *seq, const bool foreFl) = 0;
@@ -91,7 +90,7 @@ public:
 	void     shadowStr(int16 sx, const int16 sy, const char *s, const byte color);
 	void     showCursor();
 	void     userHelp() const;
-	void     writeStr(int16 sx, const int16 sy, const char *s, const byte color);
+	virtual void writeStr(int16 sx, const int16 sy, const char *s, const byte color) = 0;
 	Common::Rect drawDosText(byte x, byte y, const char *text, byte color);
 	byte getDosMessageBoxBorder() const;
 	Common::KeyState dosMessageBox(const Common::String &text, bool protect = false, TtsOptions ttsOptions = kTtsReplaceNewlines);
@@ -110,20 +109,9 @@ protected:
 	static const int kRectListSize = 16;            // Size of add/restore rect lists
 	static const int kBlitListSize = kRectListSize * 2; // Size of dirty rect blit list
 	static const int kShapeSize = 24;
-	static const int kFontLength = 128;             // Number of chars in font
-	static const int kFontSize = 1200;              // Max size of font data
-	static const int kNumFonts = 3;                 // Number of dib fonts
 	static const byte stdMouseCursorHeight = 20;
 	static const byte stdMouseCursorWidth = 12;
 
-	bool fontLoadedFl[kNumFonts];
-
-	// Fonts used in dib (non-GDI)
-	byte *_arrayFont[kNumFonts];
-	byte  _fnt;                                     // Current font number
-	byte  _fontdata[kNumFonts][kFontSize];          // Font data
-	byte *_font[kNumFonts][kFontLength];            // Ptrs to each char
-	int16 _arrayFontSize[kNumFonts];
 	byte *_mainPalette;
 	byte *_curPalette;
 	byte _paletteSize;
@@ -137,13 +125,14 @@ protected:
 	inline bool isInY(const int16 y, const Rect *rect) const;
 	inline bool isOverlapping(const Rect *rectA, const Rect *rectB) const;
 
+	int16 center(const char *s) const;
+
 private:
 	byte      _iconImage[kInvDx * kInvDy];
 
 	Icondib _iconBuffer;                          // Inventory icon DIB
 
 	int16 mergeLists(Rect *list, Rect *blist, const int16 len, int16 blen);
-	int16 center(const char *s) const;
 
 	Viewdib _backBuffer;
 	Viewdib _GUIBuffer;                              // User interface images
@@ -159,7 +148,6 @@ private:
 
 	void createPal();
 	void merge(const Rect *rectA, Rect *rectB);
-	void writeChr(const int sx, const int sy, const byte color, const char *local_fontdata);
 };
 
 class Screen_v1d : public Screen {
@@ -168,11 +156,14 @@ public:
 	~Screen_v1d() override;
 
 	void loadFont(int16 fontId) override;
-	void loadFontArr(Common::ReadStream &in) override;
+	int16 fontHeight() const override;
+	int16 stringLength(const char *s) const override;
 
 	void displayFrame(const int sx, const int sy, Seq *seq, const bool foreFl) override;
 
 	void loadPalette(Common::SeekableReadStream &in) override;
+	
+	void writeStr(int16 sx, const int16 sy, const char *s, const byte color) override;
 protected:
 	OverlayState findOvl(Seq *seqPtr, ImagePtr dstPtr, uint16 y);
 };
@@ -183,13 +174,29 @@ public:
 	~Screen_v1w() override;
 
 	void loadFont(int16 fontId) override;
-	void loadFontArr(Common::ReadStream &in) override;
+	int16 fontHeight() const override;
+	int16 stringLength(const char *s) const override;
 
 	void displayFrame(const int sx, const int sy, Seq *seq, const bool foreFl) override;
 
 	void loadPalette(Common::SeekableReadStream &in) override;
+	
+	void writeStr(int16 sx, const int16 sy, const char *s, const byte color) override;
 protected:
+	static const int kFontLength = 128;             // Number of chars in font
+	static const int kFontSize = 1200;              // Max size of font data
+	static const int kNumFonts = 3;                 // Number of dib fonts
+
+	bool fontLoadedFl[kNumFonts];
+
+	// Fonts used in dib (non-GDI)
+	byte  _fnt;                                     // Current font number
+	byte  _fontdata[kNumFonts][kFontSize];          // Font data
+	byte *_font[kNumFonts][kFontLength];            // Ptrs to each char
+
 	OverlayState findOvl(Seq *seqPtr, ImagePtr dstPtr, uint16 y);
+private:
+	void writeChr(const int sx, const int sy, const byte color, const char *local_fontdata);
 };
 
 } // End of namespace Hugo

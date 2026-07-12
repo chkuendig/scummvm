@@ -42,6 +42,14 @@ public:
 			// (after polling the events to ensure synchronous event processing)
 			g_system->delayMillis(0);
 		}
+		if (event.type == Common::EVENT_DROP_FILE) {
+			Common::Path readPath = event.path;
+			Common::FSNode node(readPath);
+			if (!node.isDirectory() && ((ConfMan.hasKey("extrapath") || ConfMan.hasDefault("extrapath")))) {
+				dynamic_cast<OSystem_Emscripten *>(g_system)->importExtrasFile(node);
+				
+			}
+		}
 		return ret_value;
 	};
 };

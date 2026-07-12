@@ -20,10 +20,12 @@
  */
 
 #include "common/file.h"
+#include "common/config-manager.h"
 #include "common/memstream.h"
 
 #include "freescape/freescape.h"
 #include "freescape/games/castle/castle.h"
+#include "freescape/games/castle/opl.music.h"
 #include "freescape/language/8bitDetokeniser.h"
 
 namespace Freescape {
@@ -49,7 +51,6 @@ Common::SeekableReadStream *CastleEngine::decryptFile(const Common::Path &filena
 	return (new Common::MemoryReadStream(encryptedBuffer, size));
 }
 
-extern byte kEGADefaultPalette[16][3];
 extern Common::MemoryReadStream *unpackEXE(Common::File &ms);
 
 byte kEGARiddleFontPalette[16][3] = {
@@ -154,7 +155,7 @@ void CastleEngine::loadAssetsDOSFullGame() {
 		file.open("CME.EXE");
 		stream = unpackEXE(file);
 		if (stream) {
-			loadSpeakerFxDOS(stream, 0x636d + 0x200, 0x63ed + 0x200, 30);
+			_sound = loadSpeakerFxDOS(stream, 0x636d + 0x200, 0x63ed + 0x200, 30);
 
 			stream->seek(0x197c0);
 			_endGameBackgroundFrame = loadFrameFromPlanes(stream, 112, 108);
@@ -222,7 +223,14 @@ void CastleEngine::loadAssetsDOSFullGame() {
 			_riddleBottomFrame = loadFrameWithHeaderDOS(stream);
 			_endGameThroneFrame = loadFrameWithHeaderDOS(stream);
 			// No header
-			Graphics::ManagedSurface *thunderFrame = loadFrameFromPlanes(stream, 32, 128);
+			Graphics::ManagedSurface *thunderFrame;
+
+			thunderFrame = loadFrameFromPlanes(stream, 16, 112);
+			thunderFrame->convertToInPlace(_gfx->_texturePixelFormat, (byte *)&kEGADefaultPalette, 16);
+			_thunderFrames.push_back(thunderFrame);
+
+			stream->seek(-0x160,SEEK_CUR);
+			thunderFrame = loadFrameFromPlanes(stream, 16, 112);
 			thunderFrame->convertToInPlace(_gfx->_texturePixelFormat, (byte *)&kEGADefaultPalette, 16);
 			_thunderFrames.push_back(thunderFrame);
 
@@ -295,6 +303,9 @@ void CastleEngine::loadAssetsDOSFullGame() {
 		stream = decryptFile("CMEDF");
 		load8bitBinary(stream, 0, 16);
 		delete stream;
+
+		if (ConfMan.getBool("opl_music"))
+			_playerMusic = new CastleOPLMusicPlayer();
 	} else
 		error("Not implemented yet");
 
@@ -314,7 +325,7 @@ void CastleEngine::loadAssetsDOSDemo() {
 		file.open("CMDE.EXE");
 		stream = unpackEXE(file);
 		if (stream) {
-			loadSpeakerFxDOS(stream, 0x636d + 0x200, 0x63ed + 0x200, 30);
+			_sound = loadSpeakerFxDOS(stream, 0x636d + 0x200, 0x63ed + 0x200, 30);
 
 			stream->seek(0x197c0 - 0x2a0);
 			_endGameBackgroundFrame = loadFrameFromPlanes(stream, 112, 108);
@@ -368,7 +379,14 @@ void CastleEngine::loadAssetsDOSDemo() {
 			_riddleBottomFrame = loadFrameWithHeaderDOS(stream);
 			_endGameThroneFrame = loadFrameWithHeaderDOS(stream);
 			// No header
-			Graphics::ManagedSurface *thunderFrame = loadFrameFromPlanes(stream, 32, 128);
+			Graphics::ManagedSurface *thunderFrame;
+
+			thunderFrame = loadFrameFromPlanes(stream, 16, 112);
+			thunderFrame->convertToInPlace(_gfx->_texturePixelFormat, (byte *)&kEGADefaultPalette, 16);
+			_thunderFrames.push_back(thunderFrame);
+
+			stream->seek(-0x160,SEEK_CUR);
+			thunderFrame = loadFrameFromPlanes(stream, 16, 112);
 			thunderFrame->convertToInPlace(_gfx->_texturePixelFormat, (byte *)&kEGADefaultPalette, 16);
 			_thunderFrames.push_back(thunderFrame);
 
@@ -420,6 +438,9 @@ void CastleEngine::loadAssetsDOSDemo() {
 		stream = decryptFile("CDEDF");
 		load8bitBinary(stream, 0, 16);
 		delete stream;
+
+		if (ConfMan.getBool("opl_music"))
+			_playerMusic = new CastleOPLMusicPlayer();
 	} else
 		error("Not implemented yet");
 
@@ -453,7 +474,7 @@ void CastleEngine::drawDOSUI(Graphics::Surface *surface) {
 	} else {
 		if (_gameStateControl != kFreescapeGameStateEnd) {
 			if (ghostInArea())
-				drawStringInSurface(_messagesList[116], 97, 182, front, back, surface);
+				drawStringInSurface(_ghostInAreaMessage, 97, 182, front, back, surface);
 			else
 				drawStringInSurface(_currentArea->_name, 97, 182, front, back, surface);
 		}

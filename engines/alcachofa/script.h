@@ -35,6 +35,7 @@ class Process;
 
 // the ScriptOp and ScriptKernelTask enums represent the *implemented* order
 // the specific Game instance maps the version-specific op codes to our order
+// keep the order in sync with ScriptOpNames/KernelCallNames in script-debug.h
 
 enum class ScriptOp {
 	Nop,
@@ -82,6 +83,7 @@ enum class ScriptKernelTask {
 	StopAndTurnMe,
 	ChangeCharacter,
 	SayText,
+	SayTextOnlySound, // only used in secta with subtitles turned off...
 	Go,
 	Put,
 	ChangeCharacterRoom,
@@ -119,16 +121,15 @@ enum class ScriptKernelTask {
 	LerpCamToObjectWithScale,
 	LerpCamToObjectResettingZ,
 	LerpCamRotation,
+	LerpOrSetCam, // only V1 and V2
 	FadeIn,
 	FadeOut,
 	FadeIn2,
 	FadeOut2,
 	LerpCamXYZ,
 	LerpCamToObjectKeepingZ,
-
-	SheriffTakesCharacter, ///< some special-case V1 tasks, unknown yet
-	ChangeDoor,
-	Disguise
+	Disguise,
+	WaitForMouseClick // only V2.1
 };
 
 enum class ScriptFlags {
@@ -168,6 +169,7 @@ public:
 		ScriptFlags flags = ScriptFlags::None);
 	bool hasProcedure(const Common::String &behavior, const Common::String &action) const;
 	bool hasProcedure(const Common::String &procedure) const;
+	Common::String procedureAt(uint32 pc) const;
 
 	using VariableNameIterator = Common::HashMap<Common::String, uint32>::const_iterator;
 	inline VariableNameIterator beginVariables() const { return _variableNames.begin(); }
@@ -175,11 +177,13 @@ public:
 	inline bool hasVariable(const char *name) const { return _variableNames.contains(name); }
 
 	void setScriptTimer(bool reset);
+	void fixNestedMenuPop(uint32 pc);
 private:
 	friend struct ScriptTask;
 	friend struct ScriptTimerTask;
 	Common::HashMap<Common::String, uint32> _variableNames;
-	Common::HashMap<Common::String, uint32> _procedures;
+	Common::HashMap<Common::String, uint32, Common::IgnoreCase_Hash, Common::IgnoreCase_EqualTo>
+		_procedures; // In CORVINO there are some mixed-case character names but upper-case procedures
 	Common::Array<ScriptInstruction> _instructions;
 	Common::Array<int32> _variables;
 	Common::SpanOwner<Common::Span<char>> _strings;

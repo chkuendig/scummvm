@@ -26,13 +26,11 @@
 #include "common/system.h"
 #include "common/error.h"
 #include "common/fs.h"
-#include "common/hash-str.h"
 #include "common/random.h"
 #include "common/serializer.h"
 #include "common/util.h"
 #include "engines/engine.h"
 #include "engines/savestate.h"
-#include "graphics/screen.h"
 
 #include "m4/detection.h"
 #include "m4/vars.h"

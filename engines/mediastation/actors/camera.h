@@ -44,13 +44,15 @@ struct ImageAsset;
 class CameraActor : public SpatialEntity, public ChannelClient {
 public:
 	CameraActor() : SpatialEntity(kActorTypeCamera) {};
-	~CameraActor();
+	virtual ~CameraActor() override;
 
 	virtual void readParameter(Chunk &chunk, ActorHeaderSectionType paramType) override;
 	virtual void readChunk(Chunk &chunk) override;
 	virtual ScriptValue callMethod(BuiltInMethod methodId, Common::Array<ScriptValue> &args) override;
 	virtual void loadIsComplete() override;
-	virtual void process() override;
+
+	virtual void onEvent(const ActorEvent &event) override;
+	virtual void timerEvent(const TimerEvent &event) override;
 
 	Common::Point getViewportOrigin();
 	Common::Rect getViewportBounds();
@@ -61,11 +63,11 @@ public:
 private:
 	bool _lensOpen = false;
 	bool _addedToStage = false;
-	double _panDuration = 0.0;
+	double _totalPanDuration = 0.0;
+	double _durationBetweenStepEvents = 0.0;
 	uint _currentPanStep = 0;
 	uint _maxPanStep = 0;
 	uint _startTime = 0;
-	uint _nextPanStepTime = 0;
 	CameraPanState _panState = kCameraNotPanning;
 	Common::Point _offset;
 	Common::Point _currentViewportOrigin;
@@ -73,8 +75,12 @@ private:
 	Common::Point _panStart;
 	Common::Point _panDest;
 	Common::Point _panDelta;
-	Common::SharedPtr<ImageAsset> _image;
-	DisplayContext _displayContext;
+
+	// A camera can have an image that overlays its contents. To do this, we need a
+	// surface on which to put the actors shown through the camera before we draw the overlay.
+	Common::SharedPtr<ImageAsset> _overlayImage;
+	PixMapImage *_childrenWithOverlaySurface = nullptr;
+	DisplayContext _childrenWithOverlayContext;
 
 	void addToStage();
 	void removeFromStage(bool stopPan);
@@ -90,12 +96,12 @@ private:
 	void stopPan();
 	bool continuePan();
 
-	void timerEvent();
 	bool processViewportMove();
 	void processNextPanStep();
 	void adjustCameraViewport(Common::Point &viewportToAdjust);
 	void calcNewViewportOrigin();
 	double percentComplete();
+	Common::Rect getAdvanceRect();
 };
 
 } // End of namespace MediaStation

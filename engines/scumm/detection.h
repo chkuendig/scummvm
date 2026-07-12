@@ -38,6 +38,12 @@ namespace Scumm {
 #define GAMEOPTION_COPY_PROTECTION                           GUIO_GAMEOPTIONS7
 #define GAMEOPTION_USE_REMASTERED_AUDIO                      GUIO_GAMEOPTIONS8
 #define GAMEOPTION_TTS                                       GUIO_GAMEOPTIONS9
+#define GAMEOPTION_REBEL2_HIRES                              GUIO_GAMEOPTIONS10
+#define GAMEOPTION_REBEL2_UNLOCK_ALL                         GUIO_GAMEOPTIONS11
+#define GAMEOPTION_REBEL1_UNLOCK_ALL                         GUIO_GAMEOPTIONS12
+#define GAMEOPTION_REBEL2_NO_DAMAGE                          GUIO_GAMEOPTIONS13
+#define GAMEOPTION_REBEL2_YODA_MODE                          GUIO_GAMEOPTIONS14
+#define GAMEOPTION_REBEL1_NO_DAMAGE                          GUIO_GAMEOPTIONS15
 
 /**
  * Descriptor of a specific SCUMM game. Used internally to store
@@ -221,6 +227,8 @@ enum ScummGameId {
 	GID_CMI,
 	GID_DIG,
 	GID_FT,
+	GID_REBEL1,
+	GID_REBEL2,
 	GID_INDY3,
 	GID_INDY4,
 	GID_LOOM,

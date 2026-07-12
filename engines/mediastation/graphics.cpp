@@ -32,6 +32,71 @@
 
 namespace MediaStation {
 
+const char *transitionTypeToString(TransitionType type) {
+	switch (type) {
+	case kTransitionFadeToBlack:
+		return "FadeToBlack";
+	case kTransitionFadeToPalette:
+		return "FadeToPalette";
+	case kTransitionSetToPalette:
+		return "SetToPalette";
+	case kTransitionSetToBlack:
+		return "SetToBlack";
+	case kTransitionFadeToColor:
+		return "FadeToColor";
+	case kTransitionSetToColor:
+		return "SetToColor";
+	case kTransitionSetToPercentOfPalette:
+		return "SetToPercentOfPalette";
+	case kTransitionFadeToPaletteObject:
+		return "FadeToPaletteObject";
+	case kTransitionSetToPaletteObject:
+		return "SetToPaletteObject";
+	case kTransitionSetToPercentOfPaletteObject:
+		return "SetToPercentOfPaletteObject";
+	case kTransitionColorShiftCurrentPalette:
+		return "ColorShiftCurrentPalette";
+	case kTransitionScrollLeft:
+		return "ScrollLeft";
+	case kTransitionScrollRight:
+		return "ScrollRight";
+	case kTransitionScrollUp:
+		return "ScrollUp";
+	case kTransitionScrollDown:
+		return "ScrollDown";
+	case kTransitionWipeLeft:
+		return "WipeLeft";
+	case kTransitionWipeRight:
+		return "WipeRight";
+	case kTransitionWipeUp:
+		return "WipeUp";
+	case kTransitionWipeDown:
+		return "WipeDown";
+	case kTransitionSlideLeft:
+		return "SlideLeft";
+	case kTransitionSlideRight:
+		return "SlideRight";
+	case kTransitionSlideUp:
+		return "SlideUp";
+	case kTransitionSlideDown:
+		return "SlideDown";
+	case kTransitionSlitLROpen:
+		return "SlitLROpen";
+	case kTransitionSlitLRClose:
+		return "SlitLRClose";
+	case kTransitionSlitUDOpen:
+		return "SlitUDOpen";
+	case kTransitionSlitUDClose:
+		return "SlitUDClose";
+	case kTransitionCircleIn:
+		return "CircleIn";
+	case kTransitionCircleOut:
+		return "CircleOut";
+	default:
+		return "UNKNOWN";
+	}
+}
+
 void Region::addRect(const Common::Rect &rect) {
 	if (rect.isEmpty()) {
 		return;
@@ -80,7 +145,9 @@ void Clip::addToRegion(const Common::Rect &rect) {
 }
 
 bool Clip::clipIntersectsRect(const Common::Rect &rect) {
-	return _region.intersects(rect);
+	Common::Rect adjustedRect = rect;
+	adjustedRect.translate(-_bounds.origin().x, -_bounds.origin().y);
+	return _region.intersects(adjustedRect);
 }
 
 void Clip::intersectWithRegion(const Common::Rect &rect) {
@@ -161,6 +228,10 @@ void DisplayContext::verifyClipSize() {
 	}
 }
 
+void DisplayContext::deleteClips() {
+	_clips.empty();
+}
+
 bool DisplayContext::clipIsEmpty() {
 	Clip *clip = currentClip();
 	if (clip != nullptr) {
@@ -198,6 +269,20 @@ void DisplayContext::setClipTo(Region region) {
 	}
 }
 
+void DisplayUpdateManager::performUpdateAll() {
+	debugC(9, kDebugGraphics, "%s", __func__);
+	g_engine->getStageDirector()->drawAll();
+	g_engine->getStageDirector()->clearDirtyRegion();
+	g_engine->getDisplayManager()->flushToDisplay();
+}
+
+void DisplayUpdateManager::performUpdateDirty() {
+	debugC(9, kDebugGraphics, "%s", __func__);
+	g_engine->getStageDirector()->drawDirtyRegion();
+	g_engine->getStageDirector()->clearDirtyRegion();
+	g_engine->getDisplayManager()->flushToDisplay();
+}
+
 VideoDisplayManager::VideoDisplayManager(MediaStationEngine *vm) : _vm(vm) {
 	initGraphics(MediaStationEngine::SCREEN_WIDTH, MediaStationEngine::SCREEN_HEIGHT);
 	_screen = new Graphics::Screen();
@@ -216,11 +301,11 @@ bool VideoDisplayManager::attemptToReadFromStream(Chunk &chunk, uint sectionType
 	bool handledParam = true;
 	switch (sectionType) {
 	case kVideoDisplayManagerUpdateDirty:
-		performUpdateDirty();
+		g_engine->getDisplayUpdateManager()->performUpdateDirty();
 		break;
 
 	case kVideoDisplayManagerUpdateAll:
-		performUpdateAll();
+		g_engine->getDisplayUpdateManager()->performUpdateAll();
 		break;
 
 	case kVideoDisplayManagerEffectTransition:
@@ -228,6 +313,7 @@ bool VideoDisplayManager::attemptToReadFromStream(Chunk &chunk, uint sectionType
 		break;
 
 	case kVideoDisplayManagerSetTime:
+		debugC(7, kDebugGraphics, "%s", __func__);
 		_defaultTransitionTime = chunk.readTypedTime();
 		break;
 
@@ -242,6 +328,67 @@ bool VideoDisplayManager::attemptToReadFromStream(Chunk &chunk, uint sectionType
 	return handledParam;
 }
 
+void VideoDisplayManager::flushToDisplay() {
+	_screen->update();
+	doTransitionOnSync();
+}
+
+void DisplayUpdateManager::onEvent(const DisplayEvent &event) {
+	switch (event.type) {
+	case kDisplayAutoUpdateEvent:
+		performAutoUpdateAndFlush();
+		break;
+
+	case kDisplayEnableAutoUpdateEvent:
+		enableAutoUpdate(event.disableScreenAutoUpdateToken);
+		break;
+
+	default:
+		break;
+	}
+}
+
+bool DisplayUpdateManager::needToDisplay() {
+	return !g_engine->getStageDirector()->getRootStage()->_dirtyRegion._rects.empty();
+}
+
+void DisplayUpdateManager::performAutoUpdateAndFlush() {
+	bool screenUpdated = false;
+	if (_autoUpdateEnabled && _forceFlush) {
+		performUpdateDirty();
+		screenUpdated = true;
+		_forceFlush = false;
+	} else if (_autoUpdateEnabled) {
+		if (needToDisplay()) {
+			performUpdateDirty();
+			screenUpdated = true;
+		}
+	}
+
+	// Any mouse movements and such need to be committed even if there
+	// was nothing else to draw.
+	if (!screenUpdated) {
+		g_system->updateScreen();
+	}
+}
+
+void DisplayUpdateManager::enableAutoUpdate(uint disabledScreenAutoUpdateToken) {
+	if (disabledScreenAutoUpdateToken == _disabledScreenAutoUpdateToken) {
+		_autoUpdateEnabled = true;
+		_forceFlush = true;
+	}
+}
+
+uint DisplayUpdateManager::disableAutoUpdate() {
+	_autoUpdateEnabled = false;
+	_forceFlush = false;
+	_disabledScreenAutoUpdateToken += 1;
+	if (_disabledScreenAutoUpdateToken == 0) {
+		_disabledScreenAutoUpdateToken = 1;
+	}
+	return _disabledScreenAutoUpdateToken;
+}
+
 void VideoDisplayManager::readAndEffectTransition(Chunk &chunk) {
 	uint argCount = chunk.readTypedUint16();
 	Common::Array<ScriptValue> args;
@@ -253,6 +400,7 @@ void VideoDisplayManager::readAndEffectTransition(Chunk &chunk) {
 }
 
 void VideoDisplayManager::readAndRegisterPalette(Chunk &chunk) {
+	debugC(5, kDebugGraphics, "%s", __func__);
 	byte *buffer = new byte[Graphics::PALETTE_SIZE];
 	chunk.read(buffer, Graphics::PALETTE_SIZE);
 	if (_registeredPalette != nullptr) {
@@ -262,12 +410,8 @@ void VideoDisplayManager::readAndRegisterPalette(Chunk &chunk) {
 }
 
 void VideoDisplayManager::effectTransition(Common::Array<ScriptValue> &args) {
-	if (args.empty()) {
-		warning("%s: Script args cannot be empty", __func__);
-		return;
-	}
-
 	TransitionType transitionType = static_cast<TransitionType>(args[0].asParamToken());
+	debugC(5, kDebugGraphics, "%s: %s", __func__, transitionTypeToString(transitionType));
 	switch (transitionType) {
 	case kTransitionFadeToBlack:
 		fadeToBlack(args);
@@ -318,7 +462,7 @@ void VideoDisplayManager::effectTransition(Common::Array<ScriptValue> &args) {
 		break;
 
 	default:
-		warning("%s: Got unknown transition type %d", __func__, static_cast<uint>(transitionType));
+		warning("%s: Got unknown transition type %d (%s)", __func__, static_cast<uint>(transitionType), transitionTypeToString(transitionType));
 	}
 }
 
@@ -329,27 +473,20 @@ void VideoDisplayManager::doTransitionOnSync() {
 	}
 }
 
-void VideoDisplayManager::performUpdateDirty() {
-	g_engine->draw();
-}
-
-void VideoDisplayManager::performUpdateAll() {
-	g_engine->draw(false);
-}
-
 void VideoDisplayManager::fadeToBlack(Common::Array<ScriptValue> &args) {
 	double fadeTime = DEFAULT_FADE_TRANSITION_TIME_IN_SECONDS;
 	uint startIndex = DEFAULT_PALETTE_TRANSITION_START_INDEX;
 	uint colorCount = DEFAULT_PALETTE_TRANSITION_COLOR_COUNT;
 
 	if (args.size() >= 2) {
-		fadeTime = args[1].asTime();
+		fadeTime = args[1].asFloatOrTime();
 	}
 	if (args.size() >= 4) {
 		startIndex = static_cast<uint>(args[2].asFloat());
 		colorCount = static_cast<uint>(args[3].asFloat());
 	}
 
+	debugC(5, kDebugGraphics, "%s: fadeTime: %f, paletteRange: [%d, %d]", __func__, fadeTime, startIndex, startIndex + colorCount);
 	_fadeToColor(0, 0, 0, fadeTime, startIndex, colorCount);
 }
 
@@ -359,13 +496,14 @@ void VideoDisplayManager::fadeToRegisteredPalette(Common::Array<ScriptValue> &ar
 	uint colorCount = DEFAULT_PALETTE_TRANSITION_COLOR_COUNT;
 
 	if (args.size() >= 2) {
-		fadeTime = args[1].asTime();
+		fadeTime = args[1].asFloatOrTime();
 	}
 	if (args.size() >= 4) {
 		startIndex = static_cast<uint>(args[2].asFloat());
 		colorCount = static_cast<uint>(args[3].asFloat());
 	}
 
+	debugC(5, kDebugGraphics, "%s: fadeTime: %f, paletteRange: [%d, %d]", __func__, fadeTime, startIndex, startIndex + colorCount);
 	_fadeToRegisteredPalette(fadeTime, startIndex, colorCount);
 }
 
@@ -378,6 +516,7 @@ void VideoDisplayManager::setToRegisteredPalette(Common::Array<ScriptValue> &arg
 		colorCount = static_cast<uint>(args[2].asFloat());
 	}
 
+	debugC(5, kDebugGraphics, "%s: colors: [%d, %d]", __func__, startIndex, startIndex + colorCount);
 	_setToRegisteredPalette(startIndex, colorCount);
 }
 
@@ -390,6 +529,7 @@ void VideoDisplayManager::setToBlack(Common::Array<ScriptValue> &args) {
 		colorCount = static_cast<uint>(args[2].asFloat());
 	}
 
+	debugC(5, kDebugGraphics, "%s: colors: [%d, %d]", __func__, startIndex, startIndex + colorCount);
 	_setToColor(0, 0, 0, startIndex, colorCount);
 }
 
@@ -403,20 +543,23 @@ void VideoDisplayManager::fadeToColor(Common::Array<ScriptValue> &args) {
 		r = static_cast<byte>(args[1].asFloat());
 		g = static_cast<byte>(args[2].asFloat());
 		b = static_cast<byte>(args[3].asFloat());
-		fadeTime = args[4].asTime();
+		fadeTime = args[4].asFloatOrTime();
 	}
 	if (args.size() >= 7) {
-		fadeTime = args[5].asTime();
+		fadeTime = args[5].asFloatOrTime();
 		startIndex = static_cast<uint>(args[6].asFloat());
 		colorCount = static_cast<uint>(args[7].asFloat());
 	}
 
+	debugC(5, kDebugGraphics, "%s: (%d, %d, %d), fadeTime: %f, paletteRange: [%d, %d]",
+		__func__, r, g, b, fadeTime, startIndex, startIndex + colorCount);
 	_fadeToColor(r, g, b, fadeTime, startIndex, colorCount);
 }
 
 void VideoDisplayManager::setToColor(Common::Array<ScriptValue> &args) {
 	if (args.size() < 6) {
-		error("%s: Too few script args", __func__);
+		warning("%s: Too few script args", __func__);
+		return;
 	}
 
 	byte r = static_cast<byte>(args[1].asFloat());
@@ -425,12 +568,15 @@ void VideoDisplayManager::setToColor(Common::Array<ScriptValue> &args) {
 	uint startIndex = static_cast<uint>(args[4].asFloat());
 	uint colorCount = static_cast<uint>(args[5].asFloat());
 
+	debugC(5, kDebugGraphics, "%s: (%d, %d, %d), paletteRange: [%d, %d]",
+		__func__, r, g, b, startIndex, startIndex + colorCount);
 	_setToColor(r, g, b, startIndex, colorCount);
 }
 
 void VideoDisplayManager::setToPercentOfPalette(Common::Array<ScriptValue> &args) {
 	if (args.size() < 7) {
-		error("%s: Too few script args", __func__);
+		warning("%s: Too few script args", __func__);
+		return;
 	}
 
 	double percent = args[1].asFloat();
@@ -440,6 +586,8 @@ void VideoDisplayManager::setToPercentOfPalette(Common::Array<ScriptValue> &args
 	uint startIndex = static_cast<uint>(args[5].asFloat());
 	uint colorCount = static_cast<uint>(args[6].asFloat());
 
+	debugC(5, kDebugGraphics, "%s: %f of (%d, %d, %d), paletteRange: [%d, %d]",
+		__func__, percent, r, g, b, startIndex, startIndex + colorCount);
 	_setPercentToColor(percent, r, g, b, startIndex, colorCount);
 }
 
@@ -456,13 +604,15 @@ void VideoDisplayManager::fadeToPaletteObject(Common::Array<ScriptValue> &args) 
 		return;
 	}
 	if (args.size() >= 3) {
-		fadeTime = args[2].asFloat();
+		fadeTime = args[2].asFloatOrTime();
 	}
 	if (args.size() >= 5) {
 		startIndex = static_cast<uint>(args[3].asFloat());
 		colorCount = static_cast<uint>(args[4].asFloat());
 	}
 
+	debugC(5, kDebugGraphics, "%s: %d, fadeTime: %f, paletteRange: [%d, %d]",
+		__func__, paletteId, fadeTime, startIndex, startIndex + colorCount);
 	_fadeToPaletteObject(paletteId, fadeTime, startIndex, colorCount);
 }
 
@@ -482,6 +632,8 @@ void VideoDisplayManager::setToPaletteObject(Common::Array<ScriptValue> &args) {
 		colorCount = static_cast<uint>(args[3].asFloat());
 	}
 
+	debugC(5, kDebugGraphics, "%s: %d, paletteRange: [%d, %d]",
+		__func__, paletteId, startIndex, startIndex + colorCount);
 	_setToPaletteObject(paletteId, startIndex, colorCount);
 }
 
@@ -495,7 +647,7 @@ void VideoDisplayManager::setToPercentOfPaletteObject(Common::Array<ScriptValue>
 		percent = args[1].asFloat();
 		paletteId = args[2].asActorId();
 	} else {
-		error("%s: Too few script args", __func__);
+		warning("%s: Too few script args", __func__);
 		return;
 	}
 	if (args.size() >= 5) {
@@ -503,6 +655,8 @@ void VideoDisplayManager::setToPercentOfPaletteObject(Common::Array<ScriptValue>
 		colorCount = static_cast<uint>(args[4].asFloat());
 	}
 
+	debugC(5, kDebugGraphics, "%s: %f of %d, paletteRange: [%d, %d]",
+		__func__, percent, paletteId, startIndex, startIndex + colorCount);
 	_setPercentToPaletteObject(percent, paletteId, startIndex, colorCount);
 }
 
@@ -516,6 +670,8 @@ void VideoDisplayManager::colorShiftCurrentPalette(Common::Array<ScriptValue> &a
 	uint startIndex = static_cast<uint>(args[2].asFloat());
 	uint colorCount = static_cast<uint>(args[3].asFloat());
 
+	debugC(5, kDebugGraphics, "%s: shift: %d, paletteRange: [%d, %d]",
+		__func__, shift, startIndex, startIndex + colorCount);
 	_colorShiftCurrentPalette(startIndex, shift, colorCount);
 }
 
@@ -535,7 +691,7 @@ void VideoDisplayManager::_setPalette(Graphics::Palette &palette, uint startInde
 }
 
 void VideoDisplayManager::_setPaletteToColor(Graphics::Palette &targetPalette, byte r, byte g, byte b) {
-	for (uint colorIndex = 0; colorIndex < Graphics::PALETTE_COUNT; colorIndex++) {
+	for (int colorIndex = 0; colorIndex < Graphics::PALETTE_COUNT; colorIndex++) {
 		targetPalette.set(colorIndex, r, g, b);
 	}
 }
@@ -674,47 +830,30 @@ void VideoDisplayManager::_colorShiftCurrentPalette(uint startIndex, uint shiftA
 }
 
 void VideoDisplayManager::_fadeToPaletteObject(uint paletteId, double fadeTime, uint startIndex, uint colorCount) {
-	Actor *actor = _vm->getActorById(paletteId);
-	if (actor == nullptr) {
-		error("%s: Got null target palette", __func__);
-	} else if (actor->type() != kActorTypePalette) {
-		error("%s: Actor %d is not a palette", __func__, paletteId);
-	}
-
-	Graphics::Palette *palette = static_cast<PaletteActor *>(actor)->_palette;
+	PaletteActor *paletteActor = static_cast<PaletteActor *>(_vm->getImtGod()->getActorByIdAndType(paletteId, kActorTypePalette));
+	Graphics::Palette *palette = paletteActor->_palette;
 	_fadeToPalette(fadeTime, *palette, startIndex, colorCount);
 }
 
 void VideoDisplayManager::_setToPaletteObject(uint paletteId, uint startIndex, uint colorCount) {
-	Actor *actor = _vm->getActorById(paletteId);
-	if (actor == nullptr) {
-		error("%s: Got null target palette", __func__);
-	} else if (actor->type() != kActorTypePalette) {
-		error("%s: Actor %d is not a palette", __func__, paletteId);
-	}
-
-	Graphics::Palette *palette = static_cast<PaletteActor *>(actor)->_palette;
+	PaletteActor *paletteActor = static_cast<PaletteActor *>(_vm->getImtGod()->getActorByIdAndType(paletteId, kActorTypePalette));
+	Graphics::Palette *palette = paletteActor->_palette;
 	_setPalette(*palette, startIndex, colorCount);
 }
 
 void VideoDisplayManager::_setPercentToPaletteObject(double percent, uint paletteId, uint startIndex, uint colorCount) {
-	Actor *actor = _vm->getActorById(paletteId);
-	if (actor == nullptr) {
-		error("%s: Got null target palette", __func__);
-	} else if (actor->type() != kActorTypePalette) {
-		error("%s: Actor %d is not a palette", __func__, paletteId);
-	}
-
-	Graphics::Palette *targetPalette = static_cast<PaletteActor *>(actor)->_palette;
-	_setToPercentPalette(percent, *_registeredPalette, *targetPalette, startIndex, colorCount);
+	PaletteActor *paletteActor = static_cast<PaletteActor *>(_vm->getImtGod()->getActorByIdAndType(paletteId, kActorTypePalette));
+	Graphics::Palette *palette = paletteActor->_palette;
+	_setToPercentPalette(percent, *_registeredPalette, *palette, startIndex, colorCount);
 }
 
 void VideoDisplayManager::imageBlit(
 	Common::Point destinationPoint,
-	const Bitmap *sourceImage,
+	const PixMapImage *sourceImage,
 	double dissolveFactor,
 	DisplayContext *displayContext,
-	Graphics::ManagedSurface *targetImage) {
+	Graphics::ManagedSurface *targetImage,
+	bool useTransBlit) {
 
 	byte blitFlags = kClipEnabled;
 	switch (sourceImage->getCompressionType()) {
@@ -726,11 +865,11 @@ void VideoDisplayManager::imageBlit(
 		break;
 
 	case kCccBitmapCompression:
-		blitFlags |= kCccBlit;
+		blitFlags |= kColorCellCompressionBlit;
 		break;
 
 	case kCccTransparentBitmapCompression:
-		blitFlags |= kCccTransparentBlit;
+		blitFlags |= kColorCellCompressionTransparentBlit;
 		break;
 
 	case kUncompressedTransparentBitmap:
@@ -756,18 +895,19 @@ void VideoDisplayManager::imageBlit(
 	Common::Array<Common::Rect> dirtyRegion;
 	if (displayContext == nullptr) {
 		if (targetImage == nullptr) {
-			warning("%s: Neither display context nor target image was provided", __func__);
+			warning("%s: Neither display context nor target image was provided. Drawing cannot continue", __func__);
+			return;
 		}
 		Common::Rect targetImageBounds(0, 0, targetImage->w, targetImage->h);
 		dirtyRegion.push_back(targetImageBounds);
 	} else {
 		Clip *currentClip = displayContext->currentClip();
 		dirtyRegion = currentClip->_region._rects;
-		destinationPoint += _displayContext._origin;
-	}
+		destinationPoint += displayContext->_origin;
 
-	if (targetImage == nullptr) {
-		targetImage = _screen;
+		if (targetImage == nullptr) {
+			targetImage = displayContext->_destImage;
+		}
 	}
 
 	// In the disasm, this whole function has complex blit flag logic
@@ -781,17 +921,19 @@ void VideoDisplayManager::imageBlit(
 		// non-transparent blitting, but we will just use simpleBlitFrom in both
 		// cases. It will pick the better method if there is no transparent
 		// color set.
-		blitRectsClip(targetImage, destinationPoint, sourceImage->_image, dirtyRegion);
+		blitRectsClip(targetImage, destinationPoint, sourceImage->_image, dirtyRegion, useTransBlit);
 		break;
 
 	case kRle8Blit | kClipEnabled:
 		rleBlitRectsClip(targetImage, destinationPoint, sourceImage, dirtyRegion);
 		break;
 
-	case kCccBlit | kClipEnabled:
-	case kCccTransparentBlit | kClipEnabled:
-		// CCC blitting is unimplemented for now because few, if any, titles actually use it.
-		error("%s: CCC blitting not implemented yet", __func__);
+	case kColorCellCompressionBlit | kClipEnabled:
+		cccBlitRectsClip(targetImage, destinationPoint, sourceImage, dirtyRegion);
+		break;
+
+	case kColorCellCompressionTransparentBlit | kClipEnabled:
+		cccTransparentBlitRectsClip(targetImage, destinationPoint, sourceImage, dirtyRegion);
 		break;
 
 	case kPartialDissolve | kClipEnabled:
@@ -813,7 +955,8 @@ void VideoDisplayManager::blitRectsClip(
 	Graphics::ManagedSurface *dest,
 	const Common::Point &destLocation,
 	const Graphics::ManagedSurface &source,
-	const Common::Array<Common::Rect> &dirtyRegion) {
+	const Common::Array<Common::Rect> &dirtyRegion,
+	bool useTransBlit) {
 
 	for (const Common::Rect &dirtyRect : dirtyRegion) {
 		Common::Rect destRect(destLocation, source.w, source.h);
@@ -823,7 +966,11 @@ void VideoDisplayManager::blitRectsClip(
 			// Calculate source coordinates (relative to source image).
 			Common::Point originOnScreen(areaToRedraw.origin());
 			areaToRedraw.translate(-destLocation.x, -destLocation.y);
-			dest->simpleBlitFrom(source, areaToRedraw, originOnScreen);
+			if (useTransBlit) {
+				dest->transBlitFrom(source, areaToRedraw, originOnScreen);
+			} else {
+				dest->simpleBlitFrom(source, areaToRedraw, originOnScreen);
+			}
 		}
 	}
 }
@@ -831,7 +978,7 @@ void VideoDisplayManager::blitRectsClip(
 void VideoDisplayManager::rleBlitRectsClip(
 	Graphics::ManagedSurface *dest,
 	const Common::Point &destLocation,
-	const Bitmap *source,
+	const PixMapImage *source,
 	const Common::Array<Common::Rect> &dirtyRegion) {
 
 	Graphics::ManagedSurface surface = decompressRle8Bitmap(source);
@@ -848,18 +995,58 @@ void VideoDisplayManager::rleBlitRectsClip(
 	}
 }
 
+void VideoDisplayManager::cccBlitRectsClip(
+	Graphics::ManagedSurface *dest,
+	const Common::Point &destLocation,
+	const PixMapImage *source,
+	const Common::Array<Common::Rect> &dirtyRegion) {
+
+	Graphics::ManagedSurface surface = decompressCccBitmap(source);
+	Common::Rect destRect(destLocation, source->width(), source->height());
+	for (const Common::Rect &dirtyRect : dirtyRegion) {
+		Common::Rect areaToRedraw = dirtyRect.findIntersectingRect(destRect);
+
+		if (!areaToRedraw.isEmpty()) {
+			// Calculate source coordinates (relative to source image).
+			Common::Point originOnScreen(areaToRedraw.origin());
+			areaToRedraw.translate(-destLocation.x, -destLocation.y);
+			dest->simpleBlitFrom(surface, areaToRedraw, originOnScreen);
+		}
+	}
+}
+
+void VideoDisplayManager::cccTransparentBlitRectsClip(
+	Graphics::ManagedSurface *dest,
+	const Common::Point &destLocation,
+	const PixMapImage *source,
+	const Common::Array<Common::Rect> &dirtyRegion) {
+
+	Graphics::ManagedSurface surface = decompressCccTransparentBitmap(source);
+	Common::Rect destRect(destLocation, source->width(), source->height());
+	for (const Common::Rect &dirtyRect : dirtyRegion) {
+		Common::Rect areaToRedraw = dirtyRect.findIntersectingRect(destRect);
+
+		if (!areaToRedraw.isEmpty()) {
+			// Calculate source coordinates (relative to source image).
+			Common::Point originOnScreen(areaToRedraw.origin());
+			areaToRedraw.translate(-destLocation.x, -destLocation.y);
+			dest->transBlitFrom(surface, areaToRedraw, originOnScreen);
+		}
+	}
+}
+
 void VideoDisplayManager::dissolveBlitRectsClip(
 	Graphics::ManagedSurface *dest,
 	const Common::Point &destPos,
-	const Bitmap *source,
+	const PixMapImage *source,
 	const Common::Array<Common::Rect> &dirtyRegion,
 	const uint integralDissolveFactor) {
 
 	byte dissolveIndex = DISSOLVE_PATTERN_COUNT;
 	if (integralDissolveFactor != 50) {
 		dissolveIndex = ((integralDissolveFactor + 2) / 4) - 1;
-		dissolveIndex = CLIP<byte>(dissolveIndex, 0, (DISSOLVE_PATTERN_COUNT - 1));
 	}
+	dissolveIndex = CLIP<byte>(dissolveIndex, 0, (DISSOLVE_PATTERN_COUNT - 1));
 
 	Common::Rect destRect(Common::Rect(destPos, source->width(), source->height()));
 	for (const Common::Rect &dirtyRect : dirtyRegion) {
@@ -877,7 +1064,7 @@ void VideoDisplayManager::dissolveBlit1Rect(
 	Graphics::ManagedSurface *dest,
 	const Common::Rect &areaToRedraw,
 	const Common::Point &originOnScreen,
-	const Bitmap *source,
+	const PixMapImage *source,
 	const Common::Rect &dirtyRegion,
 	const DissolvePattern &pattern) {
 
@@ -939,49 +1126,36 @@ void VideoDisplayManager::dissolveBlit1Rect(
 void VideoDisplayManager::imageDeltaBlit(
 	Common::Point deltaFramePos,
 	const Common::Point &keyFrameOffset,
-	const Bitmap *deltaFrame,
-	const Bitmap *keyFrame,
+	const PixMapImage *deltaFrame,
+	const PixMapImage *keyFrame,
 	const double dissolveFactor,
 	DisplayContext *displayContext) {
 
-	if (deltaFrame->getCompressionType() != kRle8BitmapCompression) {
-		error("%s: Unsupported delta frame compression type for delta blit: %d",
-			__func__, static_cast<uint>(keyFrame->getCompressionType()));
-	} else if (dissolveFactor != 1.0) {
+	Common::Array<Common::Rect> dirtyRegion;
+	if (displayContext != nullptr) {
+		Clip *currentClip = displayContext->currentClip();
+		dirtyRegion = currentClip->_region._rects;
+		deltaFramePos += displayContext->_origin;
+	} else {
+		warning("%s: Display context must be provided", __func__);
+		return;
+	}
+
+	if (dissolveFactor != 1.0) {
 		warning("%s: Delta blit does not support dissolving", __func__);
 	}
 
-	Common::Array<Common::Rect> dirtyRegion;
-	if (displayContext == nullptr) {
-		error("%s: Display context must be provided", __func__);
-	} else {
-		Clip *currentClip = displayContext->currentClip();
-		dirtyRegion = currentClip->_region._rects;
-		deltaFramePos += _displayContext._origin;
-	}
-
-	switch (keyFrame->getCompressionType()) {
-	case kUncompressedBitmap:
-	case kUncompressedTransparentBitmap:
-		deltaRleBlitRectsClip(_screen, deltaFramePos, deltaFrame, keyFrame, dirtyRegion);
-		break;
-
-	case kRle8BitmapCompression:
-		fullDeltaRleBlitRectsClip(_screen, deltaFramePos, keyFrameOffset, deltaFrame, keyFrame, dirtyRegion);
-		break;
-
-	default:
-		error("%s: Unsupported keyframe image type for delta blit: %d",
-			__func__, static_cast<uint>(deltaFrame->getCompressionType()));
-	}
+	// This is deliberately simplified logic for now. If we are trying to use an incorrect blitting
+	// mode, we will get an error in this call, rather than checking the blitting mode here.
+	fullDeltaRleBlitRectsClip(displayContext->_destImage, deltaFramePos, keyFrameOffset, deltaFrame, keyFrame, dirtyRegion);
 }
 
 void VideoDisplayManager::fullDeltaRleBlitRectsClip(
 	Graphics::ManagedSurface *destinationImage,
 	const Common::Point &deltaFramePos,
 	const Common::Point &keyFrameOffset,
-	const Bitmap *deltaFrame,
-	const Bitmap *keyFrame,
+	const PixMapImage *deltaFrame,
+	const PixMapImage *keyFrame,
 	const Common::Array<Common::Rect> &dirtyRegion) {
 
 	Graphics::ManagedSurface surface = decompressRle8Bitmap(deltaFrame, &keyFrame->_image, &keyFrameOffset);
@@ -1004,8 +1178,8 @@ void VideoDisplayManager::fullDeltaRleBlitRectsClip(
 void VideoDisplayManager::deltaRleBlitRectsClip(
 	Graphics::ManagedSurface *destinationImage,
 	const Common::Point &deltaFramePos,
-	const Bitmap *deltaFrame,
-	const Bitmap *keyFrame,
+	const PixMapImage *deltaFrame,
+	const PixMapImage *keyFrame,
 	const Common::Array<Common::Rect> &dirtyRegion) {
 
 	Common::Rect deltaFrameBounds = Common::Rect(deltaFramePos, deltaFrame->width(), deltaFrame->height());
@@ -1019,8 +1193,8 @@ void VideoDisplayManager::deltaRleBlitRectsClip(
 void VideoDisplayManager::deltaRleBlit1Rect(
 	Graphics::ManagedSurface *destinationImage,
 	const Common::Point &destinationPoint,
-	const Bitmap *deltaFrame,
-	const Bitmap *keyFrame,
+	const PixMapImage *deltaFrame,
+	const PixMapImage *keyFrame,
 	const Common::Rect &dirtyRect) {
 
 	// This is a very complex function that attempts to decompress the keyframe
@@ -1032,7 +1206,7 @@ void VideoDisplayManager::deltaRleBlit1Rect(
 }
 
 Graphics::ManagedSurface VideoDisplayManager::decompressRle8Bitmap(
-	const Bitmap *source,
+	const PixMapImage *source,
 	const Graphics::ManagedSurface *keyFrame,
 	const Common::Point *keyFrameOffset) {
 
@@ -1044,7 +1218,7 @@ Graphics::ManagedSurface VideoDisplayManager::decompressRle8Bitmap(
 
 	Common::SeekableReadStream *chunk = source->_compressedStream;
 	if (chunk == nullptr) {
-		warning("%s: Got empty image", __func__);
+		warning("%s: No image to decompress", __func__);
 		return dest;
 	}
 
@@ -1076,38 +1250,41 @@ Graphics::ManagedSurface VideoDisplayManager::decompressRle8Bitmap(
 
 				} else if (operation == 0x02) {
 					// Copy from the keyframe region.
-					assert((keyFrame != nullptr) && (keyFrameOffset != nullptr));
 					byte xToCopy = chunk->readByte();
 					byte yToCopy = chunk->readByte();
 
-					// If we requested to copy multiple lines, do that first.
-					for (int lineOffset = 0; lineOffset < yToCopy; lineOffset++) {
-						Common::Point keyFramePos = sourcePos - *keyFrameOffset + Common::Point(0, lineOffset);
-						Common::Point destPos = sourcePos + Common::Point(0, lineOffset);
+					if ((keyFrame == nullptr) || (keyFrameOffset == nullptr)) {
+						warning("%s: Keyframe copy (%d, %d) requested but keyframe or offset is null", __func__, xToCopy, yToCopy);
+					} else {
+						// If we requested to copy multiple lines, do that first.
+						for (int lineOffset = 0; lineOffset < yToCopy; lineOffset++) {
+							Common::Point keyFramePos = sourcePos - *keyFrameOffset + Common::Point(0, lineOffset);
+							Common::Point destPos = sourcePos + Common::Point(0, lineOffset);
 
+							bool sourceXInBounds = (keyFramePos.x >= 0) && (keyFramePos.x + xToCopy <= keyFrame->w);
+							bool sourceYInBounds = (keyFramePos.y >= 0) && (keyFramePos.y < keyFrame->h);
+							bool destInBounds = (destPos.y * dest.w) + (destPos.x + xToCopy) <= destSizeInBytes;
+							if (sourceXInBounds && sourceYInBounds && destInBounds) {
+								const byte *srcPtr = static_cast<const byte *>(keyFrame->getBasePtr(keyFramePos.x, keyFramePos.y));
+								byte *destPtr = static_cast<byte *>(dest.getBasePtr(destPos.x, destPos.y));
+								memcpy(destPtr, srcPtr, xToCopy);
+							} else {
+								warning("%s: Keyframe copy (multi-line) exceeds bounds", __func__);
+							}
+						}
+
+						// Then copy the pixels in the same line.
+						Common::Point keyFramePos = sourcePos - *keyFrameOffset;
 						bool sourceXInBounds = (keyFramePos.x >= 0) && (keyFramePos.x + xToCopy <= keyFrame->w);
 						bool sourceYInBounds = (keyFramePos.y >= 0) && (keyFramePos.y < keyFrame->h);
-						bool destInBounds = (destPos.y * dest.w) + (destPos.x + xToCopy) <= destSizeInBytes;
+						bool destInBounds = (sourcePos.y * dest.w) + (sourcePos.x + xToCopy) <= destSizeInBytes;
 						if (sourceXInBounds && sourceYInBounds && destInBounds) {
 							const byte *srcPtr = static_cast<const byte *>(keyFrame->getBasePtr(keyFramePos.x, keyFramePos.y));
-							byte *destPtr = static_cast<byte *>(dest.getBasePtr(destPos.x, destPos.y));
+							byte *destPtr = static_cast<byte *>(dest.getBasePtr(sourcePos.x, sourcePos.y));
 							memcpy(destPtr, srcPtr, xToCopy);
 						} else {
-							warning("%s: Keyframe copy (multi-line) exceeds bounds", __func__);
+							warning("%s: Keyframe copy (same line) exceeds bounds", __func__);
 						}
-					}
-
-					// Then copy the pixels in the same line.
-					Common::Point keyFramePos = sourcePos - *keyFrameOffset;
-					bool sourceXInBounds = (keyFramePos.x >= 0) && (keyFramePos.x + xToCopy <= keyFrame->w);
-					bool sourceYInBounds = (keyFramePos.y >= 0) && (keyFramePos.y < keyFrame->h);
-					bool destInBounds = (sourcePos.y * dest.w) + (sourcePos.x + xToCopy) <= destSizeInBytes;
-					if (sourceXInBounds && sourceYInBounds && destInBounds) {
-						const byte *srcPtr = static_cast<const byte *>(keyFrame->getBasePtr(keyFramePos.x, keyFramePos.y));
-						byte *destPtr = static_cast<byte *>(dest.getBasePtr(sourcePos.x, sourcePos.y));
-						memcpy(destPtr, srcPtr, xToCopy);
-					} else {
-						warning("%s: Keyframe copy (same line) exceeds bounds", __func__);
 					}
 
 					sourcePos += Common::Point(xToCopy, yToCopy);
@@ -1148,6 +1325,157 @@ Graphics::ManagedSurface VideoDisplayManager::decompressRle8Bitmap(
 		sourcePos.y++;
 		if (imageFullyRead) {
 			break;
+		}
+	}
+
+	return dest;
+}
+
+Graphics::ManagedSurface VideoDisplayManager::decompressCccBitmap(const PixMapImage *source) {
+	// In CCC (Color Cell Compression), the image is divided into 4x4 pixel blocks.
+	// Each block consists of color 1 (1 byte), color 2 (1 byte), and 4x4 bitmask (2 bytes).
+	// Each bit in the mask specifies which color to use.
+
+	// Create a surface to hold the decompressed bitmap.
+	Graphics::ManagedSurface dest;
+	dest.create(source->width(), source->height(), Graphics::PixelFormat::createFormatCLUT8());
+	dest.setTransparentColor(0);
+
+	Common::SeekableReadStream *compressedData = source->_compressedStream;
+	if (compressedData == nullptr) {
+		warning("%s: No image to decompress", __func__);
+		return dest;
+	}
+	compressedData->seek(0);
+
+	// Process each block of the image.
+	for (int16 blockY = 0; blockY < source->height(); blockY += CCC_BLOCK_DIMENSION) {
+		for (int16 blockX = 0; blockX < source->width(); blockX += CCC_BLOCK_DIMENSION) {
+			// Read the compressed block data.
+			byte color1 = compressedData->readByte();
+			byte color2 = compressedData->readByte();
+			uint16 bitmask = compressedData->readUint16BE();
+
+			// Calculate actual block dimensions and handle cases where the image boundary
+			// forces blocks smaller than 4x4.
+			int16 blockHeight = MIN<int16>(source->height() - blockY, CCC_BLOCK_DIMENSION);
+			int16 blockWidth = MIN<int16>(source->width() - blockX, CCC_BLOCK_DIMENSION);
+
+			// Decompress the block. In the original, a separate decompression method didn't exist.
+			// However, to reduce code duplication between the non-transparent and transparent CCC
+			// versions, we will use this helper.
+			decompressCccBlock(dest, blockX, blockY, color1, color2, bitmask, blockWidth, blockHeight);
+		}
+	}
+
+	return dest;
+}
+
+void VideoDisplayManager::decompressCccBlock(
+	Graphics::ManagedSurface &dest,
+	int16 blockX,
+	int16 blockY,
+	byte color1,
+	byte color2,
+	uint16 bitMask,
+	int16 blockWidth,
+	int16 blockHeight,
+	const byte *transparencyColor) {
+
+	// In CCC (Color Cell Compression), the image is divided into 4x4 pixel blocks (CCC blocks).
+	// The compressed stream consists of color 1 (1 byte), color 2 (1 byte), and 4x4 bitmask (2 bytes).
+	// Each bit in the mask specifies which color to use for each pixel. If transparency is enabled
+	// and we are requesting color 1, nothing is drawn.
+	bool backgroundIsTransparent = (transparencyColor != nullptr && color1 == *transparencyColor);
+
+	// Decompress the block.
+	for (int16 y = 0; y < blockHeight; y++) {
+		byte *rowPtr = static_cast<byte *>(dest.getBasePtr(blockX, blockY + y));
+
+		for (int16 x = 0; x < blockWidth; x++) {
+			// Check top bit of the bitmask.
+			if (bitMask & 0x8000) {
+				rowPtr[x] = color2;
+			} else if (!backgroundIsTransparent) {
+				rowPtr[x] = color1;
+			}
+
+			// Shift bitmask left so we can always check the top bit.
+			bitMask <<= 1;
+		}
+
+		// Skip unused bits in the mask for partial blocks.
+		int16 unusedBits = 4 - blockWidth;
+		bitMask <<= unusedBits;
+	}
+}
+
+Graphics::ManagedSurface VideoDisplayManager::decompressCccTransparentBitmap(const PixMapImage *source) {
+	// The CCC transparent format encodes CCC blocks framed in a command stream:
+	//   FF 00 00 00              End of image
+	//   FE ?? CC 00              Set transparency color to CC
+	//   ZZ ZZ YY XX              Position/count
+	//                              - ZZ: Number of CCC blocks following
+	//                              - YY: New Y position in 4x4 block units
+	//                              - XX: New X position in 4x4 block units
+	// Block data, as described above, follows each command.
+
+	// Create a surface to hold the decompressed bitmap.
+	Graphics::ManagedSurface dest;
+	dest.create(source->width(), source->height(), Graphics::PixelFormat::createFormatCLUT8());
+	byte transparencyColor = 0;
+	dest.setTransparentColor(transparencyColor);
+
+	Common::SeekableReadStream *compressedData = source->_compressedStream;
+	if (compressedData == nullptr) {
+		warning("%s: No image to decompress", __func__);
+		return dest;
+	}
+	compressedData->seek(0);
+
+	// Process command stream.
+	Common::Point blockPos;
+	while (true) {
+		// Check for end command.
+		uint32_t command = compressedData->readUint32BE();
+		if (command == 0xFF000000) {
+			break;
+		}
+
+		// Check for a new transparency color.
+		if ((command & 0xFF000000) == 0xFE000000) {
+			transparencyColor = (command >> 16) & 0xFF;
+			continue;
+		}
+
+		// Update drawing position.
+		uint16 blockCount = (command >> 16) & 0xFFFF;
+		byte yDelta = (command >> 8) & 0xFF;
+		byte xDelta = command & 0xFF;
+		if (yDelta == 0) {
+			// Do NOT change row position. Only skip xDelta blocks horizontally.
+			blockPos.x += xDelta * CCC_BLOCK_DIMENSION;
+		} else {
+			// Move to new row and column.
+			blockPos.y += yDelta * CCC_BLOCK_DIMENSION;
+			blockPos.x = xDelta * CCC_BLOCK_DIMENSION;
+		}
+
+		// Process each block in this run.
+		for (uint16 i = 0; i < blockCount; i++) {
+			// Read block data.
+			byte color1 = compressedData->readByte();
+			byte color2 = compressedData->readByte();
+			uint16 bitMask = compressedData->readUint16BE();
+
+			// Calculate actual block dimensions and handle cases where the image boundary
+			// forces blocks smaller than 4x4.
+			int16 blockHeight = MIN<int16>(source->height() - blockPos.y, CCC_BLOCK_DIMENSION);
+			int16 blockWidth = MIN<int16>(source->width() - blockPos.x, CCC_BLOCK_DIMENSION);
+
+			// Move to next block horizontally.
+			decompressCccBlock(dest, blockPos.x, blockPos.y, color1, color2, bitMask, blockWidth, blockHeight, &transparencyColor);
+			blockPos.x += CCC_BLOCK_DIMENSION;
 		}
 	}
 

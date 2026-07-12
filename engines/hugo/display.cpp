@@ -86,10 +86,6 @@ Screen::Screen(HugoEngine *vm) : _vm(vm) {
 	_dlAddIndex = 0;
 	_dlRestoreIndex = 0;
 
-	for (int i = 0; i < kNumFonts; i++) {
-		_arrayFont[i] = nullptr;
-		fontLoadedFl[i] = false;
-	}
 	for (int i = 0; i < kBlitListSize; i++) {
 		_dlBlistList[i]._x = 0;
 		_dlBlistList[i]._y = 0;
@@ -106,7 +102,6 @@ Screen::Screen(HugoEngine *vm) : _vm(vm) {
 		_dlRestoreList[i]._dx = 0;
 		_dlRestoreList[i]._dy = 0;
 	}
-	_fnt = 0;
 	_paletteSize = 0;
 
 	_frontSurface.init(320, 200, 320, _frontBuffer, Graphics::PixelFormat::createFormatCLUT8());
@@ -362,79 +357,12 @@ void Screen::displayList(int update, ...) {
 }
 
 /**
- * Write supplied character (font data) at sx,sy in supplied color
- * Font data as follows:
- * *(fontdata+1) = Font Height (pixels)
- * *(fontdata+1) = Font Width (pixels)
- * *(fontdata+x) = Font Bitmap (monochrome)
- */
-void Screen::writeChr(const int sx, const int sy, const byte color, const char *local_fontdata){
-	debugC(2, kDebugDisplay, "writeChr(%d, %d, %d, %d)", sx, sy, color, local_fontdata[0]);
-
-	byte height = local_fontdata[0];
-	byte width = 8; //local_fontdata[1];
-
-	// This can probably be optimized quite a bit...
-	for (int y = 0; y < height; ++y) {
-		for (int x = 0; x < width; ++x) {
-			int pixel = y * width + x;
-			int bitpos = pixel % 8;
-			int offset = pixel / 8;
-			byte bitTest = (1 << bitpos);
-			if ((local_fontdata[2 + offset] & bitTest) == bitTest)
-				_frontBuffer[(sy + y) * 320 + sx + x] = color;
-		}
-	}
-}
-
-/**
- * Returns height of characters in current font
- */
-int16 Screen::fontHeight() const {
-	debugC(2, kDebugDisplay, "fontHeight()");
-
-	static const int16 height[kNumFonts] = {5, 7, 8};
-	return height[_fnt - kFirstFont];
-}
-
-/**
- * Returns length of supplied string in pixels
- */
-int16 Screen::stringLength(const char *s) const {
-	debugC(2, kDebugDisplay, "stringLength(%s)", s);
-
-	byte *const*fontArr = _font[_fnt];
-	int16 sum = 0;
-	for (; *s; s++)
-		sum += *(fontArr[(uint)*s] + 1) + 1;
-
-	return sum;
-}
-
-/**
  * Return x which would center supplied string
  */
 int16 Screen::center(const char *s) const {
 	debugC(1, kDebugDisplay, "center(%s)", s);
 
 	return (int16)((kXPix - stringLength(s)) >> 1);
-}
-
-/**
- * Write string at sx,sy in supplied color in current font
- * If sx == CENTER, center it
- */
-void Screen::writeStr(int16 sx, const int16 sy, const char *s, const byte color) {
-	debugC(2, kDebugDisplay, "writeStr(%d, %d, %s, %d)", sx, sy, s, color);
-
-	if (sx == kCenter)
-		sx = center(s);
-
-	byte *const*font = _font[_fnt];
-	for (; *s; s++) {
-		writeChr(sx, sy, color, (char *)font[(uint)*s]);
-		sx += *(font[(uint)*s] + 1) + 1;
-	}
 }
 
 /**
@@ -537,17 +465,24 @@ void Screen::displayPromptText() {
 	_vm->_system->copyRectToScreen(&_frontBuffer[r.top * 320], 320, r.left, r.top, r.width(), r.height());
 }
 
+/**
+ * Display diamond in Hugo1 DOS introduction
+ *
+ * x,y: upper left of diamond.
+ * color1: left color.
+ * color2: right color.
+ */
 void Screen::drawShape(const int x, const int y, const int color1, const int color2) {
 	for (int i = 0; i < kShapeSize; i++) {
-		for (int j = 0; j < i; j++) {
-			_backBuffer[320 * (y + i) + (x + kShapeSize + j - i)] = color1;
-			_frontBuffer[320 * (y + i) + (x + kShapeSize + j - i)] = color1;
-			_backBuffer[320 * (y + i) + (x + kShapeSize + j)] = color2;
-			_frontBuffer[320 * (y + i) + (x + kShapeSize + j)] = color2;
-			_backBuffer[320 * (y + (2 * kShapeSize - 1) - i) + (x + kShapeSize + j - i)] = color1;
-			_frontBuffer[320 * (y + (2 * kShapeSize - 1) - i) + (x + kShapeSize + j - i)] = color1;
-			_backBuffer[320 * (y + (2 * kShapeSize - 1) - i) + (x + kShapeSize + j)] = color2;
-			_frontBuffer[320 * (y + (2 * kShapeSize - 1) - i) + (x + kShapeSize + j)] = color2;
+		const int top = y + i;
+		const int bottom = y + (kShapeSize * 2) - 2 - i;
+		for (int j = 0; j <= i; j++) {
+			const int left  = x + kShapeSize - 1 - j;
+			const int right = x + kShapeSize + j;
+			_frontBuffer[320 * top + left] = color1;
+			_frontBuffer[320 * top + right] = color2;
+			_frontBuffer[320 * bottom + left] = color1;
+			_frontBuffer[320 * bottom + right] = color2;
 		}
 	}
 }
@@ -890,11 +825,6 @@ void Screen::initNewScreenDisplay() {
 void Screen::freeScreen() {
 	free(_curPalette);
 	free(_mainPalette);
-
-	for (int i = 0; i < kNumFonts; i++) {
-		if (_arrayFont[i])
-			free(_arrayFont[i]);
-	}
 }
 
 void Screen::selectInventoryObjId(const int16 objId) {
@@ -981,54 +911,28 @@ Screen_v1d::~Screen_v1d() {
 }
 
 /**
- * Load font file, construct font ptrs and reverse data bytes
- * TODO: This uses hardcoded fonts in hugo.dat, it should be replaced
- *       by a proper implementation of .FON files
+ * Load font file. There is no font file in DOS, we use
+ * Graphics::DosFont to implement the Windows interface.
  */
 void Screen_v1d::loadFont(const int16 fontId) {
-	debugC(2, kDebugDisplay, "loadFont(%d)", fontId);
-
-	assert(fontId < kNumFonts);
-
-	_fnt = fontId - kFirstFont;                     // Set current font number
-
-	if (fontLoadedFl[_fnt])                         // If already loaded, return
-		return;
-
-	fontLoadedFl[_fnt] = true;
-
-	memcpy(_fontdata[_fnt], _arrayFont[_fnt], _arrayFontSize[_fnt]);
-	_font[_fnt][0] = _fontdata[_fnt];               // Store height,width of fonts
-
-	int16 offset = 2;                               // Start at fontdata[2] ([0],[1] used for height,width)
-
-	// Setup the font array (127 characters)
-	for (int i = 1; i < 128; i++) {
-		_font[_fnt][i] = _fontdata[_fnt] + offset;
-		byte height = *(_fontdata[_fnt] + offset);
-		byte width  = *(_fontdata[_fnt] + offset + 1);
-
-		int16 size = height * ((width + 7) >> 3);
-		for (int j = 0; j < size; j++)
-			Utils::reverseByte(&_fontdata[_fnt][offset + 2 + j]);
-
-		offset += 2 + size;
-	}
 }
 
 /**
- * Load fonts from Hugo.dat
- * These fonts are a workaround to avoid handling TTF fonts used by DOS versions
- * TODO: Get rid of this function when the win1 fonts are supported
+ * Returns height of characters in current font
  */
-void Screen_v1d::loadFontArr(Common::ReadStream &in) {
-	for (int i = 0; i < kNumFonts; i++) {
-		_arrayFontSize[i] = in.readUint16BE();
-		_arrayFont[i] = (byte *)malloc(sizeof(byte) * _arrayFontSize[i]);
-		for (int j = 0; j < _arrayFontSize[i]; j++) {
-			_arrayFont[i][j] = in.readByte();
-		}
-	}
+int16 Screen_v1d::fontHeight() const {
+	debugC(2, kDebugDisplay, "fontHeight()");
+
+	return _dosFont.getFontHeight();
+}
+
+/**
+ * Returns length of supplied string in pixels
+ */
+int16 Screen_v1d::stringLength(const char *s) const {
+	debugC(2, kDebugDisplay, "stringLength(%s)", s);
+
+	return _dosFont.getStringWidth(s);
 }
 
 /**
@@ -1121,7 +1025,23 @@ void Screen_v1d::loadPalette(Common::SeekableReadStream &in) {
 	memcpy(_curPalette, egaPalette.data(), _paletteSize);
 }
 
+void Screen_v1d::writeStr(int16 sx, const int16 sy, const char *s, const byte color) {
+	debugC(2, kDebugDisplay, "writeStr(%d, %d, %s, %d)", sx, sy, s, color);
+
+	if (sx == kCenter)
+		sx = center(s);
+
+	for (; *s; s++) {
+		_dosFont.drawChar(&_frontSurface, (byte)*s, sx, sy, color);
+		sx += 8;
+	}
+}
+
 Screen_v1w::Screen_v1w(HugoEngine *vm) : Screen(vm) {
+	for (int i = 0; i < kNumFonts; i++) {
+		fontLoadedFl[i] = false;
+	}
+	_fnt = 0;
 }
 
 Screen_v1w::~Screen_v1w() {
@@ -1161,14 +1081,27 @@ void Screen_v1w::loadFont(const int16 fontId) {
 }
 
 /**
- * Skips the fonts used by the DOS versions
+ * Returns height of characters in current font
  */
-void Screen_v1w::loadFontArr(Common::ReadStream &in) {
-	for (int i = 0; i < kNumFonts; i++) {
-		uint16 numElem = in.readUint16BE();
-		for (int j = 0; j < numElem; j++)
-			in.readByte();
-	}
+int16 Screen_v1w::fontHeight() const {
+	debugC(2, kDebugDisplay, "fontHeight()");
+
+	static const int16 height[kNumFonts] = {5, 7, 8};
+	return height[_fnt - kFirstFont];
+}
+
+/**
+ * Returns length of supplied string in pixels
+ */
+int16 Screen_v1w::stringLength(const char *s) const {
+	debugC(2, kDebugDisplay, "stringLength(%s)", s);
+
+	byte *const*fontArr = _font[_fnt];
+	int16 sum = 0;
+	for (; *s; s++)
+		sum += *(fontArr[(uint)*s] + 1) + 1;
+
+	return sum;
 }
 
 /**
@@ -1235,6 +1168,49 @@ void Screen_v1w::loadPalette(Common::SeekableReadStream &in) {
 	_curPalette = (byte *)malloc(sizeof(byte) * _paletteSize);
 	for (int i = 0; i < _paletteSize; i++)
 		_curPalette[i] = _mainPalette[i] = in.readByte();
+}
+
+/**
+ * Write string at sx,sy in supplied color in current font
+ * If sx == CENTER, center it
+ */
+void Screen_v1w::writeStr(int16 sx, const int16 sy, const char *s, const byte color) {
+	debugC(2, kDebugDisplay, "writeStr(%d, %d, %s, %d)", sx, sy, s, color);
+
+	if (sx == kCenter)
+		sx = center(s);
+
+	byte *const*font = _font[_fnt];
+	for (; *s; s++) {
+		writeChr(sx, sy, color, (char *)font[(uint)*s]);
+		sx += *(font[(uint)*s] + 1) + 1;
+	}
+}
+
+/**
+ * Write supplied character (font data) at sx,sy in supplied color
+ * Font data as follows:
+ * *(fontdata+1) = Font Height (pixels)
+ * *(fontdata+1) = Font Width (pixels)
+ * *(fontdata+x) = Font Bitmap (monochrome)
+ */
+void Screen_v1w::writeChr(const int sx, const int sy, const byte color, const char *local_fontdata){
+	debugC(2, kDebugDisplay, "writeChr(%d, %d, %d, %d)", sx, sy, color, local_fontdata[0]);
+
+	byte height = local_fontdata[0];
+	byte width = 8; //local_fontdata[1];
+
+	// This can probably be optimized quite a bit...
+	for (int y = 0; y < height; ++y) {
+		for (int x = 0; x < width; ++x) {
+			int pixel = y * width + x;
+			int bitpos = pixel % 8;
+			int offset = pixel / 8;
+			byte bitTest = (1 << bitpos);
+			if ((local_fontdata[2 + offset] & bitTest) == bitTest)
+				_frontBuffer[(sy + y) * 320 + sx + x] = color;
+		}
+	}
 }
 
 } // End of namespace Hugo

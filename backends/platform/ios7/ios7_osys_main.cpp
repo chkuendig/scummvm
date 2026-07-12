@@ -47,12 +47,14 @@
 #include "graphics/cursorman.h"
 #include "gui/gui-manager.h"
 
+#include "backends/events/default/default-events.h"
 #include "backends/graphics/ios/ios-graphics.h"
 #include "backends/saves/default/default-saves.h"
 #include "backends/timer/default/default-timer.h"
 #include "backends/mutex/pthread/pthread-mutex.h"
 #include "backends/fs/chroot/chroot-fs-factory.h"
 #include "backends/fs/posix/posix-fs.h"
+#include "backends/text-to-speech/avfaudio/avfaudio-text-to-speech.h"
 #include "audio/mixer.h"
 #include "audio/mixer_intern.h"
 
@@ -90,7 +92,7 @@ OSystem_iOS7::OSystem_iOS7() :
 	_screenOrientation(kScreenOrientationAuto),
 	_runningTasks(0) {
 	_queuedInputEvent.type = Common::EVENT_INVALID;
-	_currentTouchMode = kTouchModeTouchpad;
+	_currentTouchMode = Common::kTouchModeTouchpad;
 
 	_chrootBasePath = iOS7_getDocumentsDir();
 	ChRootFilesystemFactory *chFsFactory = new ChRootFilesystemFactory(_chrootBasePath);
@@ -152,6 +154,8 @@ int OSystem_iOS7::timerHandler(int t) {
 }
 
 void OSystem_iOS7::initBackend() {
+	_eventManager = new DefaultEventManager(this);
+
 	_savefileManager = new SandboxedSaveFileManager(Common::Path(_chrootBasePath, Common::Path::kNativeSeparator), "/Savegames");
 
 	_timerManager = new DefaultTimerManager();
@@ -160,13 +164,18 @@ void OSystem_iOS7::initBackend() {
 
 	_graphicsManager = new iOSGraphicsManager();
 
+#ifdef USE_TTS
+	// Initialize Text to Speech manager
+	_textToSpeechManager = new AVFAudioTextToSpeechManager();
+#endif
+
 	setupMixer();
 
 	setTimerCallback(&OSystem_iOS7::timerHandler, 10);
 
 	ConfMan.registerDefault("iconspath", Common::Path("/"));
 
-	EventsBaseBackend::initBackend();
+	BaseBackend::initBackend();
 }
 
 bool OSystem_iOS7::hasFeature(Feature f) {
@@ -182,6 +191,10 @@ bool OSystem_iOS7::hasFeature(Feature f) {
 	case kFeatureNoQuit:
 	case kFeatureKbdMouseSpeed:
 	case kFeatureTouchscreen:
+	// Opt in to the shared Control-tab touch section (on-screen control
+	// checkbox + per-context touch-mode dropdowns). iOS renders the toggle and
+	// the on-screen gamepad natively (see ios7_video / GCVirtualController).
+	case kFeatureTouchpadMode:
 #ifdef SCUMMVM_NEON
 	case kFeatureCpuNEON:
 #endif
@@ -208,6 +221,11 @@ bool OSystem_iOS7::getFeatureState(Feature f) {
 	switch (f) {
 	case kFeatureVirtualKeyboard:
 		return isKeyboardShown();
+
+	case kFeatureTouchpadMode:
+		// The per-context touch modes are driven by the shared Control tab and
+		// the native toggle, not by this legacy single-mode flag.
+		return false;
 
 	default:
 		return ModularGraphicsBackend::getFeatureState(f);
@@ -402,6 +420,9 @@ void OSystem_iOS7::addSysArchivesToSearchSet(Common::SearchSet &s, int priority)
 		}
 		CFRelease(fileUrl);
 	}
+	// Add the current dir as a very last resort (cf. bug #3984).
+	// TODO: check if it's really needed
+	s.addDirectory(".", ".", priority - 1);
 }
 
 void iOS7_buildSharedOSystemInstance() {
@@ -425,7 +446,7 @@ TouchMode iOS7_getCurrentTouchMode() {
 	if (!sys) {
 		// If the system has not finished loading, just return a
 		// default value.
-		return kTouchModeDirect;
+		return Common::kTouchModeMouse;
 	}
 	return sys->getCurrentTouchMode();
 }

@@ -476,7 +476,10 @@ static Audio::AudioStream *checkForBrokenIndy4Sample(Common::SeekableReadStream 
 void Sound::startTalkSound(uint32 offset, uint32 length, int mode, Audio::SoundHandle *handle) {
 	int num = 0, i;
 	int id = -1;
+
+#if defined(USE_FLAC) || defined(USE_VORBIS) || defined(USE_MAD)
 	int size = 0;
+#endif
 	Common::ScopedPtr<ScummFile> file;
 	uint32 origOffset = offset;
 
@@ -1501,7 +1504,7 @@ int ScummEngine::readSoundResource(ResId idx) {
 	}
 
 	if (total_size)
-		warning("Unrecognized base tag '%c%c%c%c' in sound %d", (basetag >> 24) & 0xFF, (basetag >> 16) & 0xFF, (basetag >> 8) & 0xFF, basetag & 0xFF, idx);
+		warning("Unrecognized base tag '%s' in sound %d", tag2str(basetag), idx);
 	_res->_types[rtSound][idx]._roomoffs = RES_INVALID_OFFSET;
 	return 0;
 }

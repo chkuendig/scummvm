@@ -50,7 +50,7 @@ struct AQCallbackStruct {
 	AudioStreamBasicDescription dataFormat;
 };
 
-class OSystem_iOS7 : public ModularGraphicsBackend, public EventsBaseBackend {
+class OSystem_iOS7 : virtual public BaseBackend, public ModularGraphicsBackend, Common::EventSource {
 protected:
 	static AQCallbackStruct s_AudioQueue;
 	static SoundProc s_soundCallback;
@@ -104,6 +104,9 @@ public:
 	void setSupportedScreenOrientation(ScreenOrientation screenOrientation);
 #endif
 	void applyTouchSettings(bool _3dMode, bool overlayShown);
+	// Refresh the on-screen toggle icon and (dis)connect the native virtual
+	// controller to match the current touch mode.
+	void updateTouchMode();
 
 	uint createOpenGLContext();
 	void destroyOpenGLContext();
@@ -166,7 +169,6 @@ public:
 
 protected:
 	void updateOutputSurface();
-	void updateTouchMode();
 	void setShowKeyboard(bool);
 	bool isKeyboardShown() const;
 

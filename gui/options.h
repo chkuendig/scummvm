@@ -135,7 +135,19 @@ private:
 	//
 	bool _enableControlSettings;
 
+	// Single-mode touchpad toggle (legacy). Only created on non-OpenGL SDL
+	// backends; OpenGL backends use the per-context touch modes below instead.
 	CheckboxWidget *_touchpadCheckbox;
+
+	// On-screen touch controls (per-context touch mode presets), merged into
+	// the Control tab. Shown when the backend has kFeatureTouchpadMode.
+	CheckboxWidget *_onscreenControlCheckbox;
+	StaticTextWidget *_touchModeMenusDesc;
+	PopUpWidget *_touchModeMenusPopUp;
+	StaticTextWidget *_touchMode2DGamesDesc;
+	PopUpWidget *_touchMode2DGamesPopUp;
+	StaticTextWidget *_touchMode3DGamesDesc;
+	PopUpWidget *_touchMode3DGamesPopUp;
 
 	StaticTextWidget *_kbdMouseSpeedDesc;
 	SliderWidget *_kbdMouseSpeedSlider;
@@ -317,6 +329,7 @@ protected:
 	CheckboxWidget *_guiReturnToLauncherAtExit;
 	CheckboxWidget *_guiConfirmExit;
 	CheckboxWidget *_guiDisableBDFScaling;
+	CheckboxWidget *_guiKineticScrolling;
 
 	void addGUIControls(GuiObject *boss, const Common::String &prefix, bool lowres);
 

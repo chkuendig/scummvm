@@ -908,8 +908,8 @@ ValueDisplayDialog::ValueDisplayDialog(const Common::U32String &label, int minVa
 	assert(_min <= _value && _value <= _max);
 }
 
-void ValueDisplayDialog::drawDialog(GUI::DrawLayer layerToDraw) {
-	Dialog::drawDialog(layerToDraw);
+void ValueDisplayDialog::drawDialog(GUI::DrawLayer layerToDraw, bool resetClipping) {
+	Dialog::drawDialog(layerToDraw, resetClipping);
 
 	const int labelWidth = _w - 8 - _percentBarWidth;
 	g_gui.theme()->drawText(Common::Rect(_x+4, _y+4, _x+labelWidth+4,
@@ -1218,6 +1218,13 @@ GUI::CheckboxWidget *ScummOptionsContainerWidget::createSegaShadowModeCheckbox(G
 	return new GUI::CheckboxWidget(boss, name,
 		_("Simulate Sega colors"),
 		_("Instead of using the colors defined in the game, simulate colors used on actual Sega hardware. These are significantly darker, though it's unclear if that was intended or not.")
+	);
+}
+
+GUI::CheckboxWidget *ScummOptionsContainerWidget::createSegaCdWaitCursorWhenPausedCheckbox(GuiObject *boss, const Common::String &name) {
+	return new GUI::CheckboxWidget(boss, name,
+		_("Show wait cursor when paused"),
+		_("When paused, show the animated wait cursor from the original Sega CD version.")
 	);
 }
 
@@ -1694,6 +1701,9 @@ MI1CdGameOptionsWidget::MI1CdGameOptionsWidget(GuiObject *boss, const Common::St
 	if (platform == Common::kPlatformSegaCD)
 		_enableSegaShadowModeCheckbox = createSegaShadowModeCheckbox(widgetsBoss(), "MI1CdGameOptionsDialog.EnableSegaShadowMode");
 
+	if (platform == Common::kPlatformSegaCD)
+		_enableSegaCdWaitCursorWhenPausedCheckbox = createSegaCdWaitCursorWhenPausedCheckbox(widgetsBoss(), "MI1CdGameOptionsDialog.EnableSegaCdWaitCursorWhenPaused");
+
 	GUI::StaticTextWidget *text = new GUI::StaticTextWidget(widgetsBoss(), "MI1CdGameOptionsDialog.IntroAdjustmentLabel", _("Intro Adjust:"));
 
 	text->setAlign(Graphics::TextAlign::kTextAlignEnd);
@@ -1729,6 +1739,13 @@ void MI1CdGameOptionsWidget::load() {
 	if (_enableSegaShadowModeCheckbox)
 		_enableSegaShadowModeCheckbox->setState(ConfMan.getBool("enable_sega_shadow_mode", _domain));
 
+	if (_enableSegaCdWaitCursorWhenPausedCheckbox) {
+		bool enabled = false;
+		if (ConfMan.hasKey("sega_cd_wait_cursor_when_paused", _domain))
+			enabled = ConfMan.getBool("sega_cd_wait_cursor_when_paused", _domain);
+		_enableSegaCdWaitCursorWhenPausedCheckbox->setState(enabled);
+	}
+
 	int introAdjustment = 0;
 	int outlookAdjustment = 0;
 
@@ -1755,6 +1772,9 @@ bool MI1CdGameOptionsWidget::save() {
 	if (_enableSegaShadowModeCheckbox)
 		ConfMan.setBool("enable_sega_shadow_mode", _enableSegaShadowModeCheckbox->getState(), _domain);
 
+	if (_enableSegaCdWaitCursorWhenPausedCheckbox)
+		ConfMan.setBool("sega_cd_wait_cursor_when_paused", _enableSegaCdWaitCursorWhenPausedCheckbox->getState(), _domain);
+
 	ConfMan.setInt("mi1_intro_adjustment", _introAdjustmentSlider->getValue(), _domain);
 	ConfMan.setInt("mi1_outlook_adjustment", _outlookAdjustmentSlider->getValue(), _domain);
 	ConfMan.setBool("original_gui", _enableOriginalGUICheckbox->getState(), _domain);
@@ -1776,6 +1796,9 @@ void MI1CdGameOptionsWidget::defineLayout(GUI::ThemeEval &layouts, const Common:
 
 	if (platform == Common::kPlatformSegaCD)
 		layouts.addWidget("EnableSegaShadowMode", "Checkbox");
+
+	if (platform == Common::kPlatformSegaCD)
+		layouts.addWidget("EnableSegaCdWaitCursorWhenPaused", "Checkbox");
 
 #ifdef USE_TTS
 	layouts.addWidget("EnableTTS", "Checkbox");

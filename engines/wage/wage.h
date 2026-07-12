@@ -92,8 +92,7 @@ typedef Common::List<Chr *> ChrList;
 #define STORAGESCENE "STORAGE@"
 
 enum {
-	kDebugImGui = 1,
-	kDebugSound,
+	kDebugSound = 1,
 	kDebugLoading,
 };
 
@@ -220,6 +219,7 @@ public:
 	Audio::PCSpeaker *_speaker;
 
 	void playSound(Common::String soundName, bool blocking = true);
+	void playStartupSound(byte *stream, uint32 size, int divisor);
 	void updateSoundTimerForScene(Scene *scene, bool firstTime);
 	void setMenu(Common::String soundName);
 	void appendText(const char *str);

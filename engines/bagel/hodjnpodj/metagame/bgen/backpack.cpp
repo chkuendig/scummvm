@@ -81,7 +81,6 @@ static  CFont *pFont = nullptr;                  // font to use for displaying b
 //static  char        chPathName[128];                // buffer to hold path name of the backpack file
 
 static  bool        bActiveWindow = false;          // whether our window is active
-static  bool        bFirstTime = true;              // flag for first time information is displayed
 static  int         nBackpack_DX, nBackpack_DY;     // size of useable backpack background
 static  int         nItem_DDX, nItem_DDY;           // space separation between inventory items
 static  int         nItemsPerColumn, nItemsPerRow;  // span of items that fit on the background
@@ -270,6 +269,7 @@ void CBackpack::OnDestroy() {
 		pItemText = nullptr;
 	}
 
+	bFirstTime = true;
 	CDialog::OnDestroy();
 }
 

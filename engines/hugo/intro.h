@@ -63,7 +63,9 @@ protected:
 	byte *_introY;
 	byte  _introXSize;
 	int16 _introTicks;                              // Count calls to introPlay()
+	byte *_logo_v1d;
 
+	void loadFont(const char *fileName, const char *faceName, uint16 sizeInPoints);
 	bool wait(uint32 delay);
 };
 
@@ -86,6 +88,8 @@ public:
 	void introInit() override;
 	bool introPlay() override;
 private:
+	void drawLogo(int left, int top, int color);
+
 	int _introState;
 };
 

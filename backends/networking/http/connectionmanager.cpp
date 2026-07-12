@@ -101,6 +101,15 @@ void ConnectionManager::startTimer(int interval) {
 	}
 }
 
+void ConnectionManager::restartTimer() {
+	// The TimerManager our proc lived on may have been replaced, taking the
+	// proc with it. Forget the old registration and reinstall on the current
+	// TimerManager. handle() will stop the timer again on the next tick if
+	// there is no outstanding work.
+	_timerStarted = false;
+	startTimer();
+}
+
 void ConnectionManager::stopTimer() {
 	debug(9, "timer stopped");
 	Common::TimerManager *manager = g_system->getTimerManager();

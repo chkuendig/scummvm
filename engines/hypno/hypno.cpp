@@ -94,6 +94,15 @@ HypnoEngine::HypnoEngine(OSystem *syst, const ADGameDescription *gd)
 	if (!Common::parseBool(ConfMan.get("subtitles"), _useSubtitles))
 		warning("Failed to parse bool from subtitles options");
 
+	_gamepadAimPosition = Common::Point(0, 0);
+	_gamepadAxisX = 0;
+	_gamepadAxisY = 0;
+	_gamepadAimActive = false;
+	_gamepadAimLeft = false;
+	_gamepadAimDown = false;
+	_gamepadAimRight = false;
+	_gamepadAimUp = false;
+
 	// Add quit level
 	Hotspot q(MakeMenu);
 	Action *a = new Quit();
@@ -324,6 +333,19 @@ void HypnoEngine::runIntro(MVideo &video) {
 	tmp.push_back(video);
 	runIntros(tmp);
 
+	delete _subtitles;
+	_subtitles = nullptr;
+	g_system->hideOverlay();
+}
+
+void HypnoEngine::runIntrosWithSubtitles(Videos &videos) {
+	if (videos.empty())
+		return;
+
+	loadSubtitles(Common::Path(videos[0].path));
+	if (!_subtitles)
+		warning("Conversation: failed to load subtitles for video '%s'", videos[0].path.c_str());
+	runIntros(videos);
 	delete _subtitles;
 	_subtitles = nullptr;
 	g_system->hideOverlay();

@@ -77,7 +77,9 @@ void OpenGLRenderer::init() {
 
 	glDisable(GL_LIGHTING);
 	glDisable(GL_TEXTURE_2D);
-	glEnable(GL_DEPTH_TEST);
+	glEnable(GL_CULL_FACE);
+	glFrontFace(GL_CW);
+	glCullFace(GL_BACK);
 	glEnable(GL_SCISSOR_TEST);
 	setViewport(_viewport);
 	glEnable(GL_DEPTH_CLAMP);
@@ -126,7 +128,8 @@ void OpenGLRenderer::drawTexturedRect2D(const Common::Rect &screenRect, const Co
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
 
-	glDisable(GL_DEPTH_TEST);
+
+	glDisable(GL_CULL_FACE);
 	glEnable(GL_TEXTURE_2D);
 	glColor4f(1.0, 1.0, 1.0, 1.0);
 	glDepthMask(GL_FALSE);
@@ -154,7 +157,7 @@ void OpenGLRenderer::drawTexturedRect2D(const Common::Rect &screenRect, const Co
 
 	glDisable(GL_BLEND);
 	glDepthMask(GL_TRUE);
-	glEnable(GL_DEPTH_TEST);
+	glEnable(GL_CULL_FACE);
 	glBindTexture(GL_TEXTURE_2D, 0); // Bind the default (empty) texture to avoid darker colors!
 	glFlush();
 }
@@ -162,7 +165,7 @@ void OpenGLRenderer::drawTexturedRect2D(const Common::Rect &screenRect, const Co
 void OpenGLRenderer::drawSkybox(Texture *texture, Math::Vector3d camera) {
 	OpenGLTexture *glTexture = static_cast<OpenGLTexture *>(texture);
 
-	glDisable(GL_DEPTH_TEST);
+	glDisable(GL_CULL_FACE);
 	glEnable(GL_TEXTURE_2D);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
 
@@ -171,6 +174,8 @@ void OpenGLRenderer::drawSkybox(Texture *texture, Math::Vector3d camera) {
 	glNormalPointer(GL_FLOAT, 0, _skyNormals);
 	if (texture->_width == 1008)
 		glTexCoordPointer(2, GL_FLOAT, 0, _skyUvs1008);
+	else if (texture->_width == 672)
+		glTexCoordPointer(2, GL_FLOAT, 0, _skyUvs672);
 	else if (texture->_width == 128)
 		glTexCoordPointer(2, GL_FLOAT, 0, _skyUvs128);
 	else
@@ -195,7 +200,7 @@ void OpenGLRenderer::drawSkybox(Texture *texture, Math::Vector3d camera) {
 
 	glBindTexture(GL_TEXTURE_2D, 0);
 	glDisable(GL_TEXTURE_2D);
-	glEnable(GL_DEPTH_TEST);
+	glEnable(GL_CULL_FACE);
 	glFlush();
 }
 
@@ -250,7 +255,12 @@ void OpenGLRenderer::updateProjectionMatrix(float fov, float aspectRatio, float 
 	float ymaxValue = xmaxValue / aspectRatio;
 
 	// Corrected glFrustum call
-	glFrustum(-xmaxValue, xmaxValue, -ymaxValue, ymaxValue, nearClipPlane, farClipPlane);
+	if (_stereoEye == kStereoEyeLeft || _stereoEye == kStereoEyeRight) {
+		float stereoOffset = getStereoFrustumOffset(nearClipPlane, false);
+		glFrustum(-xmaxValue + stereoOffset, xmaxValue + stereoOffset, -ymaxValue, ymaxValue, nearClipPlane, farClipPlane);
+	} else {
+		glFrustum(-xmaxValue, xmaxValue, -ymaxValue, ymaxValue, nearClipPlane, farClipPlane);
+	}
 	glScalef(-1.0f, 1.0f, 1.0f);
 
 	glMatrixMode(GL_MODELVIEW);
@@ -260,10 +270,20 @@ void OpenGLRenderer::updateProjectionMatrix(float fov, float aspectRatio, float 
 void OpenGLRenderer::positionCamera(const Math::Vector3d &pos, const Math::Vector3d &interest, float rollAngle) {
 	Math::Vector3d up_vec(0, 1, 0);
 
-	Math::Matrix4 lookMatrix = Math::makeLookAtMatrix(pos, interest, up_vec);
-	glMultMatrixf(lookMatrix.getData());
-	glRotatef(rollAngle, 0.0f, 0.0f, 1.0f);
-	glTranslatef(-pos.x(), -pos.y(), -pos.z());
+	if (_stereoEye == kStereoEyeLeft || _stereoEye == kStereoEyeRight) {
+		Math::Vector3d eyePos;
+		Math::Vector3d eyeInterest;
+		getStereoCamera(pos, interest, eyePos, eyeInterest);
+		Math::Matrix4 lookMatrix = Math::makeLookAtMatrix(eyePos, eyeInterest, up_vec);
+		glMultMatrixf(lookMatrix.getData());
+		glRotatef(rollAngle, 0.0f, 0.0f, 1.0f);
+		glTranslatef(-eyePos.x(), -eyePos.y(), -eyePos.z());
+	} else {
+		Math::Matrix4 lookMatrix = Math::makeLookAtMatrix(pos, interest, up_vec);
+		glMultMatrixf(lookMatrix.getData());
+		glRotatef(rollAngle, 0.0f, 0.0f, 1.0f);
+		glTranslatef(-pos.x(), -pos.y(), -pos.z());
+	}
 
 	// Apply a 2D shake effect on the projection matrix.
 	// This avoids moving the camera in the 3D world, which could cause clipping issues.
@@ -271,7 +291,7 @@ void OpenGLRenderer::positionCamera(const Math::Vector3d &pos, const Math::Vecto
 	GLfloat projMatrix[16];
 	glGetFloatv(GL_PROJECTION_MATRIX, projMatrix);
 	glLoadIdentity();
-	glTranslatef(_shakeOffset.x * 0.05f, _shakeOffset.y * 0.05f, 0.0f);
+	glTranslatef(_shakeOffset.x * 0.025f, _shakeOffset.y * 0.025f, 0.0f);
 	glMultMatrixf(projMatrix);
 	glMatrixMode(GL_MODELVIEW);
 }
@@ -303,7 +323,7 @@ void OpenGLRenderer::renderCrossair(const Common::Point &crossairPosition) {
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_ONE_MINUS_DST_COLOR, GL_ZERO);
 
-	glDisable(GL_DEPTH_TEST);
+
 	glDepthMask(GL_FALSE);
 
 	useColor(255, 255, 255);
@@ -329,7 +349,6 @@ void OpenGLRenderer::renderCrossair(const Common::Point &crossairPosition) {
 	glLineWidth(1);
 
 	glDisable(GL_BLEND);
-	glEnable(GL_DEPTH_TEST);
 	glDepthMask(GL_TRUE);
 }
 
@@ -359,7 +378,6 @@ void OpenGLRenderer::renderPlayerShootRay(byte color, const Common::Point &posit
 		glBlendFunc(GL_ONE_MINUS_DST_COLOR, GL_ZERO);
 	}
 
-	glDisable(GL_DEPTH_TEST);
 	glDepthMask(GL_FALSE);
 
 	glColor4ub(r, g, b, 255);
@@ -383,7 +401,6 @@ void OpenGLRenderer::renderPlayerShootRay(byte color, const Common::Point &posit
 	glLineWidth(1);
 
 	glDisable(GL_BLEND);
-	glEnable(GL_DEPTH_TEST);
 	glDepthMask(GL_TRUE);
 }
 
@@ -412,7 +429,6 @@ void OpenGLRenderer::drawCelestialBody(Math::Vector3d position, float radius, by
 		}
 
 	glLoadMatrixf(m);
-	glDisable(GL_DEPTH_TEST);
 	glDepthMask(GL_FALSE);
 
 	setStippleData(stipple);
@@ -454,7 +470,6 @@ void OpenGLRenderer::drawCelestialBody(Math::Vector3d position, float radius, by
 		useStipple(false);
 	}
 
-	glEnable(GL_DEPTH_TEST);
 	glDepthMask(GL_TRUE);
 	glPopMatrix();
 }
@@ -485,24 +500,28 @@ void OpenGLRenderer::renderPlayerShootBall(byte color, const Common::Point &posi
 		glBlendFunc(GL_ONE_MINUS_DST_COLOR, GL_ZERO);
 	}
 
-	glDisable(GL_DEPTH_TEST);
 	glDepthMask(GL_FALSE);
 
 	glColor4ub(r, g, b, 255);
 	int triangleAmount = 20;
 	float twicePi = (float)(2.0 * M_PI);
-	float coef = (9 - frame) / 9.0;
-	float radius = (1 - coef) * 4.0;
 
-	Common::Point initial_position(viewArea.left + viewArea.width() / 2 + 2, viewArea.height() + viewArea.top);
-	Common::Point ball_position = coef * position + (1 - coef) * initial_position;
+	// Exponential ease-out trajectory inspired by the original ZX animation.
+	// The stone shrinks as it flies into the screen (perspective).
+	float coef = 1.0f - powf(0.5f, (8 - frame + 1) / 2.0f);
+	float radius = 1.0f + frame * 0.5f;
+
+	float startX = viewArea.left + viewArea.width() / 2.0f + 2;
+	float startY = viewArea.height() + viewArea.top;
+	float ballX = coef * position.x + (1.0f - coef) * startX;
+	float ballY = coef * position.y + (1.0f - coef) * startY;
 
 	glEnableClientState(GL_VERTEX_ARRAY);
-	copyToVertexArray(0, Math::Vector3d(ball_position.x, ball_position.y, 0));
+	copyToVertexArray(0, Math::Vector3d(ballX, ballY, 0));
 
 	for (int i = 0; i <= triangleAmount; i++) {
-		float x = ball_position.x + (radius * cos(i *  twicePi / triangleAmount));
-		float y = ball_position.y + (radius * sin(i * twicePi / triangleAmount));
+		float x = ballX + (radius * cos(i * twicePi / triangleAmount));
+		float y = ballY + (radius * sin(i * twicePi / triangleAmount));
 		copyToVertexArray(i + 1, Math::Vector3d(x, y, 0));
 	}
 
@@ -511,7 +530,6 @@ void OpenGLRenderer::renderPlayerShootBall(byte color, const Common::Point &posi
 	glDisableClientState(GL_VERTEX_ARRAY);
 
 	glDisable(GL_BLEND);
-	glEnable(GL_DEPTH_TEST);
 	glDepthMask(GL_TRUE);
 }
 
@@ -551,13 +569,11 @@ void OpenGLRenderer::renderFace(const Common::Array<Math::Vector3d> &vertices) {
 	glDisableClientState(GL_VERTEX_ARRAY);
 }
 
-void OpenGLRenderer::depthTesting(bool enabled) {
+void OpenGLRenderer::enableCulling(bool enabled) {
 	if (enabled) {
-		// If we re-enable depth testing, we need to clear the depth buffer
-		glClear(GL_DEPTH_BUFFER_BIT);
-		glEnable(GL_DEPTH_TEST);
+		glEnable(GL_CULL_FACE);
 	} else {
-		glDisable(GL_DEPTH_TEST);
+		glDisable(GL_CULL_FACE);
 	}
 }
 
@@ -601,11 +617,28 @@ void OpenGLRenderer::useStipple(bool enabled) {
 	}
 }
 
+void OpenGLRenderer::setStereoEye(StereoEye eye) {
+	Renderer::setStereoEye(eye);
+	// Restrict stereo passes to the anaglyph channels they are allowed to touch.
+	if (eye == kStereoEyeNone)
+		glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+	else if (eye == kStereoEyeLeft)
+		glColorMask(GL_TRUE, GL_FALSE, GL_FALSE, GL_TRUE); // left eye -> red
+	else if (eye == kStereoEyeRight)
+		glColorMask(GL_FALSE, GL_FALSE, GL_TRUE, GL_TRUE); // right eye -> blue
+	else if (eye == kStereoEyeFlatAnaglyph)
+		glColorMask(GL_TRUE, GL_FALSE, GL_TRUE, GL_TRUE); // flat background -> red + blue
+}
+
 void OpenGLRenderer::useColor(uint8 r, uint8 g, uint8 b) {
+	if (_stereoEye != kStereoEyeNone)
+		applyStereoTint(r, g, b);
 	glColor4ub(r, g, b, 255);
 }
 
 void OpenGLRenderer::clear(uint8 r, uint8 g, uint8 b, bool ignoreViewport) {
+	if (_stereoEye != kStereoEyeNone)
+		applyStereoTint(r, g, b);
 	if (ignoreViewport)
 		glDisable(GL_SCISSOR_TEST);
 	glClearColor(r / 255., g / 255., b / 255., 1.0);
@@ -614,10 +647,20 @@ void OpenGLRenderer::clear(uint8 r, uint8 g, uint8 b, bool ignoreViewport) {
 		glEnable(GL_SCISSOR_TEST);
 }
 
+void OpenGLRenderer::clearDepthBuffer(bool ignoreViewport) {
+	if (ignoreViewport)
+		glDisable(GL_SCISSOR_TEST);
+	glClear(GL_DEPTH_BUFFER_BIT);
+	if (ignoreViewport)
+		glEnable(GL_SCISSOR_TEST);
+}
+
 void OpenGLRenderer::drawFloor(uint8 color) {
 	uint8 r1, g1, b1, r2, g2, b2;
 	byte *stipple;
 	assert(getRGBAt(color, 0, r1, g1, b1, r2, g2, b2, stipple)); // TODO: move check inside this function
+	if (_stereoEye != kStereoEyeNone)
+		applyStereoTint(r1, g1, b1);
 	glColor4ub(r1, g1, b1, 255);
 
 	glEnableClientState(GL_VERTEX_ARRAY);

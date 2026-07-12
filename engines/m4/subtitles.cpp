@@ -66,11 +66,11 @@ void M4Subtitles::setupSubtitles() {
 
 	int16 h = g_system->getOverlayHeight();
 	int16 w = g_system->getOverlayWidth();
-	int fontSize = MAX(MIN_FONT_SIZE, int(h * BASE_FONT_SIZE_PERCENT));
+	const int fontSize = MAX(MIN_FONT_SIZE, int(h * BASE_FONT_SIZE_PERCENT));
 
-	int bottomMargin = int(h * BOTTOM_MARGIN_PERCENT);
+	const int bottomMargin = int(h * BOTTOM_MARGIN_PERCENT);
 
-	int topOffset = int(h * DEFAULT_HEIGHT_PERCENT);
+	const int topOffset = int(h * DEFAULT_HEIGHT_PERCENT);
 	setBBox(Common::Rect(HORIZONTAL_MARGIN,
 						 h - topOffset,
 						 w - HORIZONTAL_MARGIN,
@@ -97,7 +97,7 @@ void M4Subtitles::drawSubtitle(const Common::String &audioFile) const {
 	if (!_loaded || !_subtitlesEnabled)
 		return;
 
-	Common::String subtitle = getSubtitle(audioFile);
+	const Common::String subtitle = getSubtitle(audioFile);
 	if (subtitle.empty())
 		return;
 
@@ -113,8 +113,8 @@ void M4Subtitles::drawSubtitle(const Common::String &audioFile) const {
 
 int16 M4Subtitles::nudgeSubtitle() const {
 	// Nudge subtitle text box upwards, depending on the lines to draw
-	int16 h = g_system->getOverlayHeight();
-	int fontSize = MAX(MIN_FONT_SIZE, int(h * BASE_FONT_SIZE_PERCENT));
+	const int16 h = g_system->getOverlayHeight();
+	const int fontSize = MAX(MIN_FONT_SIZE, int(h * BASE_FONT_SIZE_PERCENT));
 
 	return _splitPartCount > 0 ? static_cast<int16>((_splitPartCount - 1) * fontSize) : 0;
 }

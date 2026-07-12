@@ -24,7 +24,6 @@
 #define M4_PLATFORM_SOUND_DIGI_H
 
 #include "audio/mixer.h"
-#include "audio/audiostream.h"
 #include "common/hashmap.h"
 #include "m4/m4_types.h"
 

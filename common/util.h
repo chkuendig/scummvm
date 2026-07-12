@@ -26,6 +26,8 @@
 
 #include "common/type_traits.h"
 
+struct TimeDate;
+
 /**
  * @defgroup common_util Util
  * @ingroup common
@@ -177,25 +179,25 @@ struct Pair {
 	T1 first;
 	T2 second;
 
-	Pair() {
+	constexpr Pair() {
 	}
 
-	Pair(const Pair &other) : first(other.first), second(other.second) {
+	constexpr Pair(const Pair &other) : first(other.first), second(other.second) {
 	}
 
-	Pair(Pair &&other) : first(Common::move(other.first)), second(Common::move(other.second)) {
+	constexpr Pair(Pair &&other) : first(Common::move(other.first)), second(Common::move(other.second)) {
 	}
 
-	Pair(const T1 &first_, const T2 &second_) : first(first_), second(second_) {
+	constexpr Pair(const T1 &first_, const T2 &second_) : first(first_), second(second_) {
 	}
 
-	Pair(T1 &&first_, T2 &&second_) : first(Common::move(first_)), second(Common::move(second_)) {
+	constexpr Pair(T1 &&first_, T2 &&second_) : first(Common::move(first_)), second(Common::move(second_)) {
 	}
 
-	Pair(T1 &&first_, const T2 &second_) : first(Common::move(first_)), second(second_) {
+	constexpr Pair(T1 &&first_, const T2 &second_) : first(Common::move(first_)), second(second_) {
 	}
 
-	Pair(const T1 &first_, T2 &&second_) : first(first_), second(Common::move(second_)) {
+	constexpr Pair(const T1 &first_, T2 &&second_) : first(first_), second(Common::move(second_)) {
 	}
 
 	Pair &operator=(const Pair &other) {
@@ -410,6 +412,32 @@ bool isBlank(int c);
  * @return String with a floating point number representing the given size.
  */
 Common::String getHumanReadableBytes(uint64 bytes, const char *&unitsOut);
+
+/**
+ * Utility functions for converting a TimeDate structure into an integer representation of the time, and vice versa.
+ * The integer representation is the number of seconds since the Unix epoch (1970-01-01 00:00:00 UTC).
+ */
+namespace DateTime {
+	/**
+	 * Convert a time value (number of seconds since the Unix epoch) to a TimeDate struct representing the corresponding date and time components.
+	 */
+	TimeDate int64ToTimeDate(int64 integer);
+
+	/**
+	 * Convert a TimeDate struct representing date and time components to a time value (number of seconds since the Unix epoch).
+	 */
+	int64_t dateTimeToInt64(const TimeDate &timeDate);
+
+	/**
+	 * Convert a time value (number of seconds since the Unix epoch) to a human-readable string format.
+	 */
+	Common::String formatTime(int64 integer);
+
+	/**
+	 * Get the current time as a time value (number of seconds since the Unix epoch).
+	 */
+	int64 getTime();
+}
 
 /** @} */
 

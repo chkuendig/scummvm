@@ -37,12 +37,12 @@
 
 namespace Common {
 
-MacFinderInfo::MacFinderInfo() : type{0, 0, 0, 0}, creator{0, 0, 0, 0}, flags(0), position(0, 0), windowID(0) {
+MacFinderInfo::MacFinderInfo() : type(0), creator(0), flags(0), position(0, 0), windowID(0) {
 }
 
 MacFinderInfo::MacFinderInfo(const MacFinderInfoData &data) {
-	memcpy(type, data.data + 0, 4);
-	memcpy(creator, data.data + 4, 4);
+	type = READ_BE_UINT32(data.data + 0);
+	creator = READ_BE_UINT32(data.data + 4);
 	flags = READ_BE_UINT16(data.data + 8);
 	position.y = READ_BE_INT16(data.data + 10);
 	position.x = READ_BE_INT16(data.data + 12);
@@ -51,8 +51,8 @@ MacFinderInfo::MacFinderInfo(const MacFinderInfoData &data) {
 
 MacFinderInfoData MacFinderInfo::toData() const {
 	MacFinderInfoData data;
-	memcpy(data.data + 0, type, 4);
-	memcpy(data.data + 4, creator, 4);
+	WRITE_BE_UINT32(data.data + 0, type);
+	WRITE_BE_UINT32(data.data + 4, creator);
 	WRITE_BE_UINT16(data.data + 8, flags);
 	WRITE_BE_INT16(data.data + 10, position.y);
 	WRITE_BE_INT16(data.data + 12, position.x);
@@ -133,6 +133,7 @@ void MacResManager::close() {
 	delete[] _resTypes; _resTypes = nullptr;
 	delete _stream; _stream = nullptr;
 	_resMap.numTypes = 0;
+	_originalFileName.clear();
 }
 
 bool MacResManager::hasResFork() const {
@@ -626,9 +627,18 @@ bool MacResManager::loadFromAppleDouble(SeekableReadStream *stream) {
 			_resForkOffset = offset;
 			_mode = kResForkAppleDouble;
 			_resForkSize = length;
-			return load(stream);
+		} else if (id == 3 && length > 0) {
+			// Found the real name!
+			uint32 oldPos = stream->pos();
+			stream->seek(offset);
+			_originalFileName = stream->readString(0, length);
+			debug(1, "MacResManager: Extracted original filename '%s' from AppleDouble", _originalFileName.c_str());
+			stream->seek(oldPos);
 		}
 	}
+
+	if (_mode == kResForkAppleDouble)
+		return load(stream);
 
 	return false;
 }
@@ -641,8 +651,8 @@ bool MacResManager::getFinderInfoFromMacBinary(SeekableReadStream *stream, MacFi
 	MacFinderInfo finfo;
 
 	// Parse fields
-	memcpy(finfo.type, infoHeader + MBI_TYPE, 4);
-	memcpy(finfo.creator, infoHeader + MBI_CREATOR, 4);
+	finfo.type = READ_BE_UINT32(infoHeader + MBI_TYPE);
+	finfo.creator = READ_BE_UINT32(infoHeader + MBI_CREATOR);
 	finfo.flags = (infoHeader[MBI_FLAGSHIGH] << 8) + infoHeader[MBI_FLAGSLOW];
 	finfo.position.x = READ_BE_INT16(infoHeader + MBI_POSX);
 	finfo.position.y = READ_BE_INT16(infoHeader + MBI_POSY);
@@ -788,6 +798,12 @@ bool MacResManager::loadFromMacBinary(SeekableReadStream *stream) {
 
 		if (_resForkOffset < 0)
 			return false;
+
+		byte nameLen = infoHeader[MBI_NAMELEN];
+		if (nameLen > 0) {
+			_originalFileName = Common::String((const char *)(infoHeader + MBI_NAMELEN + 1), nameLen);
+			debug(1, "MacResManager: Extracted original filename '%s' from MacBinary", _originalFileName.c_str());
+		}
 
 		_mode = kResForkMacBinary;
 		return load(stream);

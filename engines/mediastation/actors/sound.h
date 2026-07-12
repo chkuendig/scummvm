@@ -30,28 +30,33 @@
 
 namespace MediaStation {
 
-class SoundActor : public Actor, public ChannelClient {
+class SoundActor : public Actor, public ChannelClient, public SoundClient {
 public:
-	SoundActor() : Actor(kActorTypeSound) {};
+	SoundActor() : Actor(kActorTypeSound), _sequence(this) {};
 	~SoundActor();
 
 	virtual void readParameter(Chunk &chunk, ActorHeaderSectionType paramType) override;
 	virtual ScriptValue callMethod(BuiltInMethod methodId, Common::Array<ScriptValue> &args) override;
-	virtual void process() override;
-
 	virtual void readChunk(Chunk &chunk) override;
+	virtual bool isActive() const override { return _playState == kSoundPlayStatePlaying; }
+
+	virtual void onEvent(const ActorEvent &event) override;
+	virtual void timerEvent(const TimerEvent &event) override;
+	virtual void soundPlayStateChanged(SoundPlayState state, SoundStopReason why) override;
 
 private:
 	ImtStreamFeed *_streamFeed = nullptr;
 	bool _isLoadedFromChunk = false;
-	uint _loadType = 0;
-	bool _hasOwnSubfile = false;
-	bool _isPlaying = false;
+	bool _discardAfterUse = false;
+	SoundPlayState _playState = kSoundPlayStateStopped;
 	AudioSequence _sequence;
 
-	// Script method implementations
-	void timePlay();
-	void timeStop();
+	void start();
+	void stop();
+	void pause();
+	void resume(bool restart);
+
+	void openStream();
 };
 
 } // End of namespace MediaStation

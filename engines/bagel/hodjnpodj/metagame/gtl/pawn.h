@@ -30,7 +30,7 @@ namespace HodjNPodj {
 namespace Metagame {
 namespace Gtl {
 
-#define PAWN_SPEC   ".\\art\\mlscroll.bmp"      // path for pawn's DIB on disk
+#define PAWN_SPEC   "art\\mlscroll.bmp"      // path for pawn's DIB on disk
 #define PAWN_DX         502
 #define PAWN_DY         395
 #define PAWN_CURL_DX        500
@@ -67,7 +67,9 @@ namespace Gtl {
 #define PAWN_BLURB_COLOR    RGB(0,0,255)
 
 class CPawnShop : public CDialog {
-// Construction
+private:
+	bool bFirstTime = true;              // flag for first time information is displayed
+
 public:
 	CPawnShop(CWnd* pParent, CPalette *pPalette, CInventory *pGeneralStore, CInventory *pInventory);
 

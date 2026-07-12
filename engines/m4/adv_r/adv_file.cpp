@@ -90,7 +90,7 @@ void kernel_unload_room(SceneDef *rdef, GrBuff **code_data, GrBuff **loadBuffer)
 
 bool kernel_load_room(int minPalEntry, int maxPalEntry, SceneDef *rdef, GrBuff **scr_orig_data, GrBuff **scr_orig) {
 	if (!scr_orig_data || !scr_orig) {
-		error_show(FL, 'BUF!', "load_picture_and_codes");
+		error_show(FL, "load_picture_and_codes");
 	}
 
 	term_message("Reading scene %d", _G(game).new_room);
@@ -101,7 +101,7 @@ bool kernel_load_room(int minPalEntry, int maxPalEntry, SceneDef *rdef, GrBuff *
 
 	// Read DEF file
 	if (db_def_chk_read(_G(game).new_room, rdef) != -1) {
-		error_show(FL, 'DF:(', "trying to find %d.CHK", (uint32)_G(game).new_room);
+		error_show(FL, "trying to find %d.CHK", (uint32)_G(game).new_room);
 	}
 
 	set_walker_scaling(rdef);
@@ -268,9 +268,6 @@ bool load_background(SysFile *pic_file, GrBuff **loadBuffer, RGB8 *palette) {
 	               &num_x_tiles, &num_y_tiles, &tile_x, &tile_y, palette);
 
 	*loadBuffer = new GrBuff(file_x, file_y);
-
-	if (!*loadBuffer)
-		error_show(FL, 'OOM!');
 
 	Buffer *theBuff = (**loadBuffer).get_buffer();
 

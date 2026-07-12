@@ -46,6 +46,7 @@
 #include "common/updates.h"
 #include "common/util.h"
 #include "common/text-to-speech.h"
+#include "common/touch-mode.h"
 
 #include "engines/achievements.h"
 
@@ -173,6 +174,27 @@ static const int guiBaseValues[] = { 200, 175, 150, 125, 100, 75, 50, 25, -1 };
 // "10" (value 3) is the default speed corresponding to the speed before introduction of this control
 static const char *const kbdMouseSpeedLabels[] = { "3", "5", "8", "10", "13", "15", "18", "20", nullptr };
 
+// On-screen touch mode presets are defined in common/touch-mode.h and shared
+// with the SDL and iOS backends (Android keeps its own private copy).
+using Common::kTouchModeDefault;
+using Common::kTouchModeTouchpad;
+using Common::kTouchModeMouse;
+using Common::kTouchModeGamepad;
+
+static uint32 loadTouchModeSetting(const Common::String &setting, const Common::String &domain, bool acceptDefault, uint32 defaultValue) {
+	if (!acceptDefault || ConfMan.hasKey(setting, domain))
+		return Common::parseTouchMode(ConfMan.get(setting, domain), (Common::TouchMode)defaultValue);
+	return kTouchModeDefault;
+}
+
+static void saveTouchModeSetting(const Common::String &setting, const Common::String &domain, uint32 mode) {
+	const char *value = Common::touchModeToString((Common::TouchMode)mode);
+	if (value)
+		ConfMan.set(setting, value, domain);
+	else
+		ConfMan.removeKey(setting, domain);
+}
+
 OptionsDialog::OptionsDialog(const Common::String &domain, int x, int y, int w, int h)
 	: Dialog(x, y, w, h), _domain(domain), _graphicsTabId(-1), _midiTabId(-1), _pathsContainer(nullptr), _tabWidget(nullptr) {
 	init();
@@ -190,6 +212,13 @@ OptionsDialog::~OptionsDialog() {
 void OptionsDialog::init() {
 	_enableControlSettings = false;
 	_touchpadCheckbox = nullptr;
+	_onscreenControlCheckbox = nullptr;
+	_touchModeMenusDesc = nullptr;
+	_touchModeMenusPopUp = nullptr;
+	_touchMode2DGamesDesc = nullptr;
+	_touchMode2DGamesPopUp = nullptr;
+	_touchMode3DGamesDesc = nullptr;
+	_touchMode3DGamesPopUp = nullptr;
 	_kbdMouseSpeedDesc = nullptr;
 	_kbdMouseSpeedSlider = nullptr;
 	_kbdMouseSpeedLabel = nullptr;
@@ -281,10 +310,21 @@ void OptionsDialog::build() {
 
 	// Control options
 	if (g_system->hasFeature(OSystem::kFeatureTouchpadMode)) {
-		if (ConfMan.hasKey("touchpad_mouse_mode", _domain)) {
-			bool touchpadState =  g_system->getFeatureState(OSystem::kFeatureTouchpadMode);
-			if (_touchpadCheckbox != nullptr)
-				_touchpadCheckbox->setState(touchpadState);
+		// Legacy single-mode touchpad toggle (non-OpenGL backends only)
+		if (_touchpadCheckbox != nullptr && ConfMan.hasKey("touchpad_mouse_mode", _domain)) {
+			_touchpadCheckbox->setState(g_system->getFeatureState(OSystem::kFeatureTouchpadMode));
+		}
+		// On-screen touch controls (per-context touch mode presets)
+		if (_onscreenControlCheckbox != nullptr) {
+			const bool inAppDomain = _domain.equalsIgnoreCase(Common::ConfigManager::kApplicationDomain);
+			_onscreenControlCheckbox->setState(ConfMan.getBool(ONSCREEN_CONTROL_KEY, _domain));
+			// The on-screen gamepad is not offered in menus; guard hand-edited/legacy configs.
+			uint32 menusMode = loadTouchModeSetting(TOUCH_MODE_MENUS_KEY, _domain, !inAppDomain, kTouchModeMouse);
+			if (menusMode == (uint32)kTouchModeGamepad)
+				menusMode = kTouchModeMouse;
+			_touchModeMenusPopUp->setSelectedTag(menusMode);
+			_touchMode2DGamesPopUp->setSelectedTag(loadTouchModeSetting(TOUCH_MODE_2D_GAMES_KEY, _domain, !inAppDomain, kTouchModeTouchpad));
+			_touchMode3DGamesPopUp->setSelectedTag(loadTouchModeSetting(TOUCH_MODE_3D_GAMES_KEY, _domain, !inAppDomain, kTouchModeGamepad));
 		}
 	}
 	if (g_system->hasFeature(OSystem::kFeatureKbdMouseSpeed)) {
@@ -336,7 +376,7 @@ void OptionsDialog::build() {
 			const Common::RenderModeDescription *p = Common::g_renderModes;
 			const Common::RenderMode renderMode = Common::parseRenderMode(ConfMan.get("render_mode", _domain));
 			int sel = 0;
-			for (int i = 0; p->code; ++p, ++i) {
+			for (; p->code; ++p) {
 				if (renderMode == p->id)
 					sel = p->id;
 			}
@@ -350,7 +390,7 @@ void OptionsDialog::build() {
 				const Common::RotationModeDescription *p = Common::g_rotationModes;
 				const Common::RotationMode rotationMode = Common::parseRotationMode(ConfMan.getInt("rotation_mode", _domain));
 				int sel = 0;
-				for (int i = 0; p->description; ++p, ++i) {
+				for (; p->description; ++p) {
 					if (rotationMode == p->id)
 						sel = p->id;
 				}
@@ -961,8 +1001,22 @@ void OptionsDialog::apply() {
 	// Control options
 	if (_enableControlSettings) {
 		if (g_system->hasFeature(OSystem::kFeatureTouchpadMode)) {
-			if (ConfMan.getBool("touchpad_mouse_mode", _domain) != _touchpadCheckbox->getState()) {
+			// Legacy single-mode touchpad toggle (non-OpenGL backends only)
+			if (_touchpadCheckbox != nullptr && ConfMan.getBool("touchpad_mouse_mode", _domain) != _touchpadCheckbox->getState()) {
 				g_system->setFeatureState(OSystem::kFeatureTouchpadMode, _touchpadCheckbox->getState());
+			}
+			// On-screen touch controls (per-context touch mode presets)
+			if (_onscreenControlCheckbox != nullptr) {
+				ConfMan.setBool(ONSCREEN_CONTROL_KEY, _onscreenControlCheckbox->getState(), _domain);
+				saveTouchModeSetting(TOUCH_MODE_MENUS_KEY, _domain, _touchModeMenusPopUp->getSelectedTag());
+				saveTouchModeSetting(TOUCH_MODE_2D_GAMES_KEY, _domain, _touchMode2DGamesPopUp->getSelectedTag());
+				saveTouchModeSetting(TOUCH_MODE_3D_GAMES_KEY, _domain, _touchMode3DGamesPopUp->getSelectedTag());
+				// The in-game toggle stores a session-domain override for these
+				// keys; drop it so an explicit preset change here takes effect
+				// immediately instead of being masked until relaunch.
+				ConfMan.removeKey(TOUCH_MODE_MENUS_KEY, Common::ConfigManager::kSessionDomain);
+				ConfMan.removeKey(TOUCH_MODE_2D_GAMES_KEY, Common::ConfigManager::kSessionDomain);
+				ConfMan.removeKey(TOUCH_MODE_3D_GAMES_KEY, Common::ConfigManager::kSessionDomain);
 			}
 		}
 		if (g_system->hasFeature(OSystem::kFeatureKbdMouseSpeed)) {
@@ -1350,8 +1404,8 @@ void OptionsDialog::setMIDISettingsState(bool enabled) {
 	if (_guioptions.contains(GUIO_NOMIDI))
 		enabled = false;
 
-	_gmDevicePopUpDesc->setEnabled(_domain.equals(Common::ConfigManager::kApplicationDomain) ? enabled : false);
-	_gmDevicePopUp->setEnabled(_domain.equals(Common::ConfigManager::kApplicationDomain) ? enabled : false);
+	_gmDevicePopUpDesc->setEnabled(enabled);
+	_gmDevicePopUp->setEnabled(enabled);
 
 	_enableMIDISettings = enabled;
 
@@ -1372,8 +1426,8 @@ void OptionsDialog::setMIDISettingsState(bool enabled) {
 void OptionsDialog::setMT32SettingsState(bool enabled) {
 	_enableMT32Settings = enabled;
 
-	_mt32DevicePopUpDesc->setEnabled(_domain.equals(Common::ConfigManager::kApplicationDomain) ? enabled : false);
-	_mt32DevicePopUp->setEnabled(_domain.equals(Common::ConfigManager::kApplicationDomain) ? enabled : false);
+	_mt32DevicePopUpDesc->setEnabled(enabled);
+	_mt32DevicePopUp->setEnabled(enabled);
 
 	_mt32Checkbox->setEnabled(enabled);
 	_enableGSCheckbox->setEnabled(enabled);
@@ -1436,9 +1490,38 @@ void OptionsDialog::setSubtitleSettingsState(bool enabled) {
 }
 
 void OptionsDialog::addControlControls(GuiObject *boss, const Common::String &prefix) {
-	// Touchpad Mouse mode
+#if !defined(USE_OPENGL)
+	// Legacy single-mode touchpad toggle. OpenGL backends (incl. Emscripten) use
+	// the per-context touch modes below instead, so it is only created here for
+	// non-OpenGL SDL backends (e.g. Switch, PSP2).
 	if (g_system->hasFeature(OSystem::kFeatureTouchpadMode))
 		_touchpadCheckbox = new CheckboxWidget(boss, prefix + "grTouchpadCheckbox", _("Touchpad mouse mode"));
+#endif
+
+	// On-screen touch controls: per-context touch mode presets (merged here from
+	// the former separate backend options tab).
+	if (g_system->hasFeature(OSystem::kFeatureTouchpadMode)) {
+		const bool inAppDomain = _domain.equalsIgnoreCase(Common::ConfigManager::kApplicationDomain);
+		_onscreenControlCheckbox = new CheckboxWidget(boss, prefix + "grOnScreenControl", _("Show on-screen control"));
+
+		_touchModeMenusDesc = new StaticTextWidget(boss, prefix + "grTMMenusDesc", _("In menus:"));
+		_touchModeMenusPopUp = new PopUpWidget(boss, prefix + "grTMMenus");
+		_touchMode2DGamesDesc = new StaticTextWidget(boss, prefix + "grTM2DGamesDesc", _("In 2D games:"));
+		_touchMode2DGamesPopUp = new PopUpWidget(boss, prefix + "grTM2DGames");
+		_touchMode3DGamesDesc = new StaticTextWidget(boss, prefix + "grTM3DGamesDesc", _("In 3D games:"));
+		_touchMode3DGamesPopUp = new PopUpWidget(boss, prefix + "grTM3DGames");
+
+		PopUpWidget *touchModePopUps[] = { _touchModeMenusPopUp, _touchMode2DGamesPopUp, _touchMode3DGamesPopUp };
+		for (int i = 0; i < ARRAYSIZE(touchModePopUps); i++) {
+			if (!inAppDomain)
+				touchModePopUps[i]->appendEntry(_("<default>"), kTouchModeDefault);
+			touchModePopUps[i]->appendEntry(_("Touchpad emulation"), kTouchModeTouchpad);
+			touchModePopUps[i]->appendEntry(_("Direct mouse"), kTouchModeMouse);
+			// The on-screen gamepad is only available in games, not in menus.
+			if (touchModePopUps[i] != _touchModeMenusPopUp)
+				touchModePopUps[i]->appendEntry(_("On-screen gamepad"), kTouchModeGamepad);
+		}
+	}
 
 	// Keyboard and joystick mouse speed
 	if (g_system->hasFeature(OSystem::kFeatureKbdMouseSpeed)) {
@@ -1863,7 +1946,7 @@ void OptionsDialog::addMIDIControls(GuiObject *boss, const Common::String &prefi
 }
 
 void OptionsDialog::addMT32Controls(GuiObject *boss, const Common::String &prefix) {
-	_mt32DevicePopUpDesc = new StaticTextWidget(boss, prefix + "auPrefMt32PopupDesc", _("MT-32 Device:"), _("Specifies default sound device for Roland MT-32/LAPC1/CM32l/CM64 output"));
+	_mt32DevicePopUpDesc = new StaticTextWidget(boss, prefix + "auPrefMt32PopupDesc", _("MT-32 device:"), _("Specifies default sound device for Roland MT-32/LAPC1/CM32l/CM64 output"));
 	_mt32DevicePopUp = new PopUpWidget(boss, prefix + "auPrefMt32Popup");
 
 	// Native mt32 setting
@@ -2186,6 +2269,8 @@ GlobalOptionsDialog::GlobalOptionsDialog(LauncherDialog *launcher)
 	_guiReturnToLauncherAtExit = nullptr;
 	_guiConfirmExit = nullptr;
 	_guiDisableBDFScaling = nullptr;
+	_guiKineticScrolling = nullptr;
+
 #ifdef USE_UPDATES
 	_updatesPopUpDesc = nullptr;
 	_updatesPopUp = nullptr;
@@ -2662,10 +2747,17 @@ void GlobalOptionsDialog::addGUIControls(GuiObject *boss, const Common::String &
 
 	_guiDisableBDFScaling = new CheckboxWidget(boss, prefix + "DisableBDFScaling",
 		_("Disable fixed font scaling"),
-		_("Do not upscale fixed size fonts in the GUI. This reduces artefacts on low resolution screens")
+		_("Do not upscale fixed size fonts in the GUI. This reduces artefacts on low resolution screens.")
 	);
 
 	_guiDisableBDFScaling->setState(ConfMan.getBool("gui_disable_fixed_font_scaling", _domain));
+
+	_guiKineticScrolling = new CheckboxWidget(boss, prefix + "KineticScrolling",
+		_("Enable kinetic scrolling in lists"),
+		_("Enable smooth, momentum-based scrolling in list widgets.")
+	);
+
+	_guiKineticScrolling->setState(ConfMan.getBool("gui_kinetic_scrolling", _domain));
 
 #ifdef USE_TRANSLATION
 	_guiLanguagePopUpDesc = new StaticTextWidget(boss, prefix + "GuiLanguagePopupDesc", _("GUI language:"), _("Language of ScummVM GUI"));
@@ -2959,7 +3051,7 @@ bool GlobalOptionsDialog::updateAutosavePeriod(int newValue) {
 				  "will be prompted when autosave is about to overwrite a save).\n"
 				  "List of games:\n");
 		for (ExistingSaveList::const_iterator it = saveList.begin(), end = saveList.end(); it != end; ++it)
-			message += Common::U32String(it->target) + Common::U32String(": ") + it->desc.getDescription() + "\n";
+			message += Common::U32String(it->target + ": " + it->desc.getDescription() + "\n");
 		message.deleteLastChar();
 		if (hasMore)
 			message += _("\nAnd more...");
@@ -2984,7 +3076,7 @@ bool GlobalOptionsDialog::updateAutosavePeriod(int newValue) {
 			if (!failedSaves.empty()) {
 				Common::U32String failMessage = _("ERROR: Failed to move the following saved games:\n");
 				for (ExistingSaveList::const_iterator it = failedSaves.begin(), end = failedSaves.end(); it != end; ++it)
-					failMessage += Common::U32String(it->target) + Common::U32String(": ") + it->desc.getDescription() + "\n";
+					failMessage += Common::U32String(it->target + ": " + it->desc.getDescription() + "\n");
 				failMessage.deleteLastChar();
 				GUI::MessageDialog(failMessage).runModal();
 			}
@@ -3137,6 +3229,10 @@ void GlobalOptionsDialog::apply() {
 
 	if (_guiDisableBDFScaling) {
 		ConfMan.setBool("gui_disable_fixed_font_scaling", _guiDisableBDFScaling->getState(), _domain);
+	}
+
+	if (_guiKineticScrolling) {
+		ConfMan.setBool("gui_kinetic_scrolling", _guiKineticScrolling->getState(), _domain);
 	}
 
 #ifdef USE_DISCORD
@@ -3686,7 +3782,7 @@ void GlobalOptionsDialog::setupCloudTab() {
 	if (_storageLastSyncDesc) _storageLastSyncDesc->setVisible(shownConnectedInfo);
 	if (_storageLastSync) {
 		Common::U32String sync = CloudMan.getStorageLastSync(_selectedStorageIndex);
-		if (sync == "") {
+		if (sync.empty()) {
 			if (_selectedStorageIndex == CloudMan.getStorageIndex() && CloudMan.isSyncing())
 				sync = _("<right now>");
 			else
@@ -3700,7 +3796,11 @@ void GlobalOptionsDialog::setupCloudTab() {
 		_storageSyncSavesButton->setEnabled(enabled);
 	}
 
+#ifndef EMSCRIPTEN
 	bool showDownloadButton = (showingCurrentStorage && _selectedStorageIndex != Cloud::kStorageGoogleDriveId); // cannot download via Google Drive
+#else
+	bool showDownloadButton = false; // Emscripten can access files directly and doesn't download them
+#endif
 	if (_storageDownloadHint) _storageDownloadHint->setVisible(showDownloadButton);
 	if (_storageDownloadButton) {
 		_storageDownloadButton->setVisible(showDownloadButton);

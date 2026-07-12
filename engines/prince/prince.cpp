@@ -30,6 +30,7 @@
 #include "common/keyboard.h"
 #include "common/substream.h"
 #include "common/str.h"
+#include "common/unicode-bidi.h"
 
 #include "graphics/surface.h"
 #include "graphics/pixelformat.h"
@@ -786,45 +787,50 @@ void PrinceEngine::showTexts(Graphics::Surface *screen) {
 			continue;
 		}
 
-		int x = text._x;
-		int y = text._y;
+		if (ConfMan.getBool("subtitles")) {
+			int x = text._x;
+			int y = text._y;
 
-		if (!_showInventoryFlag) {
-			x -= _picWindowX;
-			y -= _picWindowY;
-		}
-
-		Common::Array<Common::String> lines;
-		_font->wordWrapText(text._str, _graph->_frontScreen->w, lines);
-
-		int wideLine = 0;
-		for (uint i = 0; i < lines.size(); i++) {
-			int textLen = getTextWidth(lines[i].c_str());
-			if (textLen > wideLine) {
-				wideLine = textLen;
+			if (!_showInventoryFlag) {
+				x -= _picWindowX;
+				y -= _picWindowY;
 			}
-		}
 
-		int leftBorderText = 6;
-		if (x + wideLine / 2 >  kNormalWidth - leftBorderText) {
-			x = kNormalWidth - leftBorderText - wideLine / 2;
-		}
+			Common::Array<Common::String> lines;
+			_font->wordWrapText(text._str, _graph->_frontScreen->w, lines);
 
-		if (x - wideLine / 2 < leftBorderText) {
-			x = leftBorderText + wideLine / 2;
-		}
-
-		int textSkip = 2;
-		for (uint i = 0; i < lines.size(); i++) {
-			int drawX = x - getTextWidth(lines[i].c_str()) / 2;
-			int drawY = y - 10 - (lines.size() - i) * (_font->getFontHeight() - textSkip);
-			if (drawX < 0) {
-				drawX = 0;
+			int wideLine = 0;
+			for (uint i = 0; i < lines.size(); i++) {
+				int textLen = getTextWidth(lines[i].c_str());
+				if (textLen > wideLine) {
+					wideLine = textLen;
+				}
 			}
-			if (drawY < 0) {
-				drawY = 0;
+
+			int leftBorderText = 6;
+			if (x + wideLine / 2 >  kNormalWidth - leftBorderText) {
+				x = kNormalWidth - leftBorderText - wideLine / 2;
 			}
-			_font->drawString(screen, lines[i], drawX, drawY, screen->w, text._color);
+
+			if (x - wideLine / 2 < leftBorderText) {
+				x = leftBorderText + wideLine / 2;
+			}
+
+			int textSkip = 2;
+			for (uint i = 0; i < lines.size(); i++) {
+				int drawX = x - getTextWidth(lines[i].c_str()) / 2;
+				int drawY = y - 10 - (lines.size() - i) * (_font->getFontHeight() - textSkip);
+				if (drawX < 0) {
+					drawX = 0;
+				}
+				if (drawY < 0) {
+					drawY = 0;
+				}
+				Common::String line = lines[i];
+				if (getLanguage() == Common::HE_ISR)
+					line = Common::convertBiDiString(line, Common::kWindows1255);
+				_font->drawString(screen, line, drawX, drawY, screen->w, text._color);
+			}
 		}
 
 		text._time--;
@@ -1196,8 +1202,17 @@ void PrinceEngine::dialogRun() {
 					}
 				}
 
+				Graphics::TextAlign textAlign = Graphics::kTextAlignLeft;
+				int width = _graph->_frontScreen->w;
+				if (getLanguage() == Common::HE_ISR) {
+					textAlign = Graphics::kTextAlignRight;
+					width -= 2 * dialogTextX;
+				}
 				for (uint j = 0; j < lines.size(); j++) {
-					_font->drawString(_graph->_frontScreen, lines[j], dialogTextX, dialogTextY, _graph->_frontScreen->w, actualColor);
+					Common::String line = lines[j];
+					if (getLanguage() == Common::HE_ISR)
+						line = Common::convertBiDiString(line, Common::kWindows1255);
+					_font->drawString(_graph->_frontScreen, line, dialogTextX, dialogTextY, width, actualColor, textAlign);
 					dialogTextY += _font->getFontHeight();
 				}
 				dialogTextY += _dialogLineSpace;
@@ -1413,6 +1428,8 @@ void PrinceEngine::scrollCredits() {
 				}
 				if (!line.empty()) {
 					int drawX = (kNormalWidth - getTextWidth(line.c_str())) / 2;
+					if (getLanguage() == Common::HE_ISR)
+						line = Common::convertBiDiString(line, Common::kWindows1255);
 					_font->drawString(_graph->_frontScreen, line, drawX, drawY, _graph->_frontScreen->w, 217);
 				}
 

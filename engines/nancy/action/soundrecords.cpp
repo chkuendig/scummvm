@@ -21,6 +21,7 @@
 
 #include "common/random.h"
 #include "common/config-manager.h"
+#include "common/system.h"
 
 #include "engines/nancy/nancy.h"
 #include "engines/nancy/sound.h"
@@ -40,6 +41,72 @@ void SetVolume::readData(Common::SeekableReadStream &stream) {
 
 void SetVolume::execute() {
 	g_nancy->_sound->setVolume(channel, volume);
+	_isDone = true;
+}
+
+void FadeSoundToSilence::readData(Common::SeekableReadStream &stream) {
+	channel = stream.readUint16LE();
+	stream.skip(2); // pad / flag
+	fadeTimeMs = stream.readUint32LE();
+}
+
+void FadeSoundToSilence::execute() {
+	switch (_state) {
+	case kBegin:
+		_startVolume = g_nancy->_sound->getVolume(channel);
+		_startTime = g_system->getMillis();
+		_state = kRun;
+		break;
+	case kRun: {
+		const uint32 elapsed = g_system->getMillis() - _startTime;
+		if (fadeTimeMs == 0 || elapsed >= fadeTimeMs) {
+			g_nancy->_sound->setVolume(channel, 0);
+			_state = kActionTrigger;
+			break;
+		}
+		const uint16 v = (uint16)((uint32)_startVolume * (fadeTimeMs - elapsed) / fadeTimeMs);
+		g_nancy->_sound->setVolume(channel, v);
+		break;
+	}
+	case kActionTrigger:
+		finishExecution();
+		break;
+	}
+}
+
+void Update3DSound::readData(Common::SeekableReadStream &stream) {
+	_channelID = stream.readUint16LE();
+	_posX = stream.readSint32LE();
+	_posY = stream.readSint32LE();
+	_posZ = stream.readSint32LE();
+	_minDistance = stream.readSint32LE();
+	_maxDistance = stream.readSint32LE();
+}
+
+void Update3DSound::execute() {
+	if (_posX != kNoChange && _posY != kNoChange && _posZ != kNoChange) {
+		g_nancy->_sound->update3DSoundPosition(_channelID, _posX, _posY, _posZ);
+	}
+
+	if (_minDistance != kNoChange) {
+		g_nancy->_sound->update3DSoundMinDistance(_channelID, _minDistance);
+	}
+
+	if (_maxDistance != kNoChange) {
+		g_nancy->_sound->update3DSoundMaxDistance(_channelID, _maxDistance);
+	}
+
+	_isDone = true;
+}
+
+void Set3DSoundListenerPosition::readData(Common::SeekableReadStream &stream) {
+	_posX = stream.readSint32LE();
+	_posY = stream.readSint32LE();
+	_posZ = stream.readSint16LE();
+}
+
+void Set3DSoundListenerPosition::execute() {
+	g_nancy->_sound->setListenerPosition(Math::Vector3d(_posX, _posY, _posZ));
 	_isDone = true;
 }
 
@@ -70,6 +137,14 @@ void PlaySound::execute() {
 
 		if (g_nancy->getGameType() >= kGameTypeNancy8) {
 			NancySceneState.setEventFlag(_flag);
+		}
+
+		// A looping sound with no scene change and no event flag is started and then
+		// left to play; the record is marked done at once instead of waiting on a sound
+		// that never ends.
+		if (_sceneChange.sceneID == kNoScene && _flag.label == kEvNoEvent && _sound.numLoops == 0) {
+			_isDone = true;
+			break;
 		}
 
 		if (_changeSceneImmediately) {
@@ -138,7 +213,7 @@ void PlaySoundCC::readCCText(Common::SeekableReadStream &stream, Common::String 
 		const CVTX *autotext = (const CVTX *)g_nancy->getEngineData("AUTOTEXT");
 		assert(autotext);
 
-		out = autotext->texts[key];
+		out = autotext->texts.getValOrDefault(key, "");
 	}
 }
 
@@ -256,20 +331,29 @@ void StopSound::execute() {
 	_sceneChange.execute();
 }
 
+// A name beginning with '*' is the forced selection (the marker is stripped);
+// otherwise the played sound is picked at random. The choice is made once, when
+// the record is loaded.
+static uint selectRandomSound(Common::Array<Common::String> &soundNames) {
+	for (uint i = 0; i < soundNames.size(); ++i) {
+		if (soundNames[i].hasPrefix("*")) {
+			soundNames[i].deleteChar(0);
+			return i;
+		}
+	}
+
+	return g_nancy->_randomSource->getRandomNumber(soundNames.size() - 1);
+}
+
 void PlayRandomSound::readData(Common::SeekableReadStream &stream) {
 	uint16 numSounds = stream.readUint16LE();
 	readFilenameArray(stream, _soundNames, numSounds - 1);
 
 	PlaySound::readData(stream);
 	_soundNames.push_back(_sound.name);
-}
 
-void PlayRandomSound::execute() {
-	if (_state == kBegin) {
-		_sound.name = _soundNames[g_nancy->_randomSource->getRandomNumber(_soundNames.size() - 1)];
-	}
-
-	PlaySound::execute();
+	_selectedSound = selectRandomSound(_soundNames);
+	_sound.name = _soundNames[_selectedSound];
 }
 
 void PlayRandomSoundTerse::readData(Common::SeekableReadStream &stream) {
@@ -286,16 +370,10 @@ void PlayRandomSoundTerse::readData(Common::SeekableReadStream &stream) {
 		_ccTexts.push_back(Common::String());
 		readCCText(stream, _ccTexts.back());
 	}
-}
 
-void PlayRandomSoundTerse::execute() {
-	if (_state == kBegin) {
-		uint16 randomID = g_nancy->_randomSource->getRandomNumber(_soundNames.size() - 1);
-		_sound.name = _soundNames[randomID];
-		_ccText = _ccTexts[randomID];
-	}
-
-	PlaySoundCC::execute();
+	_selectedSound = selectRandomSound(_soundNames);
+	_sound.name = _soundNames[_selectedSound];
+	_ccText = _ccTexts[_selectedSound];
 }
 
 void TableIndexPlaySound::readData(Common::SeekableReadStream &stream) {

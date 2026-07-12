@@ -21,11 +21,12 @@
 
 #include "m4/riddle/rooms/section2/room204.h"
 #include "m4/riddle/rooms/section2/section2.h"
+#include "m4/riddle/riddle.h"
+#include "m4/riddle/vars.h"
+#include "m4/adv_r/adv_control.h"
 #include "m4/graphics/gr_series.h"
 #include "m4/gui/gui_vmng.h"
 #include "m4/gui/gui_vmng_screen.h"
-#include "m4/riddle/riddle.h"
-#include "m4/riddle/vars.h"
 
 namespace M4 {
 namespace Riddle {
@@ -1027,7 +1028,7 @@ void Room204::daemon() {
 
 	case 12:
 		interface_show();
-		_G(game).new_room = 205;
+		_G(game).setRoom(205);
 		break;
 
 	case 15:
@@ -2216,7 +2217,7 @@ void Room204::daemon() {
 
 	case 629:
 	case 711:
-		_G(game).new_room = 203;
+		_G(game).setRoom(203);
 		break;
 
 	case 630:

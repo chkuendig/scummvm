@@ -75,6 +75,7 @@ protected:
 
 private:
 	void tokenRefreshed(BoolCallback callback, const Networking::JsonResponse &response);
+	void tokenRefreshError(BoolCallback callback, const Networking::ErrorResponse &response);
 
 protected:
 	/** Helper function to save Storage::_isEnabled into config. */
@@ -96,6 +97,11 @@ public:
 	 * continue your work when new token is available.
 	 */
 	virtual void refreshAccessToken(BoolCallback callback, Networking::ErrorCallback errorCallback = nullptr);
+
+	/**
+	 * Returns the current access token.
+	 */
+	Common::String accessToken() const { return _token; }
 };
 
 } // End of namespace Cloud

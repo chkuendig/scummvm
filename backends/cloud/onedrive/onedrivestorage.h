@@ -89,7 +89,7 @@ public:
 	Networking::Request *upload(const Common::String &path, Common::SeekableReadStream *contents, UploadCallback callback, Networking::ErrorCallback errorCallback) override;
 
 	/** Returns pointer to Networking::NetworkReadStream. */
-	Networking::Request *streamFileById(const Common::String &path, Networking::NetworkReadStreamCallback callback, Networking::ErrorCallback errorCallback) override;
+	Networking::Request *streamFileById(const Common::String &path, Networking::NetworkReadStreamCallback callback, Networking::ErrorCallback errorCallback, uint64 startPos = 0, uint64 length = 0) override;
 
 	/** Calls the callback when finished. */
 	Networking::Request *createDirectory(const Common::String &path, BoolCallback callback, Networking::ErrorCallback errorCallback) override;
@@ -111,7 +111,28 @@ public:
 	 */
 	static void removeFromConfig(const Common::String &keyPrefix);
 
-	Common::String accessToken() const { return _token; }
+private:
+	// Temporary storage for range parameters used in streamFileById
+	uint64 _pendingRangeStartPos;
+	uint64 _pendingRangeLength;
+	Common::String _pendingFilePath; // Only set for range downloads that trigger caching
+	
+	// Download URL cache to avoid repeated metadata requests
+	struct CachedDownloadUrl {
+		Common::String url;
+		uint32 timestamp;
+		
+		CachedDownloadUrl() : timestamp(0) {}
+		CachedDownloadUrl(const Common::String &downloadUrl, uint32 time) : url(downloadUrl), timestamp(time) {}
+	};
+	
+	Common::HashMap<Common::String, CachedDownloadUrl> _downloadUrlCache;
+	static const uint32 URL_CACHE_TIMEOUT = 120; // 2 minutes in seconds (very conservative for OneDrive)
+	
+	// Helper methods for URL caching
+	bool isUrlCacheValid(const Common::String &fileId) const;
+	Common::String getCachedDownloadUrl(const Common::String &fileId) const;
+	void cacheDownloadUrl(const Common::String &fileId, const Common::String &downloadUrl);
 };
 
 } // End of namespace OneDrive

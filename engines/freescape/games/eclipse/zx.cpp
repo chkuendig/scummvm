@@ -19,9 +19,11 @@
  *
  */
 
+#include "common/config-manager.h"
 #include "common/file.h"
 
 #include "freescape/freescape.h"
+#include "freescape/games/eclipse/ay.music.h"
 #include "freescape/games/eclipse/eclipse.h"
 #include "freescape/language/8bitDetokeniser.h"
 
@@ -52,37 +54,72 @@ void EclipseEngine::initZX() {
 	_soundIndexMissionComplete = 16;
 }
 
+void EclipseEngine::loadHeartFramesZX(Common::SeekableReadStream *file, int restOffset, int beatOffset) {
+	// ZX monochrome heart sprites with 2-byte header (height, width_bytes).
+	// Stores into _eclipseSprites[0] (beat) and [1] (rest), matching Atari convention.
+	// Uses FreescapeEngine::loadFrame for the monochrome pixel decoding.
+	//
+	// The two frames have opposite bit polarity:
+	// - BEAT: "1" bits = heart shape (ink/yellow), "0" = background (paper/red)
+	// - REST: "1" bits = background (paper/red), "0" = small heart outline (ink/yellow)
+	// So front/back colors are swapped between frames.
+	int offsets[2] = { beatOffset, restOffset };
+
+	uint32 yellow = _gfx->_texturePixelFormat.ARGBToColor(0xFF, 0xd8, 0xd8, 0x00);
+	uint32 red = _gfx->_texturePixelFormat.ARGBToColor(0xFF, 0xd8, 0x00, 0x00);
+	uint32 frontColors[2] = { red, red };
+	uint32 backColors[2] = { yellow, yellow };
+
+	for (int f = 0; f < 2; f++) {
+		file->seek(offsets[f]);
+		int height = file->readByte();
+		int widthBytes = file->readByte();
+
+		auto *surf = new Graphics::ManagedSurface();
+		surf->create(widthBytes * 8, height, _gfx->_texturePixelFormat);
+		surf->fillRect(Common::Rect(0, 0, widthBytes * 8, height), backColors[f]);
+
+		loadFrame(file, surf, widthBytes, height, frontColors[f]);
+		_eclipseSprites.push_back(surf);
+	}
+}
+
 void EclipseEngine::loadAssetsZXFullGame() {
 	Common::File file;
+	const char *prefix = isEclipse2() ? "totaleclipse2" : "totaleclipse";
+	Common::Path titleFile(Common::String::format("%s.zx.title", prefix));
+	Common::Path borderFile(Common::String::format("%s.zx.border", prefix));
+	Common::Path dataFile(Common::String::format("%s.zx.data", prefix));
 
-	file.open("totaleclipse.zx.title");
+	file.open(titleFile);
 	if (file.isOpen()) {
 		_title = loadAndConvertScrImage(&file);
 	} else
-		error("Unable to find totaleclipse.zx.title");
+		error("Unable to find %s", titleFile.toString().c_str());
 
 	file.close();
-	file.open("totaleclipse.zx.border");
+	file.open(borderFile);
 	if (file.isOpen()) {
 		_border = loadAndConvertScrImage(&file);
 	} else
-		error("Unable to find totaleclipse.zx.border");
+		error("Unable to find %s", borderFile.toString().c_str());
 	file.close();
 
-	file.open("totaleclipse.zx.data");
+	file.open(dataFile);
 	if (!file.isOpen())
-		error("Failed to open totaleclipse.zx.data");
+		error("Failed to open %s", dataFile.toString().c_str());
 
 	if (isEclipse2()) {
 		loadMessagesFixedSize(&file, 0x2ac, 16, 30);
 		loadFonts(&file, 0x61c3);
-		loadSpeakerFxZX(&file, 0x8c6, 0x91a);
+		_sound = loadSpeakerFxZX(&file, 0x8c6, 0x91a, 25);
 		load8bitBinary(&file, 0x63bb, 4);
 	} else {
 		loadMessagesFixedSize(&file, 0x2ac, 16, 23);
 		loadFonts(&file, 0x6163);
-		loadSpeakerFxZX(&file, 0x816, 0x86a);
+		_sound = loadSpeakerFxZX(&file, 0x816, 0x86a, 25);
 		load8bitBinary(&file, 0x635b, 4);
+		loadHeartFramesZX(&file, 0x0D62, 0x0D7C);
 
 		// These paper colors are also invalid, but to signal the use of a special effect (only in zx release)
 		_areaMap[42]->_paperColor = 0;
@@ -93,6 +130,9 @@ void EclipseEngine::loadAssetsZXFullGame() {
 
 	for (auto &it : _indicators)
 		it->convertToInPlace(_gfx->_texturePixelFormat);
+
+	if (ConfMan.getBool("ay_music"))
+		_playerMusic = new EclipseAYMusicPlayer(_mixer);
 }
 
 void EclipseEngine::loadAssetsZXDemo() {
@@ -117,13 +157,13 @@ void EclipseEngine::loadAssetsZXDemo() {
 		error("Failed to open totaleclipse.zx.data");
 
 	if (_variant & GF_ZX_DEMO_MICROHOBBY) {
-		loadSpeakerFxZX(&file, 0x798, 0x7ec);
+		_sound = loadSpeakerFxZX(&file, 0x798, 0x7ec, 21);
 		loadMessagesFixedSize(&file, 0x2ac, 16, 23);
 		loadMessagesFixedSize(&file, 0x56e6, 264, 1);
 		loadFonts(&file, 0x5f7b);
 		load8bitBinary(&file, 0x6173, 4);
 	} else if (_variant & GF_ZX_DEMO_CRASH) {
-		loadSpeakerFxZX(&file, 0x65c, 0x6b0);
+		_sound = loadSpeakerFxZX(&file, 0x65c, 0x6b0, 25);
 		loadMessagesFixedSize(&file, 0x364, 16, 9);
 		loadMessagesFixedSize(&file, 0x5901, 264, 5);
 		loadFonts(&file, 0x6589);
@@ -135,6 +175,9 @@ void EclipseEngine::loadAssetsZXDemo() {
 
 	for (auto &it : _indicators)
 		it->convertToInPlace(_gfx->_texturePixelFormat);
+
+	if (ConfMan.getBool("ay_music"))
+		_playerMusic = new EclipseAYMusicPlayer(_mixer);
 }
 
 void EclipseEngine::drawZXUI(Graphics::Surface *surface) {
@@ -212,6 +255,8 @@ void EclipseEngine::drawZXUI(Graphics::Surface *surface) {
 
 	surface->fillRect(Common::Rect(227, 168, 235, 187), gray);
 	drawCompass(surface, 231, 177, _yaw, 10, back);
+
+	drawHeartIndicator(surface, 176, 167);
 
 	drawIndicator(surface, 65, 7, 8);
 	drawEclipseIndicator(surface, 215, 3, front, gray);

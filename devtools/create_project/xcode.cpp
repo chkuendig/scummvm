@@ -265,8 +265,8 @@ void XcodeProvider::addResourceFiles(const BuildSetup &setup, StringList &includ
 	}
 
 	ValueList &resources = getResourceFiles(setup);
-	for (ValueList::iterator it = resources.begin(); it != resources.end(); ++it) {
-		includeList.push_back(setup.srcDir + "/" + *it);
+	for (const auto &resource : resources) {
+		includeList.push_back(setup.srcDir + "/" + resource);
 	}
 
 	StringList pchDirs, pchEx;
@@ -376,9 +376,7 @@ void XcodeProvider::writeFileListToProject(const FileNode &dir, std::ostream &pr
 
 	// Ensure that top-level groups are generated for i.e. engines/
 	Group *group = touchGroupsForPath(filePrefix);
-	for (FileNode::NodeList::const_iterator i = dir.children.begin(); i != dir.children.end(); ++i) {
-		const FileNode *node = *i;
-
+	for (const auto *node : dir.children) {
 		// Iff it is a file, then add (build) file references. Since we're using Groups and not File References
 		// for folders, we shouldn't add folders as file references, obviously.
 		if (node->children.empty()) {
@@ -440,6 +438,7 @@ void XcodeProvider::setupFrameworksBuildPhase(const BuildSetup &setup) {
 	DEF_SYSFRAMEWORK("ApplicationServices");
 	DEF_SYSFRAMEWORK("AudioToolbox");
 	DEF_SYSFRAMEWORK("AudioUnit");
+	DEF_SYSFRAMEWORK("AVFAudio");
 	DEF_SYSFRAMEWORK("Carbon");
 	DEF_SYSFRAMEWORK("Cocoa");
 	DEF_SYSFRAMEWORK("CoreAudio");
@@ -612,6 +611,11 @@ void XcodeProvider::setupFrameworksBuildPhase(const BuildSetup &setup) {
 		frameworks_osx.push_back("OpenGL.framework");
 		frameworks_osx.push_back("AudioUnit.framework");
 
+		if (CONTAINS_DEFINE(setup.defines, "USE_TTS") &&
+			!CONTAINS_DEFINE(setup.defines, "USE_NS_SPEECH_SYNTHESIZER")) {
+			frameworks_osx.push_back("AVFAudio.framework");
+		}
+
 		if (CONTAINS_DEFINE(setup.defines, "USE_FAAD")) {
 			frameworks_osx.push_back(getLibString("faad", setup.useXCFramework));
 		}
@@ -691,13 +695,13 @@ void XcodeProvider::setupFrameworksBuildPhase(const BuildSetup &setup) {
 			frameworks_osx.push_back(getLibString(libSDL + "_net", setup.useXCFramework));
 
 		int order = 0;
-		for (ValueList::iterator framework = frameworks_osx.begin(); framework != frameworks_osx.end(); framework++) {
-			std::string id = "Frameworks_" + *framework + "_osx";
-			std::string comment = *framework + " in Frameworks";
+		for (const auto &framework : frameworks_osx) {
+			std::string id = "Frameworks_" + framework + "_osx";
+			std::string comment = framework + " in Frameworks";
 
 			ADD_SETTING_ORDER_NOVALUE(osx_files, getHash(id), comment, order++);
-			ADD_BUILD_FILE(id, *framework, getHash(*framework), comment);
-			ADD_FILE_REFERENCE(*framework, *framework, properties[*framework]);
+			ADD_BUILD_FILE(id, framework, getHash(framework), comment);
+			ADD_FILE_REFERENCE(framework, framework, properties[framework]);
 		}
 
 		framework_OSX->_properties["files"] = osx_files;
@@ -729,6 +733,11 @@ void XcodeProvider::setupFrameworksBuildPhase(const BuildSetup &setup) {
 		frameworks_iOS.push_back("AudioToolbox.framework");
 		frameworks_iOS.push_back("QuartzCore.framework");
 		frameworks_iOS.push_back("OpenGLES.framework");
+		frameworks_iOS.push_back("CoreMIDI.framework");
+
+		if (CONTAINS_DEFINE(setup.defines, "USE_TTS")) {
+			frameworks_iOS.push_back("AVFAudio.framework");
+		}
 
 		if (CONTAINS_DEFINE(setup.defines, "USE_FAAD")) {
 			frameworks_iOS.push_back(getLibString("faad", setup.useXCFramework));
@@ -810,13 +819,13 @@ void XcodeProvider::setupFrameworksBuildPhase(const BuildSetup &setup) {
 		}
 
 		int order = 0;
-		for (ValueList::iterator framework = frameworks_iOS.begin(); framework != frameworks_iOS.end(); framework++) {
-			std::string id = "Frameworks_" + *framework + "_iphone";
-			std::string comment = *framework + " in Frameworks";
+		for (const auto &framework : frameworks_iOS) {
+			std::string id = "Frameworks_" + framework + "_iphone";
+			std::string comment = framework + " in Frameworks";
 
 			ADD_SETTING_ORDER_NOVALUE(iOS_files, getHash(id), comment, order++);
-			ADD_BUILD_FILE(id, *framework, getHash(*framework), comment);
-			ADD_FILE_REFERENCE(*framework, *framework, properties[*framework]);
+			ADD_BUILD_FILE(id, framework, getHash(framework), comment);
+			ADD_FILE_REFERENCE(framework, framework, properties[framework]);
 		}
 
 		framework_iPhone->_properties["files"] = iOS_files;
@@ -848,7 +857,11 @@ void XcodeProvider::setupFrameworksBuildPhase(const BuildSetup &setup) {
 		frameworks_tvOS.push_back("AudioToolbox.framework");
 		frameworks_tvOS.push_back("QuartzCore.framework");
 		frameworks_tvOS.push_back("OpenGLES.framework");
+		frameworks_tvOS.push_back("CoreMIDI.framework");
 
+		if (CONTAINS_DEFINE(setup.defines, "USE_TTS")) {
+			frameworks_tvOS.push_back("AVFAudio.framework");
+		}
 		if (CONTAINS_DEFINE(setup.defines, "USE_FAAD")) {
 			frameworks_tvOS.push_back(getLibString("faad", setup.useXCFramework));
 		}
@@ -926,13 +939,13 @@ void XcodeProvider::setupFrameworksBuildPhase(const BuildSetup &setup) {
 		}
 
 		int order = 0;
-		for (ValueList::iterator framework = frameworks_tvOS.begin(); framework != frameworks_tvOS.end(); framework++) {
-			std::string id = "Frameworks_" + *framework + "_appletv";
-			std::string comment = *framework + " in Frameworks";
+		for (const auto &framework : frameworks_tvOS) {
+			std::string id = "Frameworks_" + framework + "_appletv";
+			std::string comment = framework + " in Frameworks";
 
 			ADD_SETTING_ORDER_NOVALUE(tvOS_files, getHash(id), comment, order++);
-			ADD_BUILD_FILE(id, *framework, getHash(*framework), comment);
-			ADD_FILE_REFERENCE(*framework, *framework, properties[*framework]);
+			ADD_BUILD_FILE(id, framework, getHash(framework), comment);
+			ADD_FILE_REFERENCE(framework, framework, properties[framework]);
 		}
 
 		framework_tvOS->_properties["files"] = tvOS_files;
@@ -947,28 +960,28 @@ void XcodeProvider::setupNativeTarget() {
 	// Just use a hardcoded id for the Products-group
 	Group *productsGroup = new Group(this, "Products", "PBXGroup_CustomTemplate_Products_" , "");
 	// Output native target section
-	for (unsigned int i = 0; i < _targets.size(); i++) {
-		Object *target = new Object(this, "PBXNativeTarget_" + _targets[i], "PBXNativeTarget", "PBXNativeTarget", "", _targets[i]);
+	for (const auto &_target : _targets) {
+		Object *target = new Object(this, "PBXNativeTarget_" + _target, "PBXNativeTarget", "PBXNativeTarget", "", _target);
 
-		target->addProperty("buildConfigurationList", getHash("XCConfigurationList_" + _targets[i]), "Build configuration list for PBXNativeTarget \"" + _targets[i] + "\"", kSettingsNoValue);
+		target->addProperty("buildConfigurationList", getHash("XCConfigurationList_" + _target), "Build configuration list for PBXNativeTarget \"" + _target + "\"", kSettingsNoValue);
 
 		Property buildPhases;
 		buildPhases._hasOrder = true;
 		buildPhases._flags = kSettingsAsList;
-		buildPhases._settings[getHash("PBXResourcesBuildPhase_" + _targets[i])] = Setting("", "Resources", kSettingsNoValue, 0, 0);
-		buildPhases._settings[getHash("PBXSourcesBuildPhase_" + _targets[i])] = Setting("", "Sources", kSettingsNoValue, 0, 1);
-		buildPhases._settings[getHash("PBXFrameworksBuildPhase_" + _targets[i])] = Setting("", "Frameworks", kSettingsNoValue, 0, 2);
+		buildPhases._settings[getHash("PBXResourcesBuildPhase_" + _target)] = Setting("", "Resources", kSettingsNoValue, 0, 0);
+		buildPhases._settings[getHash("PBXSourcesBuildPhase_" + _target)] = Setting("", "Sources", kSettingsNoValue, 0, 1);
+		buildPhases._settings[getHash("PBXFrameworksBuildPhase_" + _target)] = Setting("", "Frameworks", kSettingsNoValue, 0, 2);
 		target->_properties["buildPhases"] = buildPhases;
 
 		target->addProperty("buildRules", "", "", kSettingsNoValue | kSettingsAsList);
 
 		target->addProperty("dependencies", "", "", kSettingsNoValue | kSettingsAsList);
 
-		target->addProperty("name", _targets[i], "", kSettingsNoValue | kSettingsQuoteVariable);
+		target->addProperty("name", _target, "", kSettingsNoValue | kSettingsQuoteVariable);
 		target->addProperty("productName", PROJECT_NAME, "", kSettingsNoValue);
-		addProductFileReference("PBXFileReference_" PROJECT_DESCRIPTION ".app_" + _targets[i], PROJECT_DESCRIPTION ".app");
-		productsGroup->addChildByHash(getHash("PBXFileReference_" PROJECT_DESCRIPTION ".app_" + _targets[i]), PROJECT_DESCRIPTION ".app");
-		target->addProperty("productReference", getHash("PBXFileReference_" PROJECT_DESCRIPTION ".app_" + _targets[i]), PROJECT_DESCRIPTION ".app", kSettingsNoValue);
+		addProductFileReference("PBXFileReference_" PROJECT_DESCRIPTION ".app_" + _target, PROJECT_DESCRIPTION ".app");
+		productsGroup->addChildByHash(getHash("PBXFileReference_" PROJECT_DESCRIPTION ".app_" + _target), PROJECT_DESCRIPTION ".app");
+		target->addProperty("productReference", getHash("PBXFileReference_" PROJECT_DESCRIPTION ".app_" + _target), PROJECT_DESCRIPTION ".app", kSettingsNoValue);
 		target->addProperty("productType", "com.apple.product-type.application", "", kSettingsNoValue | kSettingsQuoteVariable);
 
 		_nativeTarget.add(target);
@@ -1034,6 +1047,88 @@ XcodeProvider::ValueList& XcodeProvider::getResourceFiles(const BuildSetup &setu
 			files.push_back("dists/tvos/PrivacyInfo.xcprivacy");
 		}
 		files.push_back("dists/networking/wwwroot.zip");
+		if (CONTAINS_DEFINE(setup.defines, "ENABLE_HPL1")) {
+			files.push_back("engines/hpl1/engine/impl/shaders/hpl1_gamma_correction.fragment");
+			files.push_back("engines/hpl1/engine/impl/shaders/hpl1_gamma_correction.vertex");
+			files.push_back("engines/hpl1/engine/impl/shaders/hpl1_Simple.fragment");
+			files.push_back("engines/hpl1/engine/impl/shaders/hpl1_Simple.vertex");
+			files.push_back("engines/hpl1/engine/impl/shaders/hpl1_Ambient_Color.fragment");
+			files.push_back("engines/hpl1/engine/impl/shaders/hpl1_Bump2D_Light.fragment");
+			files.push_back("engines/hpl1/engine/impl/shaders/hpl1_Bump2D_Light.vertex");
+			files.push_back("engines/hpl1/engine/impl/shaders/hpl1_BumpColorSpec_Light.fragment");
+			files.push_back("engines/hpl1/engine/impl/shaders/hpl1_BumpColorSpec_Light_Spot.fragment");
+			files.push_back("engines/hpl1/engine/impl/shaders/hpl1_BumpSpec2D_Light.fragment");
+			files.push_back("engines/hpl1/engine/impl/shaders/hpl1_BumpSpec2D_Light.vertex");
+			files.push_back("engines/hpl1/engine/impl/shaders/hpl1_BumpSpec_Light.fragment");
+			files.push_back("engines/hpl1/engine/impl/shaders/hpl1_BumpSpec_Light_Spot.fragment");
+			files.push_back("engines/hpl1/engine/impl/shaders/hpl1_BumpSpec_Light_Spot_pass2.fragment");
+			files.push_back("engines/hpl1/engine/impl/shaders/hpl1_Bump_Light.fragment");
+			files.push_back("engines/hpl1/engine/impl/shaders/hpl1_Bump_Light_Spot.fragment");
+			files.push_back("engines/hpl1/engine/impl/shaders/hpl1_Bump_Light_Spot_pass2.fragment");
+			files.push_back("engines/hpl1/engine/impl/shaders/hpl1_DiffuseSpec_Light.fragment");
+			files.push_back("engines/hpl1/engine/impl/shaders/hpl1_DiffuseSpec_Light.vertex");
+			files.push_back("engines/hpl1/engine/impl/shaders/hpl1_DiffuseSpec_Light_Spot.fragment");
+			files.push_back("engines/hpl1/engine/impl/shaders/hpl1_DiffuseSpec_Light_Spot.vertex");
+			files.push_back("engines/hpl1/engine/impl/shaders/hpl1_DiffuseSpec_Light_Spot_pass2.fragment");
+			files.push_back("engines/hpl1/engine/impl/shaders/hpl1_Diffuse_Color.fragment");
+			files.push_back("engines/hpl1/engine/impl/shaders/hpl1_Diffuse_Color.vertex");
+			files.push_back("engines/hpl1/engine/impl/shaders/hpl1_Diffuse_ColorMul.vertex");
+			files.push_back("engines/hpl1/engine/impl/shaders/hpl1_Diffuse_EnvMap_Reflect.fragment");
+			files.push_back("engines/hpl1/engine/impl/shaders/hpl1_Diffuse_EnvMap_Reflect.vertex");
+			files.push_back("engines/hpl1/engine/impl/shaders/hpl1_Diffuse_Light.fragment");
+			files.push_back("engines/hpl1/engine/impl/shaders/hpl1_Diffuse_Light.vertex");
+			files.push_back("engines/hpl1/engine/impl/shaders/hpl1_Diffuse_Light_Spot.fragment");
+			files.push_back("engines/hpl1/engine/impl/shaders/hpl1_Diffuse_Light_Spot.vertex");
+			files.push_back("engines/hpl1/engine/impl/shaders/hpl1_Diffuse_Light_Spot_pass1.fragment");
+			files.push_back("engines/hpl1/engine/impl/shaders/hpl1_Diffuse_Light_Spot_pass2.fragment");
+			files.push_back("engines/hpl1/engine/impl/shaders/hpl1_Fallback01_Bump_Light.fragment");
+			files.push_back("engines/hpl1/engine/impl/shaders/hpl1_Fallback01_Diffuse_Light_Spot.fragment");
+			files.push_back("engines/hpl1/engine/impl/shaders/hpl1_Fallback01_Diffuse_Light_Spot_p2.vertex");
+			files.push_back("engines/hpl1/engine/impl/shaders/hpl1_Fallback01_Diffuse_Light_p1.fragment");
+			files.push_back("engines/hpl1/engine/impl/shaders/hpl1_Fallback01_Diffuse_Light_p1.vertex");
+			files.push_back("engines/hpl1/engine/impl/shaders/hpl1_Fallback01_Diffuse_Light_p2.fragment");
+			files.push_back("engines/hpl1/engine/impl/shaders/hpl1_Fallback01_Diffuse_Light_p2.vertex");
+			files.push_back("engines/hpl1/engine/impl/shaders/hpl1_Fallback02_DIffuse_Light_Spot_p2.fragment");
+			files.push_back("engines/hpl1/engine/impl/shaders/hpl1_Fallback02_DIffuse_Light_Spot_p3.fragment");
+			files.push_back("engines/hpl1/engine/impl/shaders/hpl1_Fallback02_Diffuse_Light_Spot_p2.vertex");
+			files.push_back("engines/hpl1/engine/impl/shaders/hpl1_Fallback02_Diffuse_Light_Spot_p3.vertex");
+			files.push_back("engines/hpl1/engine/impl/shaders/hpl1_Fallback02_Diffuse_Light_p1.fragment");
+			files.push_back("engines/hpl1/engine/impl/shaders/hpl1_Fallback02_Diffuse_Light_p1.vertex");
+			files.push_back("engines/hpl1/engine/impl/shaders/hpl1_Fallback02_Diffuse_Light_p2.vertex");
+			files.push_back("engines/hpl1/engine/impl/shaders/hpl1_Fog_Solid.fragment");
+			files.push_back("engines/hpl1/engine/impl/shaders/hpl1_Fog_Solid.vertex");
+			files.push_back("engines/hpl1/engine/impl/shaders/hpl1_Fog_Trans.vertex");
+			files.push_back("engines/hpl1/engine/impl/shaders/hpl1_Fog_Trans_Alpha.fragment");
+			files.push_back("engines/hpl1/engine/impl/shaders/hpl1_Fog_Trans_Mod.fragment");
+			files.push_back("engines/hpl1/engine/impl/shaders/hpl1_Fog_Trans_ModX2.fragment");
+			files.push_back("engines/hpl1/engine/impl/shaders/hpl1_gles2compat.fragment");
+			files.push_back("engines/hpl1/engine/impl/shaders/hpl1_gles2compat.vertex");
+			files.push_back("engines/hpl1/engine/impl/shaders/hpl1_PostEffect_Bloom.fragment");
+			files.push_back("engines/hpl1/engine/impl/shaders/hpl1_PostEffect_Bloom.vertex");
+			files.push_back("engines/hpl1/engine/impl/shaders/hpl1_PostEffect_Blur.vertex");
+			files.push_back("engines/hpl1/engine/impl/shaders/hpl1_PostEffect_Blur_2D.fragment");
+			files.push_back("engines/hpl1/engine/impl/shaders/hpl1_PostEffect_Blur_Rect.fragment");
+			files.push_back("engines/hpl1/engine/impl/shaders/hpl1_PostEffect_DoF.fragment");
+			files.push_back("engines/hpl1/engine/impl/shaders/hpl1_PostEffect_DoF.vertex");
+			files.push_back("engines/hpl1/engine/impl/shaders/hpl1_PostEffect_Fallback01_Blur_2D.fragment");
+			files.push_back("engines/hpl1/engine/impl/shaders/hpl1_PostEffect_Fallback01_Blur_Rect.fragment");
+			files.push_back("engines/hpl1/engine/impl/shaders/hpl1_PostEffect_Motion.fragment");
+			files.push_back("engines/hpl1/engine/impl/shaders/hpl1_PostEffect_Motion.vertex");
+			files.push_back("engines/hpl1/engine/impl/shaders/hpl1_PostEffect_Motion_staticloop.fragment");
+			files.push_back("engines/hpl1/engine/impl/shaders/hpl1_PostEffect_Offset.fragment");
+			files.push_back("engines/hpl1/engine/impl/shaders/hpl1_PostEffect_Offset.vertex");
+			files.push_back("engines/hpl1/engine/impl/shaders/hpl1_ShadowExtrude.fragment");
+			files.push_back("engines/hpl1/engine/impl/shaders/hpl1_ShadowExtrude.vertex");
+			files.push_back("engines/hpl1/engine/impl/shaders/hpl1_Water_Diffuse.fragment");
+			files.push_back("engines/hpl1/engine/impl/shaders/hpl1_Water_Diffuse.vertex");
+			files.push_back("engines/hpl1/engine/impl/shaders/hpl1_Water_Fog.fragment");
+			files.push_back("engines/hpl1/engine/impl/shaders/hpl1_Water_Fog.vertex");
+			files.push_back("engines/hpl1/engine/impl/shaders/hpl1_refract.fragment");
+			files.push_back("engines/hpl1/engine/impl/shaders/hpl1_refract.vertex");
+			files.push_back("engines/hpl1/engine/impl/shaders/hpl1_refract_special.fragment");
+			files.push_back("engines/hpl1/engine/impl/shaders/hpl1_refract_water.fragment");
+			files.push_back("engines/hpl1/engine/impl/shaders/hpl1_refract_water.vertex");
+		}
 		if (CONTAINS_DEFINE(setup.defines, "ENABLE_GRIM")) {
 			files.push_back("engines/grim/shaders/grim_dim.fragment");
 			files.push_back("engines/grim/shaders/grim_dim.vertex");
@@ -1128,6 +1223,14 @@ XcodeProvider::ValueList& XcodeProvider::getResourceFiles(const BuildSetup &setu
 			files.push_back("engines/freescape/shaders/freescape_cubemap.fragment");
 			files.push_back("engines/freescape/shaders/freescape_cubemap.vertex");
 		}
+		if (CONTAINS_DEFINE(setup.defines, "ENABLE_COLONY")) {
+			files.push_back("engines/colony/shaders/colony_solid.fragment");
+			files.push_back("engines/colony/shaders/colony_solid.vertex");
+			files.push_back("engines/colony/shaders/colony_solid_3d.fragment");
+			files.push_back("engines/colony/shaders/colony_solid_3d.vertex");
+			files.push_back("engines/colony/shaders/colony_bitmap.fragment");
+			files.push_back("engines/colony/shaders/colony_bitmap.vertex");
+		}
 		if (CONTAINS_DEFINE(setup.defines, "USE_FLUIDSYNTH")) {
 			files.push_back("dists/soundfonts/Roland_SC-55.sf2");
 			files.push_back("dists/soundfonts/COPYRIGHT.Roland_SC-55");
@@ -1151,8 +1254,8 @@ XcodeProvider::ValueList& XcodeProvider::getResourceFiles(const BuildSetup &setu
 		files.push_back("NEWS.md");
 		files.push_back("README.md");
 
-		for (int i = 0; i < kEngineDataGroupCount; i++) {
-			for (const std::string &filename : _engineDataGroupDefs[i].dataFiles) {
+		for (const auto &engineDataGroupDef : _engineDataGroupDefs) {
+			for (const std::string &filename : engineDataGroupDef.dataFiles) {
 				if (std::find(files.begin(), files.end(), filename) != files.end())
 					error("Resource file " + filename + " was included multiple times");
 
@@ -1180,8 +1283,8 @@ void XcodeProvider::setupResourcesBuildPhase(const BuildSetup &setup) {
 	ValueList &files_list = getResourceFiles(setup);
 
 	// Same as for containers: a rule for each native target
-	for (unsigned int i = 0; i < _targets.size(); i++) {
-		Object *resource = new Object(this, "PBXResourcesBuildPhase_" + _targets[i], "PBXResourcesBuildPhase", "PBXResourcesBuildPhase", "", "Resources");
+	for (const auto &target : _targets) {
+		Object *resource = new Object(this, "PBXResourcesBuildPhase_" + target, "PBXResourcesBuildPhase", "PBXResourcesBuildPhase", "", "Resources");
 
 		resource->addProperty("buildActionMask", "2147483647", "", kSettingsNoValue);
 
@@ -1191,13 +1294,13 @@ void XcodeProvider::setupResourcesBuildPhase(const BuildSetup &setup) {
 		files._flags = kSettingsAsList;
 
 		int order = 0;
-		for (ValueList::iterator file = files_list.begin(); file != files_list.end(); file++) {
-			if (shouldSkipFileForTarget(*file, _targets[i], *file)) {
+		for (const auto &file : files_list) {
+			if (shouldSkipFileForTarget(file, target, file)) {
 				continue;
 			}
-			std::string resourceAbsolutePath = _projectRoot + "/" + *file;
+			std::string resourceAbsolutePath = _projectRoot + "/" + file;
 			std::string file_id = "FileReference_" + resourceAbsolutePath;
-			std::string base = basename(*file);
+			std::string base = basename(file);
 			std::string comment = base + " in Resources";
 			addBuildFile(resourceAbsolutePath, base, getHash(file_id), comment);
 			ADD_SETTING_ORDER_NOVALUE(files, getHash(resourceAbsolutePath), comment, order++);
@@ -1215,9 +1318,9 @@ void XcodeProvider::setupSourcesBuildPhase() {
 	_sourcesBuildPhase._comment = "PBXSourcesBuildPhase";
 
 	// Same as for containers: a rule for each native target
-	for (unsigned int i = 0; i < _targets.size(); i++) {
-		const std::string &targetName = _targets[i];
-		Object *source = new Object(this, "PBXSourcesBuildPhase_" + _targets[i], "PBXSourcesBuildPhase", "PBXSourcesBuildPhase", "", "Sources");
+	for (const auto &target : _targets) {
+		const std::string &targetName = target;
+		Object *source = new Object(this, "PBXSourcesBuildPhase_" + target, "PBXSourcesBuildPhase", "PBXSourcesBuildPhase", "", "Sources");
 
 		source->addProperty("buildActionMask", "2147483647", "", kSettingsNoValue);
 
@@ -1226,16 +1329,16 @@ void XcodeProvider::setupSourcesBuildPhase() {
 		files._flags = kSettingsAsList;
 
 		int order = 0;
-		for (std::vector<Object *>::iterator file = _buildFile._objects.begin(); file != _buildFile._objects.end(); ++file) {
-			const std::string &fileName = (*file)->_name;
-			if (shouldSkipFileForTarget((*file)->_id, targetName, fileName)) {
+		for (const auto *object : _buildFile._objects) {
+			const std::string &fileName = object->_name;
+			if (shouldSkipFileForTarget(object->_id, targetName, fileName)) {
 				continue;
 			}
 			if (!producesObjectFileOnOSX(fileName)) {
 				continue;
 			}
 			std::string comment = fileName + " in Sources";
-			ADD_SETTING_ORDER_NOVALUE(files, getHash((*file)->_id), comment, order++);
+			ADD_SETTING_ORDER_NOVALUE(files, getHash(object->_id), comment, order++);
 		}
 
 		setupAdditionalSources(targetName, files, order);
@@ -1380,8 +1483,8 @@ void XcodeProvider::setupBuildConfiguration(const BuildSetup &setup) {
 		*/
 		ADD_SETTING_QUOTE(scummvmOSX_Debug, "GCC_VERSION", "");
 		ValueList scummvmOSX_HeaderPaths;
-		for (StringList::const_iterator i = setup.includeDirs.begin(); i != setup.includeDirs.end(); ++i)
-			scummvmOSX_HeaderPaths.push_back("\"" + *i + "\"");
+		for (const auto &includeDir : setup.includeDirs)
+			scummvmOSX_HeaderPaths.push_back("\"" + includeDir + "\"");
 		scummvmOSX_HeaderPaths.push_back("/usr/local/include/" + libSDL);
 		scummvmOSX_HeaderPaths.push_back("/opt/homebrew/include/" + libSDL);
 		scummvmOSX_HeaderPaths.push_back("/opt/local/include/" + libSDL);
@@ -1397,8 +1500,8 @@ void XcodeProvider::setupBuildConfiguration(const BuildSetup &setup) {
 		ADD_SETTING_LIST(scummvmOSX_Debug, "HEADER_SEARCH_PATHS", scummvmOSX_HeaderPaths, kSettingsQuoteVariable | kSettingsAsList, 5);
 		ADD_SETTING_QUOTE(scummvmOSX_Debug, "INFOPLIST_FILE", "$(SRCROOT)/dists/macosx/Info.plist");
 		ValueList scummvmOSX_LibPaths;
-		for (StringList::const_iterator i = setup.libraryDirs.begin(); i != setup.libraryDirs.end(); ++i)
-			scummvmOSX_LibPaths.push_back("\"" + *i + "\"");
+		for (const auto &libraryDir : setup.libraryDirs)
+			scummvmOSX_LibPaths.push_back("\"" + libraryDir + "\"");
 		scummvmOSX_LibPaths.push_back("/usr/local/lib");
 		scummvmOSX_LibPaths.push_back("/opt/homebrew/lib");
 		scummvmOSX_LibPaths.push_back("/opt/local/lib");
@@ -1456,8 +1559,8 @@ void XcodeProvider::setupBuildConfiguration(const BuildSetup &setup) {
 		ValueList iPhone_HeaderSearchPaths;
 		iPhone_HeaderSearchPaths.push_back("$(SRCROOT)/engines/");
 		iPhone_HeaderSearchPaths.push_back("$(SRCROOT)");
-		for (StringList::const_iterator i = setup.includeDirs.begin(); i != setup.includeDirs.end(); ++i)
-			iPhone_HeaderSearchPaths.push_back("\"" + *i + "\"");
+		for (const auto &includeDir : setup.includeDirs)
+			iPhone_HeaderSearchPaths.push_back("\"" + includeDir + "\"");
 		iPhone_HeaderSearchPaths.push_back("\"" + projectOutputDirectory + "\"");
 		if (!setup.useXCFramework) {
 			iPhone_HeaderSearchPaths.push_back("\"" + projectOutputDirectory + "/include\"");
@@ -1468,8 +1571,8 @@ void XcodeProvider::setupBuildConfiguration(const BuildSetup &setup) {
 		ADD_SETTING_LIST(iPhone_Debug, "HEADER_SEARCH_PATHS", iPhone_HeaderSearchPaths, kSettingsAsList | kSettingsQuoteVariable, 5);
 		ADD_SETTING_QUOTE(iPhone_Debug, "INFOPLIST_FILE", "$(SRCROOT)/dists/ios7/Info.plist");
 		ValueList iPhone_LibPaths;
-		for (StringList::const_iterator i = setup.libraryDirs.begin(); i != setup.libraryDirs.end(); ++i)
-			iPhone_LibPaths.push_back("\"" + *i + "\"");
+		for (const auto &libraryDir : setup.libraryDirs)
+			iPhone_LibPaths.push_back("\"" + libraryDir + "\"");
 		iPhone_LibPaths.push_back("$(inherited)");
 		if (!setup.useXCFramework)
 			iPhone_LibPaths.push_back("\"" + projectOutputDirectory + "/lib\"");
@@ -1542,8 +1645,8 @@ void XcodeProvider::setupBuildConfiguration(const BuildSetup &setup) {
 		ValueList tvOS_HeaderSearchPaths;
 		tvOS_HeaderSearchPaths.push_back("$(SRCROOT)/engines/");
 		tvOS_HeaderSearchPaths.push_back("$(SRCROOT)");
-		for (StringList::const_iterator i = setup.includeDirs.begin(); i != setup.includeDirs.end(); ++i)
-			tvOS_HeaderSearchPaths.push_back("\"" + *i + "\"");
+		for (const auto &includeDir : setup.includeDirs)
+			tvOS_HeaderSearchPaths.push_back("\"" + includeDir + "\"");
 		tvOS_HeaderSearchPaths.push_back("\"" + projectOutputDirectory + "\"");
 		tvOS_HeaderSearchPaths.push_back("\"" + projectOutputDirectory + "/include\"");
 		if (CONTAINS_DEFINE(setup.defines, "USE_SDL_NET")) {
@@ -1552,8 +1655,8 @@ void XcodeProvider::setupBuildConfiguration(const BuildSetup &setup) {
 		ADD_SETTING_LIST(tvOS_Debug, "HEADER_SEARCH_PATHS", tvOS_HeaderSearchPaths, kSettingsAsList | kSettingsQuoteVariable, 5);
 		ADD_SETTING_QUOTE(tvOS_Debug, "INFOPLIST_FILE", "$(SRCROOT)/dists/tvos/Info.plist");
 		ValueList tvOS_LibPaths;
-		for (StringList::const_iterator i = setup.libraryDirs.begin(); i != setup.libraryDirs.end(); ++i)
-			tvOS_LibPaths.push_back("\"" + *i + "\"");
+		for (const auto &libraryDir : setup.libraryDirs)
+			tvOS_LibPaths.push_back("\"" + libraryDir + "\"");
 		tvOS_LibPaths.push_back("$(inherited)");
 		tvOS_LibPaths.push_back("\"" + projectOutputDirectory + "/lib\"");
 		ADD_SETTING_LIST(tvOS_Debug, "LIBRARY_SEARCH_PATHS", tvOS_LibPaths, kSettingsAsList, 5);
@@ -1566,6 +1669,7 @@ void XcodeProvider::setupBuildConfiguration(const BuildSetup &setup) {
 		ADD_SETTING_QUOTE(tvOS_Debug, "TARGETED_DEVICE_FAMILY", "3");
 		ValueList scummvmTVOSsimulator_defines;
 		ADD_DEFINE(scummvmTVOSsimulator_defines, "\"$(inherited)\"");
+		ADD_DEFINE(scummvmTVOSsimulator_defines, "IPHONE_TVOS");
 		if (CONTAINS_DEFINE(setup.defines, "USE_SDL_NET"))
 			ADD_DEFINE(scummvmTVOSsimulator_defines, "WITHOUT_SDL");
 		ADD_SETTING_LIST(tvOS_Debug, "\"GCC_PREPROCESSOR_DEFINITIONS[sdk=appletvsimulator*]\"", scummvmTVOSsimulator_defines, kSettingsNoQuote | kSettingsAsList, 5);
@@ -1598,15 +1702,15 @@ void XcodeProvider::setupBuildConfiguration(const BuildSetup &setup) {
 	}
 
 	// Warning: This assumes we have all configurations with a Debug & Release pair
-	for (std::vector<Object *>::iterator config = _buildConfiguration._objects.begin(); config != _buildConfiguration._objects.end(); config++) {
+	for (const auto *config : _buildConfiguration._objects) {
 
-		Object *configList = new Object(this, "XCConfigurationList_" + (*config)->_name, (*config)->_name, "XCConfigurationList", "", "Build configuration list for " + (*config)->_refType + " \"" + (*config)->_name + "\"");
+		Object *configList = new Object(this, "XCConfigurationList_" + config->_name, config->_name, "XCConfigurationList", "", "Build configuration list for " + config->_refType + " \"" + config->_name + "\"");
 
 		Property buildConfigs;
 		buildConfigs._flags = kSettingsAsList;
 
-		buildConfigs._settings[getHash((*config)->_id)] = Setting("", "Debug", kSettingsNoValue, 0, 0);
-		buildConfigs._settings[getHash((*(++config))->_id)] = Setting("", "Release", kSettingsNoValue, 0, 1);
+		buildConfigs._settings[getHash(config->_id)] = Setting("", "Debug", kSettingsNoValue, 0, 0);
+		buildConfigs._settings[getHash((++config)->_id)] = Setting("", "Release", kSettingsNoValue, 0, 1);
 
 		configList->_properties["buildConfigurations"] = buildConfigs;
 
@@ -1651,8 +1755,8 @@ void XcodeProvider::setupAdditionalSources(std::string targetName, Property &fil
 // Setup global defines
 void XcodeProvider::setupDefines(const BuildSetup &setup) {
 
-	for (StringList::const_iterator i = setup.defines.begin(); i != setup.defines.end(); ++i) {
-		ADD_DEFINE(_defines, *i);
+	for (const auto &define : setup.defines) {
+		ADD_DEFINE(_defines, define);
 	}
 	// Add special defines for Mac support
 	// TODO: check if it's still needed
@@ -1692,6 +1796,11 @@ std::string XcodeProvider::getHash(std::string key) {
 bool isSeparator(char s) { return (s == '-'); }
 
 #ifdef MACOSX
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+// CC_MD5 is declared deprecated because MD5 is not a secure algorithm
+// but this code is not about security
+
 std::string XcodeProvider::md5(std::string key) {
 	unsigned char md[CC_MD5_DIGEST_LENGTH];
 	CC_MD5(key.c_str(), (CC_LONG) key.length(), md);
@@ -1702,6 +1811,8 @@ std::string XcodeProvider::md5(std::string key) {
 	}
 	return stream.str();
 }
+
+#pragma clang diagnostic pop
 #endif
 
 std::string XcodeProvider::newHash() const {
@@ -1744,11 +1855,11 @@ std::string XcodeProvider::writeProperty(const std::string &variable, Property &
 		output += (prop._flags & kSettingsAsList) ? "(\n" : "{\n";
 
 	OrderedSettingList settings = prop.getOrderedSettingList();
-	for (OrderedSettingList::const_iterator setting = settings.begin(); setting != settings.end(); ++setting) {
+	for (const auto &setting : settings) {
 		if (settings.size() > 1 || (prop._flags & kSettingsSingleItem))
 			output += (flags & kSettingsSingleItem ? " " : "\t\t\t\t");
 
-		output += writeSetting(setting->first, setting->second);
+		output += writeSetting(setting.first, setting.second);
 
 		// The combination of kSettingsAsList, and kSettingsSingleItem should use "," and not ";" (i.e children
 		// in PBXGroup, so we special case that case here.

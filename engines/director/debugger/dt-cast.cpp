@@ -90,9 +90,11 @@ const char *toString(CastType castType) {
 		"DigitalVideo",
 		"Script",
 		"RTE",
-		"???",
-		"Transition"};
-	if (castType < 0 || castType > kCastTransition)
+		"OLE",
+		"Transition",
+		"Xtra",
+	};
+	if (castType < 0 || castType > kCastXtra)
 		return "???";
 	return castTypes[(int)castType];
 }
@@ -107,6 +109,93 @@ Common::String getDisplayName(CastMember *castMember) {
 		return textCastMember->getText();
 	}
 	return Common::String::format("%u", castMember->getID());
+}
+
+void drawCastRow(Cast* cast) {
+	assert(cast);
+	for (auto castMember : *cast->_loadedCast) {
+		castMember._value->load();
+
+		Common::String name(getDisplayName(castMember._value));
+		if (!_state->_cast._nameFilter.PassFilter(name.c_str()))
+			continue;
+		if ((castMember._value->_type != kCastTypeAny) &&
+				!(_state->_cast._typeFilter & (1 << (int)castMember._value->_type)))
+			continue;
+
+		ImGui::TableNextRow();
+
+		// Make the entire row selectable/clickable
+		ImGui::TableSetColumnIndex(0);
+		if (ImGui::Selectable(
+			Common::String::format("##row%d", castMember._key).c_str(),
+			false,
+			ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowOverlap,
+			ImVec2(0, 32.f) // match row height
+		)) {
+			castMember._value->load();
+			_state->_castDetails._castMember = castMember._value;
+			_state->_w.castDetails = true;
+		}
+		ImGui::SameLine();
+
+		ImGui::Text("%s %s", toIcon(castMember._value->_type), name.c_str());
+
+		ImGui::TableNextColumn();
+		ImGui::Text("%d", castMember._key);
+
+		ImGui::TableNextColumn();
+		if (castMember._value->_type == CastType::kCastLingoScript) {
+			ScriptCastMember *scriptMember = (ScriptCastMember *)castMember._value;
+			ImGui::Text("%s", toString(scriptMember->_scriptType));
+		}
+		ImGui::TableNextColumn();
+		ImGui::Text("%s", toString(castMember._value->_type));
+
+		ImGui::TableNextColumn();
+		float columnWidth = ImGui::GetColumnWidth();
+
+		ImGuiImage imgID = {};
+		switch (castMember._value->_type) {
+		case kCastBitmap:
+			{
+				imgID = getImageID(castMember._value);
+				if (imgID.id) {
+					float offsetX = (columnWidth - 32.f) * 0.5f;
+					ImGui::SetCursorPosX(ImGui::GetCursorPosX() + offsetX);
+					showImage(imgID, name.c_str(), 32.f);
+				}
+			}
+			break;
+
+		case kCastText:
+		case kCastRichText:
+		case kCastButton:
+			{
+				imgID = getTextID(castMember._value);
+				if (imgID.id) {
+					float offsetX = (columnWidth - 32.f) * 0.5f;
+					ImGui::SetCursorPosX(ImGui::GetCursorPosX() + offsetX);
+					showImage(imgID, name.c_str(), 32.f);
+				}
+			}
+			break;
+
+		case kCastShape:
+			{
+				imgID = getShapeID(castMember._value);
+				if (imgID.id) {
+					float offsetX = (columnWidth - 32.f) * 0.5f;
+					ImGui::SetCursorPosX(ImGui::GetCursorPosX() + offsetX);
+					showImage(imgID, name.c_str(), 32.f);
+				}
+			}
+			break;
+		default:
+			break;
+		}
+	}
+
 }
 
 void showCast() {
@@ -164,76 +253,13 @@ void showCast() {
 					Cast *cast = it._value;
 					if (!cast->_loadedCast)
 						continue;
-
-					for (auto castMember : *cast->_loadedCast) {
-						if (!castMember._value->isLoaded())
-							continue;
-
-						Common::String name(getDisplayName(castMember._value));
-						if (!_state->_cast._nameFilter.PassFilter(name.c_str()))
-							continue;
-						if ((castMember._value->_type != kCastTypeAny) && !(_state->_cast._typeFilter & (1 << (int)castMember._value->_type)))
-							continue;
-
-						ImGui::TableNextRow();
-						ImGui::TableNextColumn();
-						ImGui::Text("%s %s", toIcon(castMember._value->_type), name.c_str());
-
-						ImGui::TableNextColumn();
-						ImGui::Text("%d", castMember._key);
-
-						ImGui::TableNextColumn();
-						if (castMember._value->_type == CastType::kCastLingoScript) {
-							ScriptCastMember *scriptMember = (ScriptCastMember *)castMember._value;
-							ImGui::Text("%s", toString(scriptMember->_scriptType));
-						}
-						ImGui::TableNextColumn();
-						ImGui::Text("%s", toString(castMember._value->_type));
-
-						ImGui::TableNextColumn();
-						float columnWidth = ImGui::GetColumnWidth();
-
-						ImGuiImage imgID = {};
-						switch (castMember._value->_type) {
-						case kCastBitmap:
-							{
-								imgID = getImageID(castMember._value);
-								if (imgID.id) {
-									float offsetX = (columnWidth - 32.f) * 0.5f;
-									ImGui::SetCursorPosX(ImGui::GetCursorPosX() + offsetX);
-									showImage(imgID, name.c_str(), 32.f);
-								}
-							}
-							break;
-
-						case kCastText:
-						case kCastRichText:
-						case kCastButton:
-							{
-								imgID = getTextID(castMember._value);
-								if (imgID.id) {
-									float offsetX = (columnWidth - 32.f) * 0.5f;
-									ImGui::SetCursorPosX(ImGui::GetCursorPosX() + offsetX);
-									showImage(imgID, name.c_str(), 32.f);
-								}
-							}
-							break;
-
-						case kCastShape:
-							{
-								imgID = getShapeID(castMember._value);
-								if (imgID.id) {
-									float offsetX = (columnWidth - 32.f) * 0.5f;
-									ImGui::SetCursorPosX(ImGui::GetCursorPosX() + offsetX);
-									showImage(imgID, name.c_str(), 32.f);
-								}
-							}
-							break;
-						default:
-							break;
-						}
-					}
+					drawCastRow(cast);
 				}
+
+				Cast *sharedCast = movie->getSharedCast();
+				if(sharedCast && sharedCast->_loadedCast)
+					drawCastRow(sharedCast);
+
 				ImGui::EndTable();
 			}
 		} else {
@@ -248,8 +274,7 @@ void showCast() {
 						continue;
 
 					for (auto castMember : *cast->_loadedCast) {
-						if (!castMember._value->isLoaded())
-							continue;
+						castMember._value->load();
 
 						Common::String name(getDisplayName(castMember._value));
 						if (!_state->_cast._nameFilter.PassFilter(name.c_str()))
@@ -310,13 +335,20 @@ void showCast() {
 							const ImVec2 p1 = ImGui::GetItemRectMax();
 							ImGui::PushClipRect(p0, p1, true);
 							ImDrawList *draw_list = ImGui::GetWindowDrawList();
-							draw_list->AddRect(p0, p1, IM_COL32_WHITE);
+							draw_list->AddRect(p0, p1, _state->theme->borderColor);
 							const ImVec2 pos = p0 + ImVec2((thumbnailSize - textWidth) * 0.5f, (thumbnailSize - textHeight) * 0.5f);
-							draw_list->AddText(nullptr, 0.f, pos, IM_COL32_WHITE, name.c_str(), 0, thumbnailSize);
-							draw_list->AddText(nullptr, 0.f, p1 - ImVec2(16, 16), IM_COL32_WHITE, toIcon(castMember._value->_type));
+							draw_list->AddText(nullptr, 0.f, pos, _state->theme->gridTextColor, name.c_str(), 0, thumbnailSize);
+							draw_list->AddText(nullptr, 0.f, p1 - ImVec2(16, 16), _state->theme->gridTextColor, toIcon(castMember._value->_type));
 							ImGui::PopClipRect();
 						}
 						ImGui::EndGroup();
+
+						if (ImGui::IsItemHovered() && ImGui::IsMouseClicked(0)) {
+							// Cast Member Clicked
+							castMember._value->load();
+							_state->_castDetails._castMember = castMember._value; // Must set _castMember before making the caseDetails window visible to prevent null castMember
+							_state->_w.castDetails = true;
+						}
 					}
 				}
 				ImGui::EndTable();

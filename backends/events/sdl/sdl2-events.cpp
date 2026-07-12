@@ -25,6 +25,7 @@
 
 #include "backends/events/sdl/sdl-events.h"
 #include "backends/platform/sdl/sdl.h"
+#include "backends/platform/sdl/touch-action.h"
 #include "backends/graphics/graphics.h"
 #include "common/config-manager.h"
 #include "common/textconsole.h"
@@ -75,7 +76,7 @@ void SdlEventSource::loadGameControllerMappingFile() {
 SdlEventSource::SdlEventSource()
 	: EventSource(), _scrollLock(false), _joystick(nullptr), _lastScreenID(0), _graphicsManager(nullptr), _queuedFakeMouseMove(false),
 	  _lastHatPosition(SDL_HAT_CENTERED), _mouseX(0), _mouseY(0), _engineRunning(false)
-	  , _queuedFakeKeyUp(false), _fakeKeyUp(), _controller(nullptr)
+	  , _queuedFakeKeyUp(false), _fakeKeyUp(), _queuedFakeMouseScroll(0), _fakeMouseScroll(), _controller(nullptr)
 	  {
 	int joystick_num = ConfMan.getInt("joystick_num");
 	if (joystick_num >= 0) {
@@ -630,6 +631,13 @@ void SdlEventSource::preprocessFingerMotion(SDL_Event *event) {
 }
 
 bool SdlEventSource::pollEvent(Common::Event &event) {
+	// Drain synthetic events (e.g. from the on-screen touch controls) first so
+	// they are routed through the keymapper like any other input event.
+	if (!_eventQueue.empty()) {
+		event = _eventQueue.pop();
+		return true;
+	}
+
 	finishSimulatedMouseClicks();
 
 	// In case we still need to send a key up event for a key down from a
@@ -637,6 +645,13 @@ bool SdlEventSource::pollEvent(Common::Event &event) {
 	if (_queuedFakeKeyUp) {
 		event = _fakeKeyUp;
 		_queuedFakeKeyUp = false;
+		return true;
+	}
+
+	// In we still need to send scroll events for an event with a scroll amount > 1
+	if (_queuedFakeMouseScroll) {
+		event = _fakeMouseScroll;
+		--_queuedFakeMouseScroll;
 		return true;
 	}
 
@@ -663,6 +678,25 @@ bool SdlEventSource::pollEvent(Common::Event &event) {
 		// right mouse click: second finger short tap while first finger is still down
 		// pointer motion: single finger drag
 		if (ev.type == SDL_FINGERDOWN || ev.type == SDL_FINGERUP || ev.type == SDL_FINGERMOTION) {
+			{
+				int action = (ev.type == SDL_FINGERDOWN) ? kActionDown :
+				             (ev.type == SDL_FINGERUP) ? kActionUp : kActionMove;
+				// On-screen mode-toggle button takes precedence over everything.
+				if (handleTouchToggle(action, ev.tfinger.x, ev.tfinger.y)) {
+					continue;
+				}
+				// In gamepad mode (no physical controller — applyTouchSettings
+				// falls back otherwise), drive the on-screen gamepad and consume
+				// the finger, like the Android backend does from JNI.
+				OSystem_SDL *sdlSystem = dynamic_cast<OSystem_SDL *>(g_system);
+				if (sdlSystem && sdlSystem->getTouchMode() == Common::kTouchModeGamepad &&
+				    sdlSystem->getTouchControls().isInitialized()) {
+					Common::Point size = getTouchscreenSizePixels();
+					sdlSystem->getTouchControls().update((TouchAction)action,
+						(int)(ev.tfinger.fingerId & 0x7fffffff), (int)(ev.tfinger.x * size.x), (int)(ev.tfinger.y * size.y));
+					continue;
+				}
+			}
 			// front (0) or back (1) panel
 			SDL_TouchID port = ev.tfinger.touchId;
 			// touchpad_mouse_mode off: use only front panel for direct touch control of pointer
@@ -717,16 +751,25 @@ bool SdlEventSource::dispatchSDLEvent(SDL_Event &ev, Common::Event &event) {
 	case SDL_MOUSEWHEEL: {
 		Sint32 yDir = ev.wheel.y;
 		// We want the mouse coordinates supplied with a mouse wheel event.
-		// However, SDL2 does not supply these, thus we use whatever we got
-		// last time.
+		// However, SDL2 only supplies these since v2.26.0. For older versions
+		// we use whatever we got last time.
+#if SDL_VERSION_ATLEAST(2, 26, 0)
+		if (!processMouseEvent(event, ev.wheel.mouseX, ev.wheel.mouseY)) {
+#else
 		if (!processMouseEvent(event, _mouseX, _mouseY)) {
+#endif
 			return false;
 		}
+
 		if (yDir < 0) {
 			event.type = Common::EVENT_WHEELDOWN;
+			_fakeMouseScroll = event;
+			_queuedFakeMouseScroll = -yDir - 1;
 			return true;
 		} else if (yDir > 0) {
 			event.type = Common::EVENT_WHEELUP;
+			_fakeMouseScroll = event;
+			_queuedFakeMouseScroll = yDir - 1;
 			return true;
 		} else {
 			return false;
@@ -967,6 +1010,12 @@ bool SdlEventSource::handleJoystickAdded(const SDL_JoyDeviceEvent &device, Commo
 	closeJoystick();
 	openJoystick(joystick_num);
 
+	// The on-screen gamepad is only a fallback when no physical controller is
+	// connected, so re-evaluate the touch preset now that one was plugged in.
+	if (OSystem_SDL *sdlSystem = dynamic_cast<OSystem_SDL *>(g_system)) {
+		sdlSystem->applyTouchSettings();
+	}
+
 	event.type = Common::EVENT_INPUT_CHANGED;
 	return true;
 }
@@ -992,6 +1041,12 @@ bool SdlEventSource::handleJoystickRemoved(const SDL_JoyDeviceEvent &device, Com
 	debug(5, "SdlEventSource: Newly removed joystick with instance id '%d' matches currently used joystick, closing current joystick", device.which);
 
 	closeJoystick();
+
+	// A physical controller went away; the on-screen gamepad fallback may now
+	// apply again, so re-evaluate the touch preset.
+	if (OSystem_SDL *sdlSystem = dynamic_cast<OSystem_SDL *>(g_system)) {
+		sdlSystem->applyTouchSettings();
+	}
 
 	event.type = Common::EVENT_INPUT_CHANGED;
 	return true;

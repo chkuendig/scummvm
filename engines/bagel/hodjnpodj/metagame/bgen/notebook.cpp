@@ -87,7 +87,6 @@ static  CFont *pNoteFont = nullptr;              // font to use for displaying n
 //static  bool        bInfoEOF = false;               // whether end-of-file has been reached
 
 static  bool        bActiveWindow = false;          // whether our window is active
-static  bool        bFirstTime = true;              // flag for first time information is displayed
 //static  int         nNotebook_DX, nNotebook_DY;     // size of useable notebook background
 //static  int         nItem_DDX, nItem_DDY;           // space separation between inventory items
 //static  int         nItemsPerColumn, nItemsPerRow;  // span of items that fit on the background
@@ -291,6 +290,7 @@ void CNotebook::OnDestroy() {
 		}
 	*/
 
+	bFirstTime = true;
 	CDialog::OnDestroy();
 }
 

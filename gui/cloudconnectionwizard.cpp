@@ -99,7 +99,7 @@ CloudConnectionWizard::~CloudConnectionWizard() {
 
 #ifdef EMSCRIPTEN
 // allow browser to pass in JSON tokens
-void CloudConnectionWizard::emscriptenCloudConnectionCallback(const Common::String *message ){
+void CloudConnectionWizard::emscriptenCloudConnectionCallback(const Common::String *message ) {
 	showStep(Step::MANUAL_MODE_STEP_2);
 	if (!message->empty()) {
 		_codeBox->setEditString(*message);

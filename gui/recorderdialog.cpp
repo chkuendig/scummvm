@@ -21,11 +21,11 @@
 
 #include "common/algorithm.h"
 #include "common/bufferedstream.h"
+#include "common/config-manager.h"
 #include "common/savefile.h"
 #include "common/system.h"
 #include "graphics/palette.h"
 #include "graphics/scaler.h"
-#include "graphics/thumbnail.h"
 #include "common/translation.h"
 #include "gui/widgets/list.h"
 #include "gui/editrecorddialog.h"
@@ -35,6 +35,9 @@
 #include "gui/ThemeEval.h"
 #include "gui/gui-manager.h"
 #include "gui/recorderdialog.h"
+#ifdef EMSCRIPTEN
+#include "backends/platform/sdl/emscripten/emscripten.h"
+#endif
 
 #define MAX_RECORDS_NAMES 0xFF
 
@@ -48,7 +51,10 @@ enum {
 	kDeleteCmd = 'DEL ',
 	kNextScreenshotCmd = 'NEXT',
 	kPrevScreenshotCmd = 'PREV',
-	kEditRecordCmd = 'EDIT'
+	kEditRecordCmd = 'EDIT',
+#ifdef EMSCRIPTEN
+	kDownloadRecordCmd = 'DLRC'
+#endif
 };
 
 RecorderDialog::RecorderDialog() : Dialog("RecorderDialog"), _list(nullptr), _currentScreenshot(0) {
@@ -70,6 +76,15 @@ RecorderDialog::RecorderDialog() : Dialog("RecorderDialog"), _list(nullptr), _cu
 	_list->setNumberingMode(GUI::kListNumberingOff);
 
 	_deleteButton = new GUI::ButtonWidget(this, "RecorderDialog.Delete", _("Delete"), Common::U32String(), kDeleteCmd);
+#ifdef EMSCRIPTEN
+	// The recording lives in the browser's virtual filesystem, which the user
+	// cannot reach directly. Offer a download so a recorded session can be
+	// exported (e.g. to replay it in a headless profiling harness). The button
+	// shares the "Delete" slot in the theme layout; reflowLayout() splits that
+	// slot between the two buttons, avoiding a theme-zip regeneration.
+	_downloadButton = new GUI::ButtonWidget(this, "RecorderDialog.Delete", _("Export"), Common::U32String(), kDownloadRecordCmd);
+	_downloadButton->setEnabled(false);
+#endif
 	new GUI::ButtonWidget(this, "RecorderDialog.Cancel", _("Cancel"), Common::U32String(), kCloseCmd);
 	new GUI::ButtonWidget(this, "RecorderDialog.Record", _("Record"), Common::U32String(), kRecordCmd);
 	_playbackButton = new GUI::ButtonWidget(this, "RecorderDialog.Playback", _("Playback"), Common::U32String(), kPlaybackCmd);
@@ -90,6 +105,21 @@ void RecorderDialog::reflowLayout() {
 	addThumbnailContainerButtonsAndText();
 
 	Dialog::reflowLayout();
+
+#ifdef EMSCRIPTEN
+	// The Download button shares the theme slot of the Delete button (the
+	// theme layouts do not know about it), so the reflow above stacked them
+	// on top of each other. Split the slot between the two buttons.
+	if (_downloadButton && _deleteButton) {
+		const int16 dx = _deleteButton->getRelX();
+		const int16 dy = _deleteButton->getRelY();
+		const uint16 dw = _deleteButton->getWidth();
+		const uint16 dh = _deleteButton->getHeight();
+		const uint16 half = (dw - 4) / 2;
+		_deleteButton->resize(dx, dy, half, dh, false);
+		_downloadButton->resize(dx + half + 4, dy, half, dh, false);
+	}
+#endif
 
 	if (g_gui.xmlEval()->getVar("Globals.RecorderDialog.ExtInfo.Visible") == 1) {
 		int16 x, y;
@@ -221,6 +251,19 @@ void RecorderDialog::handleCommand(CommandSender *sender, uint32 cmd, uint32 dat
 	case GUI::kListSelectionChangedCmd:
 		updateSelection(true);
 		break;
+#ifdef EMSCRIPTEN
+	case kDownloadRecordCmd:
+		if (_list->getSelected() >= 0) {
+			_playbackFile.close();
+			// Records are stored in the savefile directory (savepath); resolve
+			// the full virtual-FS path so the backend can stream it to a
+			// browser download.
+			Common::Path recordPath = ConfMan.getPath("savepath")
+				.appendComponent(_fileHeaders[_list->getSelected()].fileName);
+			dynamic_cast<OSystem_Emscripten *>(g_system)->exportFile(recordPath);
+		}
+		break;
+#endif
 	case kRecordCmd: {
 		TimeDate t;
 		QualifiedGameDescriptor desc = EngineMan.findTarget(_target);
@@ -274,7 +317,7 @@ void RecorderDialog::updateList() {
 int RecorderDialog::runModal(Common::String &target) {
 	_target = target;
 	if (_gfxWidget)
-		_gfxWidget->setGfx((Graphics::ManagedSurface *)nullptr);
+		_gfxWidget->clearGfx();
 
 	reflowLayout();
 	updateList();
@@ -289,6 +332,10 @@ void RecorderDialog::updateSelection(bool redraw) {
 		_editButton->setEnabled(true);
 		_deleteButton->setEnabled(true);
 		_playbackButton->setEnabled(true);
+#ifdef EMSCRIPTEN
+		if (_downloadButton)
+			_downloadButton->setEnabled(true);
+#endif
 	}
 
 	if (g_gui.xmlEval()->getVar("Globals.RecorderDialog.ExtInfo.Visible") != 1)
@@ -346,13 +393,11 @@ void RecorderDialog::updateScreenshot() {
 		_currentScreenshot = 1;
 	}
 
-	Graphics::Surface *srcsf = _playbackFile.getScreenShot(_currentScreenshot);
-	Common::SharedPtr<Graphics::Surface> srcsfSptr = Common::SharedPtr<Graphics::Surface>(srcsf, Graphics::SurfaceDeleter());
-	if (srcsfSptr) {
-		Graphics::Surface *destsf = Graphics::scale(*srcsfSptr, _gfxWidget->getWidth(), _gfxWidget->getHeight());
-		Common::SharedPtr<Graphics::Surface> destsfSptr = Common::SharedPtr<Graphics::Surface>(destsf, Graphics::SurfaceDeleter());
-		if (destsfSptr && _gfxWidget->isVisible())
-			_gfxWidget->setGfx(destsf, false);
+	Common::SharedPtr<Graphics::ManagedSurface> srcsf(_playbackFile.getScreenShot(_currentScreenshot));
+	if (srcsf) {
+		Common::SharedPtr<Graphics::ManagedSurface> destsf(srcsf->scale(_gfxWidget->getWidth(), _gfxWidget->getHeight()));
+		if (destsf && _gfxWidget->isVisible())
+			_gfxWidget->setGfx(destsf);
 	} else {
 		_gfxWidget->setGfx(-1, -1, 0, 0, 0);
 	}

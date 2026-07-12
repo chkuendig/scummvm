@@ -26,7 +26,6 @@
  */
 
 #include "hpl1/engine/impl/LowLevelGraphicsSDL.h"
-#include "hpl1/engine/graphics/font_data.h"
 
 #include "hpl1/engine/graphics/bitmap2D.h"
 #include "hpl1/engine/graphics/font_data.h"
@@ -34,38 +33,22 @@
 #include "hpl1/engine/impl/SDLTexture.h"
 #include "hpl1/engine/impl/VertexBufferOGL.h"
 #include "hpl1/engine/impl/VertexBufferVBO.h"
+#include "hpl1/engine/math/Math.h"
 #include "hpl1/engine/system/low_level_system.h"
 
 #include "common/algorithm.h"
+#include "common/array.h"
 #include "common/config-manager.h"
 #include "common/system.h"
 #include "engines/util.h"
+#include "graphics/cursorman.h"
 #include "hpl1/debug.h"
 #include "hpl1/engine/impl/OcclusionQueryOGL.h"
 #include "hpl1/graphics.h"
 
-#ifdef HPL1_USE_OPENGL
+#if defined(HPL1_USE_OPENGL) && !USE_FORCED_GLES2
 
 namespace hpl {
-
-GLenum ColorFormatToGL(eColorDataFormat format) {
-	switch (format) {
-	case eColorDataFormat_RGB:
-		return GL_RGB;
-	case eColorDataFormat_RGBA:
-		return GL_RGBA;
-	case eColorDataFormat_ALPHA:
-		return GL_ALPHA;
-	case eColorDataFormat_BGR:
-		return GL_BGR;
-	case eColorDataFormat_BGRA:
-		return GL_BGRA;
-	default:
-		break;
-	}
-	Hpl1::logError(Hpl1::kDebugOpenGL, "invalid color format (%d)\n", format);
-	return GL_RGB;
-}
 
 GLenum TextureTargetToGL(eTextureTarget target) {
 	switch (target) {
@@ -95,6 +78,8 @@ cLowLevelGraphicsSDL::cLowLevelGraphicsSDL() {
 	mvVirtualSize.y = 600;
 	mfGammaCorrection = 1.0;
 	mpRenderTarget = nullptr;
+	_screenBuffer = nullptr;
+	_gammaCorrectionProgram = nullptr;
 	mpPixelFormat = Graphics::PixelFormat::createFormatRGBA32();
 
 	Common::fill(mpCurrentTexture, mpCurrentTexture + MAX_TEXTUREUNITS, nullptr);
@@ -103,7 +88,6 @@ cLowLevelGraphicsSDL::cLowLevelGraphicsSDL() {
 	mbClearDepth = true;
 	mbClearStencil = false;
 
-	// Create the batch arrays:
 	mlBatchStride = 13;
 	// 3 Pos floats, 4 color floats, 3 Tex coord floats .
 	mpVertexArray = (float *)hplMalloc(sizeof(float) * mlBatchStride * mlBatchArraySize);
@@ -181,24 +165,18 @@ static void logOGLInfo(const cLowLevelGraphicsSDL &graphics) {
 
 void cLowLevelGraphicsSDL::SetupGL() {
 	GL_CHECK(glViewport(0, 0, mvScreenSize.x, mvScreenSize.y));
-	// Inits GL stuff
-	// Set Shade model and clear color.
 	GL_CHECK(glShadeModel(GL_SMOOTH));
 	GL_CHECK(glClearColor(0.0f, 0.0f, 0.0f, 0.0f));
 
-	// Depth Test setup
-	GL_CHECK(glClearDepth(1.0f));      // VAlues buffer is cleared with
-	GL_CHECK(glEnable(GL_DEPTH_TEST)); // enable depth testing
-	GL_CHECK(glDepthFunc(GL_LEQUAL));  // function to do depth test with
+	GL_CHECK(glClearDepth(1.0f));
+	GL_CHECK(glEnable(GL_DEPTH_TEST));
+	GL_CHECK(glDepthFunc(GL_LEQUAL));
 	GL_CHECK(glDisable(GL_ALPHA_TEST));
 
-	// Set best perspective correction
 	GL_CHECK(glHint(GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST));
 
-	// Stencil setup
 	GL_CHECK(glClearStencil(0));
 
-	// Clear the screen
 	GL_CHECK(glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT));
 
 	GL_CHECK(glMatrixMode(GL_MODELVIEW));
@@ -208,13 +186,11 @@ void cLowLevelGraphicsSDL::SetupGL() {
 
 	/////  BEGIN BATCH ARRAY STUFF ///////////////
 
-	// Enable all the vertex arrays that are used:
-	GL_CHECK(glEnableClientState(GL_VERTEX_ARRAY));        // The positions
-	GL_CHECK(glEnableClientState(GL_COLOR_ARRAY));         // The color
-	GL_CHECK(glEnableClientState(GL_TEXTURE_COORD_ARRAY)); // Tex coords
+	GL_CHECK(glEnableClientState(GL_VERTEX_ARRAY));
+	GL_CHECK(glEnableClientState(GL_COLOR_ARRAY));
+	GL_CHECK(glEnableClientState(GL_TEXTURE_COORD_ARRAY));
 	GL_CHECK(glDisableClientState(GL_NORMAL_ARRAY));
-	// Disable the once not used.
-	GL_CHECK(glDisableClientState(GL_INDEX_ARRAY)); // color index
+	GL_CHECK(glDisableClientState(GL_INDEX_ARRAY));
 	GL_CHECK(glDisableClientState(GL_EDGE_FLAG_ARRAY));
 
 	///// END BATCH ARRAY STUFF ///////////////
@@ -228,6 +204,11 @@ int cLowLevelGraphicsSDL::GetCaps(eGraphicCaps type) const {
 
 	// Texture Rectangle
 	case eGraphicCaps_TextureTargetRectangle:
+		// WebGL2 has no GL_TEXTURE_RECTANGLE, but on USE_FORCED_GLES2 the
+		// renderer remaps Rect→2D in GetGLTextureTargetEnum and the shader
+		// preamble polyfills texture2DRect() to a normalized-UV texture2D()
+		// sample via _hpl1_invFramebufferSize. The post-effects pipeline
+		// (refraction, gamma, screen capture) is treated as available.
 		return 1;
 
 	// Vertex Buffer Object
@@ -282,7 +263,7 @@ int cLowLevelGraphicsSDL::GetCaps(eGraphicCaps type) const {
 //-----------------------------------------------------------------------
 
 void cLowLevelGraphicsSDL::ShowCursor(bool toggle) {
-	g_system->showMouse(toggle);
+	CursorMan.showMouse(toggle);
 }
 
 //-----------------------------------------------------------------------
@@ -487,20 +468,16 @@ void cLowLevelGraphicsSDL::SetTexture(unsigned int alUnit, iTexture *apTex) {
 	if (mpCurrentTexture[alUnit])
 		LastTarget = GetGLTextureTargetEnum(mpCurrentTexture[alUnit]->GetTarget());
 
-	// Check if multi texturing is supported.
 	if (GetCaps(eGraphicCaps_GL_MultiTexture)) {
 		GL_CHECK(glActiveTexture(GL_TEXTURE0 + alUnit));
 	}
 
-	// If the current texture in this unit is a render target, unbind it.
 	if (mpCurrentTexture[alUnit] && mpCurrentTexture[alUnit]->GetTextureType() == eTextureType_RenderTarget)
 		error("render target not supported");
 
-	// Disable this unit if NULL
 	if (apTex == NULL) {
 		GL_CHECK(glDisable(LastTarget));
 		// glBindTexture(LastTarget,0);
-		// Enable the unit, set the texture handle and bind the pbuffer
 	} else {
 		if (NewTarget != LastTarget && LastTarget != 0)
 			GL_CHECK(glDisable(LastTarget));
@@ -510,7 +487,6 @@ void cLowLevelGraphicsSDL::SetTexture(unsigned int alUnit, iTexture *apTex) {
 		GL_CHECK(glBindTexture(NewTarget, pSDLTex->GetTextureHandle()));
 		GL_CHECK(glEnable(NewTarget));
 
-		// if it is a render target we need to do some more binding.
 		if (pSDLTex->GetTextureType() == eTextureType_RenderTarget) {
 			error("render target not supported");
 		}
@@ -594,15 +570,22 @@ void cLowLevelGraphicsSDL::FlushRendering() {
 }
 
 void cLowLevelGraphicsSDL::applyGammaCorrection() {
-	if (!_gammaCorrectionProgram)
+	if (!_gammaCorrectionProgram || !_screenBuffer)
+		return;
+	// User has gamma == 1.0 effectively means "don't bother"; skip the
+	// round-trip to save the per-frame screen capture + composite.
+	if (mfGammaCorrection == 1.0f)
 		return;
 
 	SetBlendActive(false);
 
-	// Copy screen to texture
 	CopyContextToTexure(_screenBuffer, 0,
 						cVector2l((int)mvScreenSize.x, (int)mvScreenSize.y));
 
+	// Full-screen quad in clip space (the gamma vertex shader writes
+	// gl_Position = a_position directly, no worldViewProj). Texcoords
+	// differ between paths: desktop _screenBuffer is GL_TEXTURE_RECTANGLE
+	// (pixel-space), GLES2 remaps it to GL_TEXTURE_2D (normalized).
 	tVertexVec vVtx;
 	vVtx.push_back(cVertex(cVector3f(-1.0, 1.0, 0), cVector2f(0, mvScreenSize.y), cColor(0)));
 	vVtx.push_back(cVertex(cVector3f(1.0, 1.0, 0), cVector2f(mvScreenSize.x, mvScreenSize.y), cColor(0)));
@@ -1339,7 +1322,22 @@ void cLowLevelGraphicsSDL::DrawFilledRect2D(const cRect2f &aRect, float afZ, cCo
 //-----------------------------------------------------------------------
 
 void cLowLevelGraphicsSDL::DrawLineCircle2D(const cVector2f &avCenter, float afRadius, float afZ, cColor aCol) {
-	// Implement later
+	// Legacy desktop GL: the original "Implement later" stub. Mirror the
+	// GLES2 path so debug overlays look consistent across builds.
+	const int kSegments = 32;
+	const float kStep = k2Pif / (float)kSegments;
+	SetTexture(0, nullptr);
+	SetBlendActive(false);
+	glColor4f(aCol.r, aCol.g, aCol.b, aCol.a);
+	glBegin(GL_LINE_STRIP);
+	for (int i = 0; i <= kSegments; ++i) {
+		const float a = i * kStep;
+		glVertex3f(avCenter.x + cosf(a) * afRadius,
+				   avCenter.y + sinf(a) * afRadius,
+				   afZ);
+	}
+	glEnd();
+	GL_CHECK_FN();
 }
 
 //-----------------------------------------------------------------------
@@ -1457,7 +1455,6 @@ void cLowLevelGraphicsSDL::SetVirtualSize(cVector2f avSize) {
 //-----------------------------------------------------------------------
 
 void cLowLevelGraphicsSDL::SetUpBatchArrays() {
-	// Set the arrays
 	glVertexPointer(3, GL_FLOAT, sizeof(float) * mlBatchStride, mpVertexArray);
 	glColorPointer(4, GL_FLOAT, sizeof(float) * mlBatchStride, &mpVertexArray[3]);
 	glNormalPointer(GL_FLOAT, sizeof(float) * mlBatchStride, &mpVertexArray[10]);
@@ -1807,4 +1804,4 @@ void cLowLevelGraphicsSDL::SetMatrixMode(eMatrix type) {
 
 } // namespace hpl
 
-#endif // HPL1_USE_OPENGL
+#endif // defined(HPL1_USE_OPENGL) && !USE_FORCED_GLES2

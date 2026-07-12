@@ -64,7 +64,7 @@ static  CColorButton *pDefaultsButton = nullptr;               // Defaults butto
 static  CCheckButton *pFixedButton = nullptr;
 
 CUserCfgDlg::CUserCfgDlg(CWnd *pParent, CPalette *pPalette, unsigned int nID)
-	: CBmpDialog(pParent, pPalette, nID, ".\\ART\\SSCROLL.BMP") {
+	: CBmpDialog(pParent, pPalette, nID, "art\\SSCROLL.BMP") {
 
 	m_pNamesButton = nullptr;
 	DoModal();
@@ -82,22 +82,6 @@ void CUserCfgDlg::PutDlgData() {
 	pFixedButton->SetCheck(!m_bRandomLetters);
 	m_pNamesButton->SetCheck(m_bShowNames);
 }
-
-
-void CUserCfgDlg::GetDlgData() {
-	m_nGameSpeed = m_pSpeedScroll->GetScrollPos();
-	m_nShown = m_pShownScroll->GetScrollPos();
-
-	m_bRandomLetters = true;
-	if (pFixedButton->GetCheck() == 1)
-		m_bRandomLetters = false;
-
-	m_bShowNames = false;
-	if (m_pNamesButton->GetCheck() == 1) {
-		m_bShowNames = true;
-	}
-}
-
 
 bool CUserCfgDlg::OnCommand(WPARAM wParam, LPARAM lParam) {
 	/*
@@ -427,8 +411,6 @@ void CUserCfgDlg::ClearDialogImage() {
 	CDC *pDC;
 
 	if (m_bShouldSave) {
-		GetDlgData();
-
 		WritePrivateProfileString(INI_SECTION, "RandomLetters",
 		                          m_bRandomLetters ? "Yes" : "No", INI_FILENAME);
 		WritePrivateProfileString(INI_SECTION, "NumStartingLetters",

@@ -39,16 +39,23 @@ public:
 	Font() = default;
 	~Font() = default;
 
+	Font(Font &&) = default;
+
 	void read(Common::SeekableReadStream &stream);
 
 	int getFontHeight() const override { return _fontHeight - 1; }
 	int getMaxCharWidth() const override { return _maxCharWidth; }
 	int getCharWidth(uint32 chr) const override;
-	int getKerningOffset(uint32 left, uint32 right) const override { return 1; }
+	int getKerningOffset(uint32 left, uint32 right) const override { return 0; }
 
 	void drawChar(Graphics::Surface *dst, uint32 chr, int x, int y, uint32 color) const override;
 
 	const Graphics::ManagedSurface &getImageSurface() const { return _image; }
+
+	// Samples an opaque pixel from a solid glyph rendered in the given color
+	// variant, so callers can match the exact text color. Used to draw
+	// underlines (the <u> markup toggle), for which the atlas has no glyph.
+	uint32 getColorPixel(uint color) const;
 
 	// Custom word wrapping function to fix an edge case with overflowing whitespaces
 	void wordWrap(const Common::String &str, int maxWidth, Common::Array<Common::String> &lines, int initWidth = 0) const;
@@ -116,6 +123,18 @@ private:
 	int16 _oWithAcuteOffset					= -1;
 	int16 _uWithAcuteOffset					= -1;
 	int16 _eszettOffset						= -1;
+
+	// Even more specific offsets for extended ASCII characters. Introduced in nancy10
+	int16 _uppercaseAWithDotOffset          = -1;
+	int16 _aWithDotOffset                   = -1;
+	int16 _underscoreOffset                 = -1;
+	int16 _hashOffset                       = -1;
+	int16 _dollarOffset                     = -1;
+	int16 _lessThanOffset                   = -1;
+	int16 _greaterThanOffset                = -1;
+	int16 _leftCurlyBracketOffset           = -1;
+	int16 _rightCurlyBracketOffset          = -1;
+	int16 _euroOffset                       = -1;
 
 	Common::Array<Common::Rect> _characterRects;
 

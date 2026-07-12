@@ -28,6 +28,9 @@
 #include "mediastation/mediascript/function.h"
 #include "mediastation/actors/camera.h"
 #include "mediastation/actors/canvas.h"
+#include "mediastation/actors/cursor.h"
+#include "mediastation/actors/diskimage.h"
+#include "mediastation/actors/dotgame.h"
 #include "mediastation/actors/palette.h"
 #include "mediastation/actors/image.h"
 #include "mediastation/actors/path.h"
@@ -50,18 +53,18 @@ Context::~Context() {
 	_variables.clear();
 }
 
-void MediaStationEngine::readControlCommands(Chunk &chunk) {
+void ImtGod::readControlCommands(Chunk &chunk) {
 	ContextSectionType sectionType = kContextEndOfSection;
 	do {
 		sectionType = static_cast<ContextSectionType>(chunk.readTypedUint16());
-		debugC(5, kDebugLoading, "%s: sectionType = 0x%x (@0x%llx)", __func__, static_cast<uint>(sectionType), static_cast<long long int>(chunk.pos()));
+		debugC(5, kDebugLoading, "%s: command 0x%x", __func__, static_cast<uint>(sectionType));
 		if (sectionType != kContextEndOfSection) {
 			readCommandFromStream(chunk, sectionType);
 		}
 	} while (sectionType != kContextEndOfSection);
 }
 
-void MediaStationEngine::readCreateContextData(Chunk &chunk) {
+void ImtGod::readCreateContextData(Chunk &chunk) {
 	uint contextId = chunk.readTypedUint16();
 	debugC(5, kDebugLoading, "%s: Context %d", __func__, contextId);
 	Context *context = _loadedContexts.getValOrDefault(contextId);
@@ -72,30 +75,30 @@ void MediaStationEngine::readCreateContextData(Chunk &chunk) {
 	}
 }
 
-void MediaStationEngine::readDestroyContextData(Chunk &chunk) {
+void ImtGod::readDestroyContextData(Chunk &chunk) {
 	uint contextId = chunk.readTypedUint16();
 	debugC(5, kDebugLoading, "%s: Context %d", __func__, contextId);
 	destroyContext(contextId);
 }
 
-void MediaStationEngine::readDestroyActorData(Chunk &chunk) {
+void ImtGod::readDestroyActorData(Chunk &chunk) {
 	uint actorId = chunk.readTypedUint16();
-	debugC(5, kDebugLoading, "%s: Actor %d", __func__, actorId);
+	debugC(5, kDebugLoading, "[%s] %s", g_engine->formatActorName(actorId).c_str(), __func__);
 	destroyActor(actorId);
 }
 
-void MediaStationEngine::readActorLoadComplete(Chunk &chunk) {
+void ImtGod::readActorLoadComplete(Chunk &chunk) {
 	uint actorId = chunk.readTypedUint16();
-	debugC(5, kDebugLoading, "%s: Actor %d", __func__, actorId);
-	Actor *actor = g_engine->getActorById(actorId);
+	Actor *actor = g_engine->getImtGod()->getActorById(actorId);
+	debugC(5, kDebugLoading, "[%s] %s", actor->debugName(), __func__);
 	actor->loadIsComplete();
 }
 
-void MediaStationEngine::readCreateActorData(Chunk &chunk) {
+void ImtGod::readCreateActorData(Chunk &chunk) {
 	uint contextId = chunk.readTypedUint16();
 	ActorType type = static_cast<ActorType>(chunk.readTypedUint16());
 	uint id = chunk.readTypedUint16();
-	debugC(5, kDebugLoading, "%s: Actor %d, type 0x%x", __func__, id, static_cast<uint>(type));
+	debugC(5, kDebugLoading, "[%s] %s: type 0x%x", g_engine->formatActorName(id).c_str(), __func__, static_cast<uint>(type));
 
 	Actor *actor = nullptr;
 	switch (type) {
@@ -155,20 +158,32 @@ void MediaStationEngine::readCreateActorData(Chunk &chunk) {
 		actor = new TextActor();
 		break;
 
+	case kActorTypeCursor:
+		actor = new CursorActor();
+		break;
+
+	case kActorTypeDiskImage:
+		actor = new DiskImageActor();
+		break;
+
+	case kActorTypeDotGame:
+		actor = new DotGameActor();
+		break;
+
 	default:
-		error("%s: No class for actor type 0x%x (@0x%llx)", __func__, static_cast<uint>(type), static_cast<long long int>(chunk.pos()));
+		error("%s: No class for actor type 0x%x", __func__, static_cast<uint>(type));
 	}
 	actor->setId(id);
 	actor->setContextId(contextId);
 	actor->initFromParameterStream(chunk);
-	g_engine->registerActor(actor);
+	g_engine->getImtGod()->addConstructedActor(actor);
 }
 
-void MediaStationEngine::readCreateVariableData(Chunk &chunk) {
+void ImtGod::readCreateVariableData(Chunk &chunk) {
 	uint contextId = chunk.readTypedUint16();
 	uint id = chunk.readTypedUint16();
-	if (g_engine->getVariable(id) != nullptr) {
-		error("%s: Global variable %d already exists", __func__, id);
+	if (g_engine->getImtGod()->getVariable(id) != nullptr) {
+		error("[%s] %s: Global variable already exists", g_engine->formatVariableName(id).c_str(), __func__);
 	}
 
 	ScriptValue *value = new ScriptValue(&chunk);
@@ -178,19 +193,21 @@ void MediaStationEngine::readCreateVariableData(Chunk &chunk) {
 	}
 
 	context->_variables.setVal(id, value);
-	debugC(5, kDebugScript, "%s: %d (type: %s)", __func__, id, scriptValueTypeToStr(value->getType()));
+	debugC(5, kDebugLoading, "[%s] %s", g_engine->formatVariableName(id).c_str(), __func__);
 }
 
-void MediaStationEngine::readHeaderSections(Subfile &subfile, Chunk &chunk) {
+void ImtGod::readHeaderSections(Subfile &subfile, Chunk &chunk) {
 	do {
-		ChannelClient *actor = g_engine->getChannelClientByChannelIdent(chunk._id);
+		debugC(5, kDebugLoading, "[%s] %s", g_engine->formatAssetNameForChannelIdent(chunk._id).c_str(), __func__);
+		ChannelClient *actor = g_engine->getImtGod()->getChannelClientByChannelIdent(chunk._id);
 		if (actor == nullptr) {
-			error("%s: Client \"%s\" (0x%x) does not exist or has not been read yet in this title. (@0x%llx)", __func__, tag2str(chunk._id), chunk._id, static_cast<long long int>(chunk.pos()));
+			error("%s: Client %s does not exist or has not been read yet in this title",
+				__func__, g_engine->formatAssetNameForChannelIdent(chunk._id).c_str());
 		}
+
 		if (chunk.bytesRemaining() > 0) {
 			actor->readChunk(chunk);
 		}
-
 		if (chunk.bytesRemaining() != 0) {
 			warning("%s: %d bytes remaining at end of chunk", __func__, chunk.bytesRemaining());
 		}
@@ -201,7 +218,7 @@ void MediaStationEngine::readHeaderSections(Subfile &subfile, Chunk &chunk) {
 	} while (!subfile.atEnd());
 }
 
-void MediaStationEngine::readContextNameData(Chunk &chunk) {
+void ImtGod::readSetContextName(Chunk &chunk) {
 	uint contextId = chunk.readTypedUint16();
 	debugC(5, kDebugLoading, "%s: Context %d", __func__, contextId);
 	Context *context = _loadedContexts.getValOrDefault(contextId);
@@ -211,7 +228,7 @@ void MediaStationEngine::readContextNameData(Chunk &chunk) {
 	context->_name = chunk.readTypedString();
 }
 
-void MediaStationEngine::readCommandFromStream(Chunk &chunk, ContextSectionType sectionType) {
+void ImtGod::readCommandFromStream(Chunk &chunk, ContextSectionType sectionType) {
 	switch (sectionType) {
 	case kContextCreateData:
 		readCreateContextData(chunk);
@@ -238,7 +255,7 @@ void MediaStationEngine::readCommandFromStream(Chunk &chunk, ContextSectionType 
 		break;
 
 	case kContextNameData:
-		readContextNameData(chunk);
+		readSetContextName(chunk);
 		break;
 
 	default:

@@ -19,6 +19,7 @@
  *
  */
 
+#include "common/config-manager.h"
 #include "gui/message.h"
 #include "graphics/thumbnail.h"
 
@@ -34,7 +35,8 @@ using namespace Graphics;
 namespace Alcachofa {
 
 static void createThumbnail(ManagedSurface &surface) {
-	surface.create(kBigThumbnailWidth, kBigThumbnailHeight, g_engine->renderer().getPixelFormat());
+	const auto size = g_engine->game().getThumbnailResolution();
+	surface.create(size.x, size.y, g_engine->renderer().getPixelFormat());
 }
 
 static void convertToGrayscale(ManagedSurface &surface) {
@@ -61,9 +63,22 @@ static void convertToGrayscale(ManagedSurface &surface) {
 	}
 }
 
+Menu *Menu::create() {
+	if (g_engine->isV1())
+		return new MenuV1();
+	else if (g_engine->isV2())
+		return new MenuV2();
+	else if (g_engine->isV3())
+		return new MenuV3();
+	else
+		error("Menu is not implemented for this engine version");
+}
+
 Menu::Menu()
 	: _interactionSemaphore("menu")
 	, _saveFileMgr(g_system->getSavefileManager()) {}
+
+Menu::~Menu() {}
 
 void Menu::resetAfterLoad() {
 	_isOpen = false;
@@ -88,7 +103,7 @@ void Menu::updateOpeningMenu() {
 	_millisBeforeMenu = g_engine->getMillis();
 	_previousRoom = g_engine->player().currentRoom();
 	_isOpen = true;
-	g_engine->player().changeRoom("MENUPRINCIPAL", true);
+	g_engine->player().changeRoom(g_engine->game().getMenuRoom(), true);
 	_savefiles = _saveFileMgr->listSavefiles(g_engine->getSaveStatePattern());
 	sort(_savefiles.begin(), _savefiles.end()); // the pattern ensures that the last file has the greatest slot
 	_selectedSavefileI = _savefiles.size();
@@ -96,9 +111,21 @@ void Menu::updateOpeningMenu() {
 
 	g_engine->player().heldItem() = nullptr;
 	g_engine->scheduler().backupContext();
-	g_engine->camera().backup(1);
-	g_engine->camera().setPosition(Math::Vector3d(
-		g_system->getWidth() / 2.0f, g_system->getHeight() / 2.0f, 0.0f));
+	g_engine->camera().onOpenMenu();
+}
+
+void MenuV1::updateOpeningMenu() {
+	bool willOpen = _openAtNextFrame;
+	Menu::updateOpeningMenu();
+	if (willOpen)
+		switchToState(MainMenuAction::ConfirmSavestate);
+}
+
+void MenuV2::updateOpeningMenu() {
+	bool willOpen = _openAtNextFrame;
+	Menu::updateOpeningMenu();
+	if (willOpen)
+		toggleMessageBox(false);
 }
 
 static int parseSavestateSlot(const String &filename) {
@@ -108,22 +135,12 @@ static int parseSavestateSlot(const String &filename) {
 }
 
 void Menu::updateSelectedSavefile(bool hasJustSaved) {
-	auto getButton = [] (const char *name) {
-		MenuButton *button = dynamic_cast<MenuButton *>(g_engine->player().currentRoom()->getObjectByName(name));
-		scumm_assert(button != nullptr);
-		return button;
-	};
-
-	bool isOldSavefile = _selectedSavefileI < _savefiles.size();
-	getButton("CARGAR")->isInteractable() = isOldSavefile;
-	getButton("ANTERIOR")->toggle(_selectedSavefileI > 0);
-	getButton("SIGUIENTE")->toggle(isOldSavefile);
-
 	if (hasJustSaved) {
 		// we just saved in-game so we also still have the correct thumbnail in memory
 		_selectedThumbnail.copyFrom(_bigThumbnail);
-	} else if (isOldSavefile) {
+	} else if (!isOnNewSlot()) {
 		if (!tryReadOldSavefile()) {
+			// an old savefile we could not read, use blank thumbnail and default description
 			_selectedSavefileDescription = String::format("Savestate %d",
 				parseSavestateSlot(_savefiles[_selectedSavefileI]));
 			createThumbnail(_selectedThumbnail);
@@ -131,7 +148,8 @@ void Menu::updateSelectedSavefile(bool hasJustSaved) {
 	} else {
 		// the unsaved gamestate is shown as grayscale
 		_selectedThumbnail.copyFrom(_bigThumbnail);
-		convertToGrayscale(_selectedThumbnail);
+		if (g_engine->isV3())
+			convertToGrayscale(_selectedThumbnail);
 	}
 
 	ObjectBase *captureObject = g_engine->player().currentRoom()->getObjectByName("Capture");
@@ -139,6 +157,39 @@ void Menu::updateSelectedSavefile(bool hasJustSaved) {
 	Graphic *captureGraphic = captureObject->graphic();
 	scumm_assert(captureGraphic);
 	captureGraphic->animation().overrideTexture(_selectedThumbnail);
+}
+
+void MenuV1::updateSelectedSavefile(bool hasJustSaved) {
+	Menu::updateSelectedSavefile(hasJustSaved);
+
+	ObjectBase *captureObject = g_engine->player().currentRoom()->getObjectByName("Capture");
+	scumm_assert(captureObject);
+	bool isInCorrectState = _currentState == MainMenuAction::Load || _currentState == MainMenuAction::Save;
+	captureObject->toggle(isInCorrectState && !isOnNewSlot());
+}
+
+void MenuV2::updateSelectedSavefile(bool hasJustSaved) {
+	Menu::updateSelectedSavefile(hasJustSaved);
+
+	auto getButton = [ ] (const char *name) -> MenuButton &{
+		return g_engine->player().currentRoom()->getRequiredObjectByName<MenuButton>(name);
+	};
+
+	getButton("CARGAR").isInteractable() = !isOnNewSlot();
+	getButton("ANTERIOR").toggle(_selectedSavefileI > 0);
+	getButton("SIGUIENTE").toggle(!isOnNewSlot());
+}
+
+void MenuV3::updateSelectedSavefile(bool hasJustSaved) {
+	Menu::updateSelectedSavefile(hasJustSaved);
+
+	auto getButton = [ ] (const char *name) -> MenuButton& {
+		return g_engine->player().currentRoom()->getRequiredObjectByName<MenuButton>(name);
+	};
+
+	getButton("CARGAR").isInteractable() = !isOnNewSlot();
+	getButton("ANTERIOR").toggle(_selectedSavefileI > 0);
+	getButton("SIGUIENTE").toggle(!isOnNewSlot());
 }
 
 bool Menu::tryReadOldSavefile() {
@@ -168,7 +219,7 @@ void Menu::continueGame() {
 	g_engine->input().nextFrame(); // presumably to clear all was* flags
 	g_engine->player().changeRoom(_previousRoom->name(), true);
 	g_engine->sounds().pauseAll(false);
-	g_engine->camera().restore(1);
+	g_engine->camera().onCloseMenu();
 	g_engine->scheduler().restoreContext();
 	g_engine->setMillis(_millisBeforeMenu);
 }
@@ -176,7 +227,7 @@ void Menu::continueGame() {
 void Menu::triggerMainMenuAction(MainMenuAction action) {
 	switch (action) {
 	case MainMenuAction::ContinueGame:
-		g_engine->menu().continueGame();
+		continueGame();
 		break;
 	case MainMenuAction::Save:
 		triggerSave();
@@ -194,13 +245,69 @@ void Menu::triggerMainMenuAction(MainMenuAction action) {
 		dialog.runModal();
 	}break;
 	case MainMenuAction::OptionsMenu:
-		g_engine->menu().openOptionsMenu();
+		openOptionsMenu();
 		break;
 	case MainMenuAction::Exit:
 	case MainMenuAction::AlsoExit:
 		// implemented in AlcachofaEngine as it has its own event loop
 		g_engine->fadeExit();
 		break;
+	case MainMenuAction::NewGame:
+		// this action is unused just like the only room it would appear: MENUPRINCIPALINICIO
+		// it also breaks the engine in very funny ways so let's not do anything instead
+		// g_engine->script().createProcess(MainCharacterKind::None, g_engine->world().initScriptName());
+		warning("MainMenuAction::NewGame triggered!");
+		break;
+	default:
+		g_engine->game().unknownMenuAction((int32)action);
+		break;
+	}
+}
+
+void MenuV1::triggerMainMenuAction(MainMenuAction action) {
+	auto updateMusicVolume = [&] (int delta) {
+		auto &config = g_engine->config();
+		int volume = config.musicVolume();
+		volume = volume + (delta * Audio::Mixer::kMaxChannelVolume / 100);
+		volume = CLIP(volume, 0, (int)Audio::Mixer::kMaxChannelVolume);
+		config.musicVolume() = volume;
+		ConfMan.setInt("music_volume", config.musicVolume());
+		g_engine->syncSoundSettings();
+		// we do not use saveToScummVM here to avoid frequent disk flushes
+	};
+
+	const uint maxSavegameI = _currentState == MainMenuAction::Load
+		? _savefiles.size()
+		: _savefiles.size() + 1; // the "new savegame" slot
+	switch (action) {
+	case MainMenuAction::Load:
+		if (!isOnNewSlot())
+			Menu::triggerMainMenuAction(action);
+		break;
+	case MainMenuAction::PrevSave:
+		if (_currentState == MainMenuAction::OptionsMenu)
+			updateMusicVolume(-10);
+		else {
+			_selectedSavefileI = _selectedSavefileI == 0 ? maxSavegameI - 1 : _selectedSavefileI - 1;
+			updateSelectedSavefile(false);
+		}
+		break;
+	case MainMenuAction::NextSave:
+		if (_currentState == MainMenuAction::OptionsMenu)
+			updateMusicVolume(+10);
+		else {
+			_selectedSavefileI = maxSavegameI == 0 ? 0 : (_selectedSavefileI + 1) % maxSavegameI;
+			updateSelectedSavefile(false);
+		}
+		break;
+	default:
+		Menu::triggerMainMenuAction(action);
+		break;
+	}
+}
+
+void MenuV2::triggerMainMenuAction(MainMenuAction action) {
+	switch (action) {
 	case MainMenuAction::NextSave:
 		if (_selectedSavefileI < _savefiles.size()) {
 			_selectedSavefileI++;
@@ -213,13 +320,37 @@ void Menu::triggerMainMenuAction(MainMenuAction action) {
 			updateSelectedSavefile(false);
 		}
 		break;
-	case MainMenuAction::NewGame:
-		// this action might be unused just like the only room it would appear: MENUPRINCIPALINICIO
-		g_engine->player().isGameLoaded() = true;
-		g_engine->script().createProcess(MainCharacterKind::None, g_engine->world().initScriptName());
+	case MainMenuAction::Exit:
+		toggleMessageBox(true);
+		break;
+	case MainMenuAction::Cancel:
+		toggleMessageBox(false);
+		break;
+	case MainMenuAction::Accept:
+		Menu::triggerMainMenuAction(MainMenuAction::Exit);
 		break;
 	default:
-		warning("Unknown main menu action: %d", (int32)action);
+		Menu::triggerMainMenuAction(action);
+		break;
+	}
+}
+
+void MenuV3::triggerMainMenuAction(MainMenuAction action) {
+	switch (action) {
+	case MainMenuAction::NextSave:
+		if (_selectedSavefileI < _savefiles.size()) {
+			_selectedSavefileI++;
+			updateSelectedSavefile(false);
+		}
+		break;
+	case MainMenuAction::PrevSave:
+		if (_selectedSavefileI > 0) {
+			_selectedSavefileI--;
+			updateSelectedSavefile(false);
+		}
+		break;
+	default:
+		Menu::triggerMainMenuAction(action);
 		break;
 	}
 }
@@ -237,16 +368,15 @@ void Menu::triggerLoad() {
 
 void Menu::triggerSave() {
 	String fileName;
-	if (_selectedSavefileI < _savefiles.size()) {
-		fileName = _savefiles[_selectedSavefileI]; // overwrite a previous save
-	} else {
+	if (isOnNewSlot()) {
 		// for a new savefile we figure out the next slot index
 		int nextSlot = _savefiles.empty()
 			? 1 // start at one to keep autosave alone
 			: parseSavestateSlot(_savefiles.back()) + 1;
 		fileName = g_engine->getSaveStateName(nextSlot);
 		_selectedSavefileDescription = String::format("Savestate %d", nextSlot);
-	}
+	} else
+		fileName = _savefiles[_selectedSavefileI]; // overwrite a previous save
 
 	Error error(kNoError);
 	auto savefile = ScopedPtr<OutSaveFile>(_saveFileMgr->openForSaving(fileName));
@@ -256,7 +386,7 @@ void Menu::triggerSave() {
 		error = g_engine->saveGameStream(savefile.get());
 	if (error.getCode() == kNoError) {
 		g_engine->getMetaEngine()->appendExtendedSave(savefile.get(), g_engine->getTotalPlayTime(), _selectedSavefileDescription, false);
-		if (_selectedSavefileI >= _savefiles.size())
+		if (isOnNewSlot())
 			_savefiles.push_back(fileName);
 		updateSelectedSavefile(true);
 	} else {
@@ -266,47 +396,59 @@ void Menu::triggerSave() {
 }
 
 void Menu::openOptionsMenu() {
+	_currentSlideButton = nullptr;
 	setOptionsState();
 	g_engine->player().changeRoom("MENUOPCIONES", true);
 }
 
-void Menu::setOptionsState() {
+void MenuV1::setOptionsState() {}
+
+void MenuV2::setOptionsState() {
 	Config &config = g_engine->config();
 	Room *optionsMenu = g_engine->world().getRoomByName("MENUOPCIONES");
 	scumm_assert(optionsMenu != nullptr);
-
-	auto getSlideButton = [&] (const char *name) {
-		SlideButton *slideButton = dynamic_cast<SlideButton *>(optionsMenu->getObjectByName(name));
-		scumm_assert(slideButton != nullptr);
-		return slideButton;
+	auto getSlideButton = [&] (const char *name) -> SlideButton& {
+		return optionsMenu->getRequiredObjectByName<SlideButton>(name);
 	};
-	SlideButton
-		*slideMusicVolume = getSlideButton("Slider Musica"),
-		*slideSpeechVolume = getSlideButton("Slider Sonido");
-	slideMusicVolume->value() = config.musicVolume() / 255.0f;
-	slideSpeechVolume->value() = config.speechVolume() / 255.0f;
+	auto getPushButton = [&] (const char *name) -> PushButton& {
+		return optionsMenu->getRequiredObjectByName<PushButton>(name);
+	};
+
+	// there is a mouse sensitivity slider, this does not exist in ScummVM, so we ignore it
+	getSlideButton("VOLUMENCD").value() = config.musicVolume() / 255.0f;
+	getSlideButton("VOLUMENAUDIO").value() = config.speechVolume() / 255.0f;
+
+	getPushButton("CURSOR0").isChecked() = config.cursor() == 0;
+	getPushButton("CURSOR1").isChecked() = config.cursor() == 1;
+	getPushButton("CURSOR2").isChecked() = config.cursor() == 2;
+	getPushButton("CURSOR3").isChecked() = config.cursor() == 3;
+	getPushButton("TEXTOSON").isChecked() = config.subtitles();
+	getPushButton("TEXTOSOFF").isChecked() = !config.subtitles();
+}
+
+void MenuV3::setOptionsState() {
+	Config &config = g_engine->config();
+	Room *optionsMenu = g_engine->world().getRoomByName("MENUOPCIONES");
+	scumm_assert(optionsMenu != nullptr);
+	auto getSlideButton = [&] (const char *name) -> SlideButton& {
+		return optionsMenu->getRequiredObjectByName<SlideButton>(name);
+	};
+	auto getCheckBox = [&] (const char *name) -> CheckBox& {
+		return optionsMenu->getRequiredObjectByName<CheckBox>(name);
+	};
+
+	getSlideButton("Slider Musica").value() = config.musicVolume() / 255.0f;
+	getSlideButton("Slider Sonido").value() = config.speechVolume() / 255.0f;
 
 	if (!config.bits32())
 		config.highQuality() = false;
-	auto getCheckBox = [&] (const char *name) {
-		CheckBox *checkBox = dynamic_cast<CheckBox *>(optionsMenu->getObjectByName(name));
-		scumm_assert(checkBox != nullptr);
-		return checkBox;
-	};
-	CheckBox
-		*checkSubtitlesOn = getCheckBox("Boton ON"),
-		*checkSubtitlesOff = getCheckBox("Boton OFF"),
-		*check32Bits = getCheckBox("Boton 32 Bits"),
-		*check16Bits = getCheckBox("Boton 16 Bits"),
-		*checkHighQuality = getCheckBox("Boton Alta"),
-		*checkLowQuality = getCheckBox("Boton Baja");
-	checkSubtitlesOn->isChecked() = config.subtitles();
-	checkSubtitlesOff->isChecked() = !config.subtitles();
-	check32Bits->isChecked() = config.bits32();
-	check16Bits->isChecked() = !config.bits32();
-	checkHighQuality->isChecked() = config.highQuality();
-	checkLowQuality->isChecked() = !config.highQuality();
-	checkHighQuality->toggle(config.bits32());
+	getCheckBox("Boton ON").isChecked() = config.subtitles();
+	getCheckBox("Boton OFF").isChecked() = !config.subtitles();
+	getCheckBox("Boton 32 Bits").isChecked() = config.bits32();
+	getCheckBox("Boton 16 Bits").isChecked() = !config.bits32();
+	getCheckBox("Boton Alta").isChecked() = config.highQuality();
+	getCheckBox("Boton Baja").isChecked() = !config.highQuality();
+	getCheckBox("Boton Alta").toggle(config.bits32());
 }
 
 void Menu::triggerOptionsAction(OptionsMenuAction action) {
@@ -331,6 +473,18 @@ void Menu::triggerOptionsAction(OptionsMenuAction action) {
 	case OptionsMenuAction::Bits16:
 		config.bits32() = false;
 		break;
+	case OptionsMenuAction::Cursor0:
+		config.cursor() = 0;
+		break;
+	case OptionsMenuAction::Cursor1:
+		config.cursor() = 1;
+		break;
+	case OptionsMenuAction::Cursor2:
+		config.cursor() = 2;
+		break;
+	case OptionsMenuAction::Cursor3:
+		config.cursor() = 3;
+		break;
 	case OptionsMenuAction::MainMenu:
 		continueMainMenu();
 		break;
@@ -350,6 +504,8 @@ void Menu::triggerOptionsValue(OptionsMenuValue valueId, float value) {
 	case OptionsMenuValue::Speech:
 		config.speechVolume() = CLIP<uint8>((uint8)(value * 255), 0, 255);
 		break;
+	case OptionsMenuValue::Sensitivity:
+		break;
 	default:
 		warning("Unknown options menu value: %d", (int32)valueId);
 		break;
@@ -360,16 +516,45 @@ void Menu::triggerOptionsValue(OptionsMenuValue valueId, float value) {
 void Menu::continueMainMenu() {
 	g_engine->config().saveToScummVM();
 	g_engine->syncSoundSettings();
-	g_engine->player().changeRoom(
-		g_engine->player().isGameLoaded() ? "MENUPRINCIPAL" : "MENUPRINCIPALINICIO",
-		true
-	);
+	g_engine->player().changeRoom(g_engine->game().getMenuRoom(), true);
 
 	updateSelectedSavefile(false);
 }
 
 const Graphics::Surface *Menu::getBigThumbnail() const {
 	return _bigThumbnail.empty() ? nullptr : &_bigThumbnail.rawSurface();
+}
+
+void MenuV1::switchToState(MainMenuAction state) {
+	_currentState = state;
+
+	if (state == MainMenuAction::Load) {
+		if (isOnNewSlot()) {
+			_selectedSavefileI = _savefiles.empty() ? 0 : _savefiles.size() - 1;
+			updateSelectedSavefile(false);
+		}
+	} else if (state == MainMenuAction::Save) {
+		_selectedSavefileI = _savefiles.size();
+		updateSelectedSavefile(false);
+	}
+}
+
+void MenuV2::toggleMessageBox(bool show) {
+	auto getButton = [&] (const char *name) -> MenuButton& {
+		return g_engine->player().currentRoom()->getRequiredObjectByName<MenuButton>(name);
+	};
+
+	getButton("MBACEPTAR").toggle(show);
+	getButton("MBCANCELAR").toggle(show);
+
+	getButton("ANTERIOR").toggle(!show);
+	getButton("SIGUIENTE").toggle(!show);
+	getButton("CARGAR").toggle(!show);
+	getButton("GRABAR").toggle(!show);
+	getButton("INTERNET").toggle(!show);
+	getButton("OPCIONES").toggle(!show);
+	getButton("JUGAR").toggle(!show);
+	getButton("SALIR").toggle(!show);
 }
 
 }

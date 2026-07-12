@@ -24,7 +24,9 @@
 #if defined(SDL_BACKEND)
 #include "backends/graphics/surfacesdl/surfacesdl-graphics.h"
 #include "backends/events/sdl/sdl-events.h"
+#include "backends/platform/sdl/sdl.h"
 #include "common/config-manager.h"
+#include "common/memstream.h"
 #include "common/mutex.h"
 #include "common/textconsole.h"
 #include "common/translation.h"
@@ -37,6 +39,8 @@
 #include "graphics/blit.h"
 #include "graphics/font.h"
 #include "graphics/fontman.h"
+#include "graphics/managed_surface.h"
+#include "graphics/svg.h"
 #include "graphics/scaler.h"
 #include "graphics/scaler/aspect.h"
 #include "graphics/surface.h"
@@ -181,7 +185,8 @@ SurfaceSdlGraphicsManager::SurfaceSdlGraphicsManager(SdlEventSource *sdlEventSou
 	_overlayscreen(nullptr), _tmpscreen2(nullptr),
 	_screenChangeCount(0),
 	_mouseSurface(nullptr), _mouseScaler(nullptr),
-	_mouseOrigSurface(nullptr), _cursorDontScale(false), _cursorPaletteDisabled(true),
+	_mouseOrigSurface(nullptr), _cursorPaletteDisabled(true),
+	_cursorScaleX(0), _cursorScaleY(0),
 	_currentShakeXOffset(0), _currentShakeYOffset(0),
 	_paletteDirtyStart(0), _paletteDirtyEnd(0),
 	_screenIsLocked(false),
@@ -193,7 +198,8 @@ SurfaceSdlGraphicsManager::SurfaceSdlGraphicsManager(SdlEventSource *sdlEventSou
 	_scalerPlugins(ScalerMan.getPlugins()), _scalerPlugin(nullptr), _scaler(nullptr),
 	_needRestoreAfterOverlay(false), _isInOverlayPalette(false), _isDoubleBuf(false), _prevForceRedraw(false), _numPrevDirtyRects(0),
 	_prevCursorNeedsRedraw(false),
-	_mouseKeyColor(0), _disableMouseKeyColor(false) {
+	_mouseKeyColor(0), _disableMouseKeyColor(false)
+	{
 
 	// allocate palette storage
 	_currentPalette = (SDL_Color *)calloc(256, sizeof(SDL_Color));
@@ -387,9 +393,7 @@ void SurfaceSdlGraphicsManager::beginGFXTransaction() {
 	_transactionDetails.needDisplayResize = false;
 	_transactionDetails.needTextureUpdate = false;
 #endif
-#ifdef USE_RGB_COLOR
 	_transactionDetails.formatChanged = false;
-#endif
 
 	_oldVideoMode = _videoMode;
 }
@@ -443,14 +447,13 @@ OSystem::TransactionError SurfaceSdlGraphicsManager::endGFXTransaction() {
 
 			_videoMode.filtering = _oldVideoMode.filtering;
 		}
-#ifdef USE_RGB_COLOR
+
 		if (_videoMode.format != _oldVideoMode.format) {
 			errors |= OSystem::kTransactionFormatNotSupported;
 
 			_videoMode.format = _oldVideoMode.format;
 			_screenFormat = _videoMode.format;
 		}
-#endif
 
 		if (_videoMode.screenWidth != _oldVideoMode.screenWidth || _videoMode.screenHeight != _oldVideoMode.screenHeight) {
 			errors |= OSystem::kTransactionSizeChangeFailed;
@@ -468,11 +471,7 @@ OSystem::TransactionError SurfaceSdlGraphicsManager::endGFXTransaction() {
 		_oldVideoMode.setup = false;
 	}
 
-#ifdef USE_RGB_COLOR
 	if (_transactionDetails.sizeChanged || _transactionDetails.formatChanged) {
-#else
-	if (_transactionDetails.sizeChanged) {
-#endif
 		unloadGFXMode();
 		if (!loadGFXMode()) {
 			if (_oldVideoMode.setup) {
@@ -709,10 +708,7 @@ void SurfaceSdlGraphicsManager::setGraphicsModeIntern() {
 
 	// If the scalerIndex has changed, change scaler plugins
 	if (&_scalerPlugins[_videoMode.scalerIndex]->get<ScalerPluginObject>() != _scalerPlugin
-#ifdef USE_RGB_COLOR
-		|| _transactionDetails.formatChanged
-#endif
-		) {
+		|| _transactionDetails.formatChanged) {
 		Graphics::PixelFormat format = convertSDLPixelFormat(_hwScreen->format);
 		delete _scaler;
 
@@ -812,7 +808,6 @@ void SurfaceSdlGraphicsManager::initSize(uint w, uint h, const Graphics::PixelFo
 		getDefaultResolution(w, h);
 	}
 
-#ifdef USE_RGB_COLOR
 	//avoid redundant format changes
 	Graphics::PixelFormat newFormat;
 	if (!format)
@@ -827,7 +822,6 @@ void SurfaceSdlGraphicsManager::initSize(uint w, uint h, const Graphics::PixelFo
 		_transactionDetails.formatChanged = true;
 		_screenFormat = newFormat;
 	}
-#endif
 
 #if !SDL_VERSION_ATLEAST(2, 0, 0)
 	// Avoid redundant res changes, only in SDL1. In SDL2, redundancies may not
@@ -997,10 +991,8 @@ bool SurfaceSdlGraphicsManager::loadGFXMode() {
 	if (_screen == nullptr)
 		error("allocating _screen failed");
 
-#ifdef USE_RGB_COLOR
 	// Avoid having SDL_SRCALPHA set even if we supplied an alpha-channel in the format.
 	SDL_SetAlpha(_screen, 0, 255);
-#endif
 
 	// SDL 1.2 palettes default to all black,
 	// SDL 1.3 palettes default to all white,
@@ -1086,6 +1078,9 @@ bool SurfaceSdlGraphicsManager::loadGFXMode() {
 		error("allocating _tmpscreen2 failed");
 
 	if (_isHwPalette) {
+		if (!_screenFormat.isCLUT8())
+			return false;
+
 		SDL_SetColors(_tmpscreen2, _overlayPalette, 0, 256);
 		SDL_SetColors(_overlayscreen, _overlayPalette, 0, 256);
 	}
@@ -1984,6 +1979,28 @@ void SurfaceSdlGraphicsManager::clearFocusRectangle() {
 #pragma mark --- Overlays ---
 #pragma mark -
 
+void SurfaceSdlGraphicsManager::showOverlay(bool inGUI) {
+	WindowedGraphicsManager::showOverlay(inGUI);
+	OSystem_SDL *sdlSystem = dynamic_cast<OSystem_SDL *>(g_system);
+	if (sdlSystem) {
+		// The GUI overlay can only be shown after the theme has loaded (which
+		// creates the virtual-fs cache dir), so it is now safe to load the
+		// on-screen control assets. Mirrors the OpenGL graphics manager.
+		if (inGUI) {
+			sdlSystem->setTouchUiReady();
+		}
+		sdlSystem->applyTouchSettings();
+	}
+}
+
+void SurfaceSdlGraphicsManager::hideOverlay() {
+	WindowedGraphicsManager::hideOverlay();
+	OSystem_SDL *sdlSystem = dynamic_cast<OSystem_SDL *>(g_system);
+	if (sdlSystem) {
+		sdlSystem->applyTouchSettings();
+	}
+}
+
 void SurfaceSdlGraphicsManager::clearOverlay() {
 	Common::StackLock lock(_graphicsMutex);	// Lock the mutex until this function ends
 
@@ -2126,7 +2143,7 @@ void SurfaceSdlGraphicsManager::copyRectToOverlay(const void *buf, int pitch, in
 #pragma mark --- Mouse ---
 #pragma mark -
 
-void SurfaceSdlGraphicsManager::setMouseCursor(const void *buf, uint w, uint h, int hotspotX, int hotspotY, uint32 keyColor, bool dontScale, const Graphics::PixelFormat *format, const byte *mask, bool disableKeyColor) {
+void SurfaceSdlGraphicsManager::setMouseCursor(const void *buf, uint w, uint h, int hotspotX, int hotspotY, uint32 keyColor, const Graphics::PixelFormat *format, const byte *mask, frac_t scaleX, frac_t scaleY, bool disableKeyColor) {
 
 	if (mask && (!format || format->bytesPerPixel == 1)) {
 		// 8-bit masked cursor, SurfaceSdl has no alpha mask support so we must convert this to color key
@@ -2166,16 +2183,15 @@ void SurfaceSdlGraphicsManager::setMouseCursor(const void *buf, uint w, uint h, 
 				maskedImage[i] = static_cast<byte>(bestKey);
 		}
 
-		setMouseCursor(&maskedImage[0], w, h, hotspotX, hotspotY, bestKey, dontScale, format, nullptr, disableKeyColor);
+		setMouseCursor(&maskedImage[0], w, h, hotspotX, hotspotY, bestKey, format, nullptr, scaleX, scaleY, disableKeyColor);
 		return;
 	}
 
-#ifdef USE_RGB_COLOR
 	if (mask && format && format->bytesPerPixel > 1 && !_isHwPalette) {
 		const uint numPixels = w * h;
 		const uint inBPP = format->bytesPerPixel;
 
-		Graphics::PixelFormat formatWithAlpha = Graphics::createPixelFormat<8888>();
+		Graphics::PixelFormat formatWithAlpha = Graphics::PixelFormat::createFormatRGBA32();
 
 		// Use the existing format if it already has alpha
 		if (format->aBits() > 0)
@@ -2218,10 +2234,9 @@ void SurfaceSdlGraphicsManager::setMouseCursor(const void *buf, uint w, uint h, 
 		}
 
 		// Disable the key color because SDL_SetColorKey ignores the alpha channel, which would make 0xFF000000 transparent
-		setMouseCursor(&maskedImage[0], w, h, hotspotX, hotspotY, 0, dontScale, &formatWithAlpha, nullptr, true);
+		setMouseCursor(&maskedImage[0], w, h, hotspotX, hotspotY, 0, &formatWithAlpha, nullptr, scaleX, scaleY, true);
 		return;
 	}
-#endif
 
 	bool formatChanged = false;
 
@@ -2254,7 +2269,8 @@ void SurfaceSdlGraphicsManager::setMouseCursor(const void *buf, uint w, uint h, 
 		keycolorChanged = true;
 	}
 
-	_cursorDontScale = dontScale;
+	_cursorScaleX = scaleX;
+	_cursorScaleY = scaleY;
 
 	if (_mouseCurState.w != (int)w || _mouseCurState.h != (int)h || formatChanged || !_mouseOrigSurface) {
 		_mouseCurState.w = w;
@@ -2359,8 +2375,8 @@ void SurfaceSdlGraphicsManager::setMouseCursor(const void *buf, uint w, uint h, 
 	blitCursor();
 }
 
-void SurfaceSdlGraphicsManager::setMouseCursor(const void *buf, uint w, uint h, int hotspotX, int hotspotY, uint32 keyColor, bool dontScale, const Graphics::PixelFormat *format, const byte *mask) {
-	setMouseCursor(buf, w, h, hotspotX, hotspotY, keyColor, dontScale, format, mask, false);
+void SurfaceSdlGraphicsManager::setMouseCursor(const void *buf, uint w, uint h, int hotspotX, int hotspotY, uint32 keyColor, const Graphics::PixelFormat *format, const byte *mask, frac_t scaleX, frac_t scaleY) {
+	setMouseCursor(buf, w, h, hotspotX, hotspotY, keyColor, format, mask, scaleX, scaleY, false);
 }
 
 void SurfaceSdlGraphicsManager::blitCursor() {
@@ -2373,20 +2389,14 @@ void SurfaceSdlGraphicsManager::blitCursor() {
 
 	_cursorNeedsRedraw = true;
 
-	int cursorScale;
-	if (_cursorDontScale) {
-		// Don't scale the cursor at all if the user requests this behavior.
-		cursorScale = 1;
-	} else {
-		// Scale the cursor with the game screen scale factor.
-		cursorScale = _videoMode.scaleFactor;
-	}
+	frac_t cursorScaleX = _cursorScaleX == 0 ? static_cast<frac_t>(FRAC_ONE) : _videoMode.scaleFactor * _cursorScaleX;
+	frac_t cursorScaleY = _cursorScaleY == 0 ? static_cast<frac_t>(FRAC_ONE) : _videoMode.scaleFactor * _cursorScaleY;
 
 	// Adapt the real hotspot according to the scale factor.
-	int rW = w * cursorScale;
-	int rH = h * cursorScale;
-	_mouseCurState.rHotX = _mouseCurState.hotX * cursorScale;
-	_mouseCurState.rHotY = _mouseCurState.hotY * cursorScale;
+	int rW = fracToInt(w * cursorScaleX);
+	int rH = fracToInt(h * cursorScaleY);
+	_mouseCurState.rHotX = fracToInt(_mouseCurState.hotX * cursorScaleX);
+	_mouseCurState.rHotY = fracToInt(_mouseCurState.hotY * cursorScaleY);
 
 	// The virtual dimensions will be the same as the original.
 
@@ -2400,7 +2410,7 @@ void SurfaceSdlGraphicsManager::blitCursor() {
 	const int rH1 = rH;
 #endif
 
-	if (!_cursorDontScale && _videoMode.aspectRatioCorrection) {
+	if (!(_cursorScaleX == 0 && _cursorScaleY == 0) && _videoMode.aspectRatioCorrection) {
 		rH = real2Aspect(rH - 1) + 1;
 		_mouseCurState.rHotY = real2Aspect(_mouseCurState.rHotY);
 	}
@@ -2460,12 +2470,13 @@ void SurfaceSdlGraphicsManager::blitCursor() {
 	// If possible, use the same scaler for the cursor as for the rest of
 	// the game. This only works well with the non-blurring scalers so we
 	// otherwise use the Normal scaler
-	if (!_cursorDontScale) {
+	if (!(_cursorScaleX == 0 && _cursorScaleY == 0)) {
 #ifdef USE_SCALERS
 		// HACK: AdvMame4x requires a height of at least 4 pixels, so we
 		// fall back on the Normal scaler when a smaller cursor is supplied.
-		if (_mouseScaler && _scalerPlugin->canDrawCursor() && (uint)_mouseCurState.h >= _extraPixels) {
-			_mouseScaler->setFactor(_videoMode.scaleFactor);
+		if (_mouseScaler && _scalerPlugin->canDrawCursor() && (uint)_mouseCurState.h >= _extraPixels && cursorScaleX == cursorScaleY &&
+		    !((cursorScaleX | cursorScaleY) & FRAC_HALF) && _scalerPlugins[_videoMode.scalerIndex]->get<ScalerPluginObject>().hasFactor(fracToInt(cursorScaleX))) {
+			_mouseScaler->setFactor(fracToInt(cursorScaleX));
 #if SDL_VERSION_ATLEAST(3, 0, 0)
 			const SDL_PixelFormatDetails *pixelFormatDetails = SDL_GetPixelFormatDetails(_mouseOrigSurface->format);
 			if (pixelFormatDetails == nullptr)
@@ -2489,12 +2500,12 @@ void SurfaceSdlGraphicsManager::blitCursor() {
 				error("getting pixel format details failed");
 			Graphics::scaleBlit((byte *)_mouseSurface->pixels, (const byte *)_mouseOrigSurface->pixels + _mouseOrigSurface->pitch * _maxExtraPixels + _maxExtraPixels * pixelFormatDetails->bytes_per_pixel,
 			                    _mouseSurface->pitch, _mouseOrigSurface->pitch,
-				                _mouseCurState.w * _videoMode.scaleFactor, _mouseCurState.h * _videoMode.scaleFactor,
+			                    _mouseCurState.rW, _mouseCurState.rH,
 			                    _mouseCurState.w, _mouseCurState.h, convertSDLPixelFormat(_mouseSurface->format));
 #else
 			Graphics::scaleBlit((byte *)_mouseSurface->pixels, (const byte *)_mouseOrigSurface->pixels + _mouseOrigSurface->pitch * _maxExtraPixels + _maxExtraPixels * _mouseOrigSurface->format->BytesPerPixel,
 			                    _mouseSurface->pitch, _mouseOrigSurface->pitch,
-				                _mouseCurState.w * _videoMode.scaleFactor, _mouseCurState.h * _videoMode.scaleFactor,
+			                    _mouseCurState.rW, _mouseCurState.rH,
 			                    _mouseCurState.w, _mouseCurState.h, convertSDLPixelFormat(_mouseSurface->format));
 #endif
 
@@ -2518,7 +2529,7 @@ void SurfaceSdlGraphicsManager::blitCursor() {
 	}
 
 #ifdef USE_ASPECT
-	if (!_cursorDontScale && _videoMode.aspectRatioCorrection)
+	if (!(_cursorScaleX == 0 && _cursorScaleY == 0) && _videoMode.aspectRatioCorrection)
 		stretch200To240Nearest((uint8 *)_mouseSurface->pixels, _mouseSurface->pitch, rW, rH1, 0, 0, 0, convertSDLPixelFormat(_mouseSurface->format));
 #endif
 
@@ -2538,6 +2549,8 @@ void SurfaceSdlGraphicsManager::undrawMouse() {
 	_mouseNextRect.y = virtualCursor.y + _gameScreenShakeYOffset;
 
 	if (!_overlayInGUI) {
+		// The game cursor rect is kept in virtual coordinates: drawMouse()
+		// scales and aspect-corrects it, so subtract the virtual hotspot here
 		_mouseNextRect.w = _mouseCurState.vW;
 		_mouseNextRect.h = _mouseCurState.vH;
 		_mouseNextRect.x -= _mouseCurState.vHotX;
@@ -2892,7 +2905,7 @@ void SurfaceSdlGraphicsManager::handleScalerHotkeys(uint mode, int factor) {
 	if (sizeChanged) {
 		// Forcibly resizing the window here since a user switching scaler
 		// size will not normally cause the window to update
-		_window->createOrUpdateWindow(_hwScreen->w, _hwScreen->h, _lastFlags);
+		_window->createOrUpdateWindow(_hwScreen->w, _hwScreen->h, _window->getWindowFlags());
 	}
 #endif
 
@@ -3277,9 +3290,9 @@ void *SurfaceSdlGraphicsManager::getImGuiTexture(const Graphics::Surface &image,
 	SDL_UpdateTexture(texture, nullptr, s->getPixels(), s->pitch);
 	SDL_SetTextureBlendMode(texture, SDL_BLENDMODE_BLEND);
 #ifdef USE_IMGUI_SDLRENDERER3
-	SDL_SetTextureScaleMode(texture, SDL_SCALEMODE_LINEAR);
+	SDL_SetTextureScaleMode(texture, SDL_SCALEMODE_NEAREST);
 #elif defined(USE_IMGUI_SDLRENDERER2)
-	SDL_SetTextureScaleMode(texture, SDL_ScaleModeLinear);
+	SDL_SetTextureScaleMode(texture, SDL_ScaleModeNearest);
 #endif
 
 	s->free();

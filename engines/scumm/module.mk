@@ -4,6 +4,7 @@ MODULE_OBJS := \
 	actor.o \
 	akos.o \
 	base-costume.o \
+	base-costume-optimised.o \
 	bomp.o \
 	boxes.o \
 	camera.o \
@@ -19,6 +20,7 @@ MODULE_OBJS := \
 	file_nes.o \
 	gfx_gui.o \
 	gfx_mac.o \
+	gfx_nes.o \
 	gfx_towns.o \
 	gfx.o \
 	he/mixer_he.o \
@@ -53,6 +55,7 @@ MODULE_OBJS := \
 	midiparser_ro.o \
 	object.o \
 	palette.o \
+	playback.o \
 	players/player_ad.o \
 	players/player_apple2.o \
 	players/player_he.o \
@@ -94,9 +97,26 @@ MODULE_OBJS := \
 	vars.o \
 	verbs.o
 
-ifdef USE_ARM_COSTUME_ASM
+ifdef USE_IMGUI
 MODULE_OBJS += \
-	proc3ARM.o
+	debugger/debugtools.o \
+	debugger/editor.o \
+	debugger/explorer.o \
+	debugger/file.o \
+	debugger/resource.o
+endif
+
+ifdef USE_M68K_COSTUME_ASM
+MODULE_OBJS += \
+	m68k/bylerledecode_classic.o \
+	m68k/bylerledecode_mode0.o \
+	m68k/bylerledecode_mode1.o \
+	m68k/bylerledecode_mode3.o \
+	m68k/bylerledecode_scaled_mode0.o \
+	m68k/bylerledecode_scaled_mode0_smask.o \
+	m68k/bylerledecode_scaled_mode1.o \
+	m68k/bylerledecode_scaled_mode1_smask.o \
+	m68k/bylerledecode_scaled_mode3.o
 endif
 
 ifdef ENABLE_SCUMM_7_8
@@ -127,11 +147,35 @@ MODULE_OBJS += \
 	insane/insane_enemy.o \
 	insane/insane_scenes.o \
 	insane/insane_iact.o \
+	insane/rebel/rebel_audio.o \
+	insane/rebel/rebel_gamepad.o \
+	insane/rebel1/rebel.o \
+	insane/rebel1/audio.o \
+	insane/rebel1/iact.o \
+	insane/rebel1/levels.o \
+	insane/rebel1/menu.o \
+	insane/rebel1/render.o \
+	insane/rebel1/runlevels.o \
+	insane/rebel1/saveload.o \
+	insane/rebel2/rebel.o \
+	insane/rebel2/audio.o \
+	insane/rebel2/iact.o \
+	insane/rebel2/levels.o \
+	insane/rebel2/menu.o \
+	insane/rebel2/render.o \
+	insane/rebel2/runlevels.o \
 	smush/codec1.o \
 	smush/codec20.o \
 	smush/codec37.o \
 	smush/codec47.o \
-	smush/smush_player.o
+	smush/smush_player.o \
+	smush/rebel/codec_ra1.o \
+	smush/rebel/codec_ra2.o \
+	smush/rebel/font_rebel2.o \
+	smush/rebel/smush_multi_font.o \
+	smush/rebel/smush_player_rebel.o \
+	smush/rebel/smush_player_ra1.o \
+	smush/rebel/smush_player_ra2.o
 
 ifdef USE_ARM_SMUSH_ASM
 MODULE_OBJS += \
@@ -143,6 +187,11 @@ endif
 ifdef USE_ARM_GFX_ASM
 MODULE_OBJS += \
 	gfxARM.o
+endif
+
+ifdef USE_M68K_GFX_ASM
+MODULE_OBJS += \
+	gfxM68K.o
 endif
 
 ifdef ENABLE_HE
@@ -169,6 +218,7 @@ MODULE_OBJS += \
 	he/basketball/shooting.o \
 	he/basketball/trajectory.o \
 	he/cup_player_he.o \
+	he/font_he.o \
 	he/gfx_comp/aux_comp.o \
 	he/gfx_comp/mrle_comp.o \
 	he/gfx_comp/trle_comp.o \

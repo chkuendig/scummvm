@@ -23,8 +23,6 @@
 #ifndef M4_SOUND_PLATFORM_MIDI_H
 #define M4_SOUND_PLATFORM_MIDI_H
 
-#include "m4/m4_types.h"
-
 #include "audio/mididrv_ms.h"
 #include "audio/midiparser.h"
 

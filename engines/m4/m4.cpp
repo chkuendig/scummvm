@@ -33,7 +33,6 @@
 #include "m4/adv_r/conv_io.h"
 #include "m4/graphics/gr_sprite.h"
 #include "m4/gui/hotkeys.h"
-#include "m4/platform/sound/digi.h"
 #include "m4/platform/sound/midi.h"
 #include "m4/detection.h"
 #include "m4/console.h"
@@ -75,10 +74,11 @@ Common::Language M4Engine::getLanguage() const {
 int M4Engine::isDemo() const {
 	if ((getFeatures() & ADGF_DEMO) == 0)
 		return GStyle_Game;
-	else if (_gameDescription->features & kFeaturesNonInteractiveDemo)
+
+	if (_gameDescription->features & kFeaturesNonInteractiveDemo)
 		return GStyle_NonInteractiveDemo;
-	else
-		return GStyle_Demo;
+
+	return GStyle_Demo;
 }
 
 Common::Error M4Engine::run() {
@@ -120,7 +120,7 @@ void M4Engine::m4_inflight() {
 	while (KEEP_PLAYING) {
 		if (_G(game).previous_room == KERNEL_RESTORING_GAME) {
 			midi_stop();
-			int slot = _G(kernel).restore_slot;
+			const int slot = _G(kernel).restore_slot;
 			if (!kernel_load_game(slot))
 				error("Could not restore save slot %d", slot);
 		}
@@ -384,7 +384,7 @@ bool M4Engine::saveGameFromMenu(int slotNum, const Common::String &desc,
 	M4MetaEngine *metaEngine = static_cast<M4MetaEngine *>(getMetaEngine());
 	metaEngine->_thumbnail = &thumbnail;
 
-	bool result = saveGameState(slotNum, desc).getCode() == Common::kNoError;
+	const bool result = saveGameState(slotNum, desc).getCode() == Common::kNoError;
 
 	metaEngine->_thumbnail = nullptr;
 	return result;

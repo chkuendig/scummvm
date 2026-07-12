@@ -160,6 +160,7 @@ _flac=auto
 _mad=auto
 _opl2lpt=no
 _retrowave=auto
+_nfm=auto
 _alsa=auto
 _seq_midi=auto
 _sndio=auto
@@ -191,7 +192,9 @@ _taskbar=auto
 _updates=no
 _libunity=auto
 _dialogs=auto
+_printing=yes
 _tts=auto
+_osx_tts_backend=auto
 _gtk=auto
 _fribidi=auto
 _discord=auto
@@ -205,6 +208,7 @@ _werror_build=auto
 _text_console=no
 _mt32emu=yes
 _lua=yes
+_mfc=yes
 _build_scalers=yes
 _build_hq_scalers=yes
 _build_edge_scalers=yes
@@ -266,6 +270,7 @@ _xcodetoolspath=
 _sparklepath=
 _pkgconfig=pkg-config
 _sdlconfig=sdl2-config
+_prefer_sdl3=no
 _libcurlconfig=curl-config
 _libmikmodconfig=libmikmod-config
 _freetypeconfig=freetype-config
@@ -297,14 +302,19 @@ _need_memalign=yes
 _have_x86=no
 _have_amd64=no
 _imgui=yes
+_cdtoons=auto
 _indeo3=auto
 _indeo45=auto
+_hmi_audio=auto
 _hnm=auto
+_jyv1=auto
 _qdm2=auto
 _fmtowns_pc98_audio=auto
 _sid_audio=auto
 _svq1=auto
+_truemotion1=auto
 _vgmtrans_audio=auto
+_xan=auto
 _midi=auto
 _universaltracker=auto
 
@@ -326,16 +336,21 @@ add_feature png "PNG" "_png"
 add_feature vorbis "Vorbis file support" "_vorbis _tremor"
 add_feature zlib "zlib" "_zlib"
 add_feature test_cxx11 "Test C++11" "_test_cxx11"
+add_feature printing "Printing" "_printing"
 
 # Components are features which may be disabled if unused by the engines
+add_component cdtoons "CDTOONS" "_cdtoons" "USE_CDTOONS"
 add_component enet "ENet" "_enet" "USE_ENET"
 add_component fmtowns_pc98_audio "FM-TOWNS/PC98 audio" "_fmtowns_pc98_audio" "USE_FMTOWNS_PC98_AUDIO"
 add_component gif "GIF" "_gif" "USE_GIF"
+add_component hmi_audio "HMI Infinite Audio" "_hmi_audio" "USE_HMI_AUDIO"
 add_component hnm "HNM" "_hnm" "USE_HNM"
 add_component imgui "Dear ImGui based debugger" "_imgui" "USE_IMGUI"
 add_component indeo3 "Indeo 3" "_indeo3" "USE_INDEO3"
 add_component indeo45 "Indeo 4&5" "_indeo45" "USE_INDEO45"
+add_component jyv1 "JYV1" "_jyv1" "USE_JYV1"
 add_component lua "Lua" "_lua" "USE_LUA"
+add_component mfc "MFC" "_mfc" "USE_MFC"
 add_component vpx "libvpx" "_vpx" "USE_VPX"
 add_component theoradec "libtheoradec" "_theoradec" "USE_THEORADEC"
 add_component midi "MIDI synthesis" "_midi" "USE_MIDI"
@@ -345,8 +360,10 @@ add_component qdm2 "QDM2" "_qdm2" "USE_QDM2"
 add_component sid_audio "SID audio" "_sid_audio" "USE_SID_AUDIO"
 add_component svq1 "Sorenson Video 1" "_svq1" "USE_SVQ1"
 add_component tinygl "TinyGL" "_tinygl" "USE_TINYGL"
+add_component truemotion1 "TrueMotion 1" "_truemotion1" "USE_TRUEMOTION1"
 add_component universaltracker "External Tracker Libraries" "_universaltracker" "USE_UNIVERSALTRACKER"
 add_component vgmtrans_audio "VGMTrans Soundfont audio" "_vgmtrans_audio" "USE_VGMTRANS_AUDIO"
+add_component xan "XAN" "_xan" "USE_XAN"
 
 # The following list of features cannot be declared as components
 # because they are used in the common code:
@@ -419,6 +436,18 @@ cc_check() {
 	cc_check_no_clean "$@"
 	TMPR="$?"
 	cc_check_clean
+	return "$TMPR"
+}
+
+cc_objc_check() {
+	prevcxx=$CXX
+	# `-ObjC++` flag doesn't always exist; `-x` flag is more portable, but
+	# should appear before any input file.
+	CXX="$CXX -x objective-c++ -lobjc"
+	cc_check_no_clean "$@"
+	TMPR="$?"
+	cc_check_clean
+	CXX=$prevcxx
 	return "$TMPR"
 }
 
@@ -671,7 +700,7 @@ get_system_exe_extension() {
 	mingw* | *os2-emx)
 		_exeext=".exe"
 		;;
-	mint)
+	mint*)
 		_exeext=".prg"
 		;;
 	emscripten)
@@ -1147,6 +1176,9 @@ Optional Libraries:
   --with-retrowave-prefix=DIR prefix where libretrowave is installed (optional)
   --enable-retrowave          enable RetroWave OPL3 support
 
+  --with-nfm-prefix=DIR  prefix where nFM is installed (optional)
+  --enable-nfm           enable OPL2/3 support via nFM
+
   --with-sparkle-prefix=DIR prefix where sparkle is installed
                             (macOS/Windows only - optional)
   --disable-sparkle         disable sparkle automatic update support
@@ -1160,6 +1192,8 @@ Optional Libraries:
                            /opt/mxe/usr/i686-w64-mingw32.static/bin/sdl2-config
                            then you should pass:
                            '--with-sdl-prefix=/opt/mxe/usr/i686-w64-mingw32.static'
+
+  --prefer-sdl3               prefer SDL3 over SDL2 if both are available [no]
 
   --with-freetype2-prefix=DIR prefix where the freetype-config script is
                               installed (optional)
@@ -1285,6 +1319,8 @@ for ac_option in $@; do
 	--disable-opl2lpt)            _opl2lpt=no            ;;
 	--enable-retrowave)           _retrowave=yes         ;;
 	--disable-retrowave)          _retrowave=no          ;;
+	--enable-nfm)                 _nfm=yes               ;;
+	--disable-nfm)                _nfm=no                ;;
 	--enable-flac)                _flac=yes              ;;
 	--disable-flac)               _flac=no               ;;
 	--enable-mad)                 _mad=yes               ;;
@@ -1396,6 +1432,8 @@ for ac_option in $@; do
 	--disable-vkeybd)            _vkeybd=no              ;;
 	--enable-eventrecorder)      _eventrec=yes           ;;
 	--disable-eventrecorder)     _eventrec=no            ;;
+	--enable-system-printing)    _printing=yes           ;;
+	--disable-system-printing)   _printing=no            ;;
 	--enable-text-console)       _text_console=yes       ;;
 	--disable-text-console)      _text_console=no        ;;
 	--enable-ext-sse2)           _ext_sse2=yes           ;;
@@ -1404,6 +1442,7 @@ for ac_option in $@; do
 	--disable-ext-avx2)          _ext_avx2=no            ;;
 	--enable-ext-neon)           _ext_neon=yes           ;;
 	--disable-ext-neon)          _ext_neon=no            ;;
+	--prefer-sdl3)               _prefer_sdl3=yes        ;;
 	--with-fluidsynth-prefix=*)
 		arg=`echo $ac_option | cut -d '=' -f 2`
 		FLUIDSYNTH_CFLAGS="-I$arg/include"
@@ -1468,6 +1507,11 @@ for ac_option in $@; do
 		arg=`echo $ac_option | cut -d '=' -f 2`
 		RETROWAVE_CFLAGS="-I$arg/include"
 		RETROWAVE_LIBS="-L$arg/lib"
+		;;
+	--with-nfm-prefix=*)
+		arg=`echo $ac_option | cut -d '=' -f 2`
+		NFM_CFLAGS="-I$arg/include -I$arg/include/platform/atari"
+		NFM_LIBS="-L$arg/lib/m68020-60"
 		;;
 	--with-flac-prefix=*)
 		arg=`echo $ac_option | cut -d '=' -f 2`
@@ -1825,6 +1869,11 @@ kos32)
 	_host_os=kolibrios
 	_host_cpu=i686
 	_host_alias=kos32
+	;;
+m68k-atari-mintelf*)
+	_host_os=mintelf
+	_host_cpu=m68k
+	_host_alias=$_host
 	;;
 m68k-atari-mint*)
 	_host_os=mint
@@ -2249,7 +2298,7 @@ if test "$_host_os" = android; then
 	if test -z "$PKG_CONFIG_LIBDIR"; then
 		PKG_CONFIG_LIBDIR="$_android_toolchain/sysroot/usr/lib/$_host_alias/$_android_version/pkgconfig"
 	fi
-	_libcurlpath="$_android_toolchain/sysroot/usr/bin/$_host_alias/$_android_version:$_libcurlpath"
+	_libmikmodpath="$_android_toolchain/sysroot/usr/bin/$_host_alias/$_android_version:$_libmikmodpath"
 fi
 
 #
@@ -2372,6 +2421,8 @@ have_icc=no
 cc_check_define __INTEL_COMPILER && have_icc=yes
 have_clang=no
 cc_check_define __clang__ && have_clang=yes
+have_apple_clang=no
+test "$have_clang" = yes && cc_check_define __apple_build_version__ && have_apple_clang=yes
 
 if test "$have_icc" = yes; then
 	add_line_to_config_mk 'HAVE_ICC = 1'
@@ -2396,7 +2447,7 @@ if test "$have_gcc" = yes; then
 	add_line_to_config_mk 'HAVE_GCC = 1'
 	_cxx_major=`gcc_get_define __GNUC__`
 	_cxx_minor=`gcc_get_define __GNUC_MINOR__`
-	cxx_version="`( $CXX -dumpversion ) 2>&1`"
+	cxx_version="`$CXX -dumpversion 2>&1`"
 
 	if test "$have_clang" = yes; then
 		# Clang sets a gcc version number for compatibility.
@@ -2404,10 +2455,15 @@ if test "$have_gcc" = yes; then
 		# compiler version checks.
 
 		# For the version reported in the configure log (cxx_version),
-		# we get the actual clang version.
+		# we get the actual Clang version. Apple Clang also has its
+		# own version numbers, so differentiate it.
 		cxx_version=`gcc_get_define __clang_version__`
 		cxx_version="`echo "${cxx_version}" | sed -e 's/"\([^ ]*\) .*/\1/'`"
-		cxx_version="clang $cxx_version, ok"
+		if test "$have_apple_clang" = yes; then
+			cxx_version="Apple Clang $cxx_version, ok"
+		else
+			cxx_version="Clang $cxx_version, ok"
+		fi
 
 		_clang_major=`gcc_get_define __clang_major__`
 		_clang_minor=`gcc_get_define __clang_minor__`
@@ -2444,13 +2500,13 @@ if test "$have_gcc" = yes; then
 		fi
 	fi
 elif test "$have_icc" = yes; then
-	cxx_version="`( $CXX -dumpversion ) 2>/dev/null`"
+	cxx_version="`$CXX -dumpversion 2>/dev/null`"
 	_cxx_major="`echo "${cxx_version}" | sed -ne 's/\([0-9][0-9]*\)\..*/\1/gp'`"
 	_cxx_minor="`echo "${cxx_version}" | sed -ne 's/[0-9][0-9]*\.\([0-9][0-9]*\)/\1/gp'`"
 	cxx_version="ICC $cxx_version, ok"
 else
 	# TODO: Big scary warning about unsupported compilers
-	cxx_version=`( $CXX -version ) 2>&1`
+	cxx_version=`$CXX -version 2>&1`
 	if test "$?" -eq 0; then
 		cxx_version="`echo "${cxx_version}" | sed -ne 's/^.*[^0-9]\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\).*$/\1/gp'`"
 		if test -z "${cxx_version}"; then
@@ -2872,9 +2928,6 @@ case $_host_cpu in
 				define_in_config_if_yes yes 'USE_ARM_SCALER_ASM'
 				define_in_config_if_yes yes 'USE_ARM_SMUSH_ASM'
 				define_in_config_if_yes yes 'USE_ARM_GFX_ASM'
-				# FIXME: The following feature exhibits a bug during the intro scene of Indy 4
-				# (on Pandora and iPhone at least)
-				#define_in_config_if_yes yes 'USE_ARM_COSTUME_ASM'
 				;;
 		esac
 
@@ -3221,6 +3274,10 @@ EOF
 			fi
 		fi
 
+		# The TTS backend can use either NSSpeechSynthesizer or AVSpeechSynthesizer. The latter
+		# is only available since macOS 10.14, while the former is available in older versions
+		# but deprecated in macOS 12. This coincides with the switch to Apple Silicon CPUs.
+		_osx_tts_backend="NSSpeechSynthesizer"
 		case $_host_cpu in
 		powerpc*)
 			# We use -force_cpusubtype_ALL to ensure the binary runs on every
@@ -3237,6 +3294,7 @@ EOF
 			;;
 		aarch64)
 			add_line_to_config_mk 'MACOSX_ARM64 = 1'
+			_osx_tts_backend="AVSpeechSynthesizer"
 			;;
 		esac
 
@@ -3317,12 +3375,36 @@ EOF
 		append_var DEFINES "-DEMSCRIPTEN"
 		add_line_to_config_mk 'EMSCRIPTEN = 1'
 		_port_mk="backends/platform/sdl/emscripten/emscripten.mk"
-		append_var LDFLAGS "-s INITIAL_MEMORY=128MB -s STACK_SIZE=32MB -s ALLOW_MEMORY_GROWTH=1"
+		# GROWABLE_ARRAYBUFFERS=0: emscripten 6.0.2 flipped this default to 1,
+		# making the growable HEAP a resizable ArrayBuffer. Its string-decode
+		# codegen then feeds TextDecoder.decode() a view of that resizable buffer,
+		# which throws by spec (TextDecoder input lacks [AllowResizable]) on every
+		# browser - crashing UTF8ToString. Single-threaded builds hit this (the
+		# guard only covers SharedArrayBuffer). See emscripten issue #27241 / fix
+		# #27242 (6.0.3). Disable until we move to 6.0.3.
+		# MAXIMUM_MEMORY: 512MB made large demos (wintermute:ritter needs ~537MB)
+		# abort cleanly but unplayably; a real-device trace showed ~640MB total
+		# was fine on iOS, while 1GB is known to get the tab jetsamed (iOS
+		# reserves against the declared max). 640MB is the measured sweet spot.
+		append_var LDFLAGS "-s INITIAL_MEMORY=128MB -s STACK_SIZE=8MB -s MAXIMUM_MEMORY=640MB -s ALLOW_MEMORY_GROWTH=1 -s GROWABLE_ARRAYBUFFERS=0"
 		append_var LDFLAGS "-s FORCE_FILESYSTEM -lidbfs.js"
 		append_var LDFLAGS "-s ASYNCIFY=1 -s ASYNCIFY_STACK_SIZE=1048576"
-
-		append_var LDFLAGS "-s EXPORTED_FUNCTIONS=[_main,_malloc,_free,_raise]"
-		append_var LDFLAGS "-s EXPORTED_RUNTIME_METHODS=[ccall,lengthBytesUTF8,setValue,writeArrayToMemory]"
+		append_var LDFLAGS "--js-library backends/fs/emscripten/emscripten-fs-factory.js"
+        append_var LDFLAGS "--js-library backends/networking/http/emscripten/networkreadstream-emscripten.js"
+        append_var LDFLAGS "--js-library backends/platform/sdl/emscripten/emscripten.js"
+		append_var LDFLAGS "--js-library backends/fs/emscripten/dragdrop-fs.js"
+		if test "$_tts" != "no" ; then
+			append_var LDFLAGS "--js-library backends/text-to-speech/emscripten/emscripten-text-to-speech.js"
+		fi
+		if test "$_midi" != "no" ; then
+			append_var LDFLAGS "--js-library backends/midi/webmidi.js"
+		fi
+		# custom_shell-post.js calls Module._raise() on unload to send SIGINT
+		# (releases RetroWave/MIDI devices). Export it in the dynamic-plugin
+		# build too - it was only exported for the static build, so the dynamic
+		# build DCE'd raise (nothing in C references it) and Module._raise was
+		# undefined, throwing on every page unload.
+		append_var LDFLAGS "-s EXPORTED_FUNCTIONS=[_main,_raise]"
 
 		append_var LDFLAGS "-O2"
 		_optimization_level=-O2
@@ -3336,6 +3418,8 @@ EOF
 		else
 			embuilder build sdl3
 		fi
+		define_in_config_if_yes yes 'USE_IMGUI_SDLRENDERER3'
+
 		_pkg_config=yes
 		PKG_CONFIG_LIBDIR="$EMSDK/upstream/emscripten/cache/sysroot/local/lib/pkgconfig:$EMSDK/upstream/emscripten/cache/sysroot/lib/pkgconfig"
 		_sdlconfig="pkg-config sdl3"
@@ -3391,9 +3475,10 @@ EOF
 			_zlib=no
 		fi
 		;;
-	freebsd* | dragonfly*)
+	freebsd* | dragonfly* | openbsd*)
 		append_var LDFLAGS "-L/usr/local/lib"
 		append_var CXXFLAGS "-I/usr/local/include"
+		_seq_midi=no
 		;;
 	gamecube)
 		_optimization_level=-Os
@@ -3421,6 +3506,10 @@ EOF
 	haiku*)
 		append_var DEFINES "-DSYSTEM_NOT_SUPPORTING_D_TYPE"
 		append_var DEFINES "-D_GNU_SOURCE"
+		if test "$_dynamic_modules" = yes ; then
+			_detection_features_static=no
+			_plugins_default=dynamic
+		fi
 		# Needs -lnetwork for the timidity MIDI driver
 		append_var LIBS "-lnetwork"
 		_seq_midi=no
@@ -3452,13 +3541,15 @@ EOF
 		fi
 		append_var LDFLAGS "-Wl,--export-dynamic"
 		append_var LDFLAGS "-L/usr/local/lib"
-		append_var CXXFLAGS "-D__MORPHOS_SHAREDLIBS"
 		# Suppress format warnings as the long 4 byte causes noisy warnings.
 		append_var CXXFLAGS "-Wno-format"
 		add_line_to_config_mk 'MORPHOS = 1'
 		_port_mk="backends/platform/sdl/morphos/morphos.mk"
 		# use SDL2
 		_sdlconfig=sdl2-config
+		# OpenGL configuration
+		_opengl_game_classic=yes
+		_opengl_game_shaders=no
 		;;
 	msys)
 		echo ERROR: Using the MSYS shell in msys mode is not supported. Please use the MSYS shell in mingw mode instead.
@@ -3478,11 +3569,6 @@ EOF
 		_detection_features_full=no
 		_nuked_opl=no
 		_sid_audio=no
-		;;
-	openbsd*)
-		append_var LDFLAGS "-L/usr/local/lib"
-		append_var CXXFLAGS "-I/usr/local/include"
-		_seq_midi=no
 		;;
 	ps3)
 		# Force use of SDL and freetype from the ps3 toolchain
@@ -3552,6 +3638,7 @@ EOF
 			_detection_features_static=no
 			_plugins_default=dynamic
 		fi
+		_detection_features_full=no
 		append_var CXXFLAGS "-I$PSPSDK/include"
 		# FIXME: Why is the following in CXXFLAGS and not in DEFINES? Change or document this.
 		append_var CXXFLAGS "-D_PSP_FW_VERSION=150"
@@ -3700,9 +3787,10 @@ if test -n "$_host"; then
 			;;
 		wasm*-emscripten)
 			_backend="emscripten"
+			_vkeybd=yes # No hardware keyboard in the browser; use the rendered virtual keyboard
 			_enet=no    # Disable ENet (no sockets in the browser)
 			_sdlnet=no  # Disable SDL_Net (no sockets in the browser)
-			_libcurl=no # Emscripten backend uses emscripten_fetch not libcurl
+			_libcurl=no # Emscripten backend uses Fetch API not libcurl
 			if test "$_cloud" != yes; then
 				_cloud=no
 			fi
@@ -3842,6 +3930,8 @@ if test -n "$_host"; then
 			#	# --disable-debug
 			#	append_var LDFLAGS "-s"
 			#fi
+			append_var DEFINES "-DSCUMM_OPTIMISED_CODE"
+			append_var DEFINES "-DDISABLE_DOSBOX_OPL"
 
 			# auto -> no
 			if test "$_optimizations" = "yes"; then
@@ -3894,6 +3984,16 @@ if test -n "$_host"; then
 			_tinygl=no
 			_nuked_opl=no
 			_detection_features_full=no
+
+			if test "$_backend" = sdl; then
+				if cc_check_define __mcoldfire__; then
+					_firebee_plugin_provider=yes
+				else
+					_atari_plugin_provider=yes
+				fi
+				define_in_config_if_yes "$_atari_plugin_provider" 'USE_ATARI_PLUGIN_PROVIDER'
+				define_in_config_if_yes "$_firebee_plugin_provider" 'USE_FIREBEE_PLUGIN_PROVIDER'
+			fi
 
 			_port_mk="backends/platform/atari/atari.mk"
 			;;
@@ -3991,7 +4091,6 @@ if test -n "$_host"; then
 			append_var LDFLAGS "-mtune=vr4300"
 			append_var LDFLAGS "-nodefaultlibs"
 			append_var LDFLAGS "-nostartfiles"
-			append_var LDFLAGS "-mno-crt0"
 			append_var LDFLAGS "-L$N64SDK/hkz-libn64"
 			append_var LDFLAGS "-L$N64SDK/lib"
 			append_var LDFLAGS "-T n64ld_cpp.x -Xlinker -Map -Xlinker scummvm.map"
@@ -4109,6 +4208,7 @@ if test -n "$_host"; then
 			#the -gcc- variants allow link time optimization
 			_ar="$_host_alias-gcc-ar cr"
 			_ranlib=$_host_alias-gcc-ranlib
+			_pkgconfig="${VITASDK}/bin/arm-vita-eabi-pkg-config"
 			;;
 		psp)
 			_backend="psp"
@@ -4120,7 +4220,7 @@ if test -n "$_host"; then
 			;;
 		tvos)
 			add_line_to_config_mk 'IPHONE = 1'
-			append_var DEFINES "-DIPHONE -DIPHONE_IOS7"
+			append_var DEFINES "-DIPHONE -DIPHONE_IOS7 -DIPHONE_TVOS"
 			_backend="ios7"
 			_seq_midi=no
 			_timidity=no
@@ -4200,9 +4300,10 @@ case $_backend in
 		fi
 		;;
 	atari)
-		define_in_config_if_yes yes "ATARI"
+		append_var DEFINES "-DATARI"
+		define_in_config_if_yes yes "USE_M68K_COSTUME_ASM"
+		define_in_config_if_yes yes "USE_M68K_GFX_ASM"
 		append_var DEFINES "-DDISABLE_NES_APU"
-		#append_var DEFINES "-DDISABLE_DOSBOX_OPL"
 		append_var LIBS "-lgem"
 		_ogg=no
 		_vorbis=no
@@ -4246,8 +4347,8 @@ case $_backend in
 	ios7)
 		append_var LIBS "-lobjc -framework UIKit -framework CoreGraphics -framework OpenGLES"
 		append_var LIBS "-framework QuartzCore -framework CoreFoundation -framework Foundation"
-		append_var LIBS "-framework AudioToolbox -framework CoreAudio -framework SystemConfiguration "
-		append_var LIBS "-framework GameController"
+		append_var LIBS "-framework AudioToolbox -framework CoreAudio -framework SystemConfiguration"
+		append_var LIBS "-framework GameController -framework CoreMIDI"
 		if test "$_host" = 'tvos'; then
 			append_var LDFLAGS "-mtvos-version-min=9 -arch arm64"
 			append_var CFLAGS "-mtvos-version-min=9 -arch arm64"
@@ -4411,7 +4512,7 @@ fi
 # Setup SDL specifics for SDL based backends
 #
 if test "$_sdl" = auto ; then
-	if test "$_pkg_config" = "yes" && ($_pkgconfig --exists sdl || $_pkgconfig --exists sdl2); then
+	if test "$_pkg_config" = "yes" && test "$_prefer_sdl3" = "no" && ($_pkgconfig --exists sdl || $_pkgconfig --exists sdl2); then
 		find_sdlconfig
 		_sdlversion=`$_sdlconfig --version`
 		cat > $TMPC << EOF
@@ -5117,12 +5218,35 @@ PLUGIN_LDFLAGS		+= -Wl,-T$(srcdir)/backends/plugins/ds/plugin.ld -mthumb -mthumb
 		append_var DEFINES "-DUNCACHED_PLUGINS"
 		append_var CXXFLAGS "-fPIC"
 		append_var LIBS ""
-_mak_plugins='
+		# ASYNCIFY_IMPORTS: was ["*"] (every import treated as a suspend point ->
+		# near-total asyncify instrumentation of every plugin). Narrowed to the
+		# main-module functions that can actually suspend (plus the invoke_*
+		# exception/setjmp shims); indirect (virtual) calls are instrumented by
+		# asyncify regardless, so correctness is preserved. Shrinks plugins ~15%
+		# and reduces Safari's wasm-compile-thread memory blowup (WebKit bug
+		# 304810). Regenerate with: ./dists/emscripten/build.sh asyncify-imports
+		# (see dists/emscripten/gen-asyncify-imports.js for the full mechanism;
+		# additive-only union, alias-aware matching). IMPORTANT: harvest from a
+		# FULL-FEATURE (CI-parity) configured tree - a feature-reduced main
+		# (e.g. missing theoradec) lacks entire suspend subgraphs and yields an
+		# incomplete list that corrupts asyncify state in engines using them.
+		#
+		# The narrowing is a release-only size/compile-memory optimization: it
+		# is only applied for --enable-release. Debug/dev builds keep the
+		# always-correct ASYNCIFY_IMPORTS=["*"] so an out-of-date list can never
+		# corrupt asyncify state while iterating (and so features not covered by
+		# a CI-parity harvest, e.g. --enable-eventrecorder, are unaffected).
+		if test "$_release_build" = yes ; then
+			_emscripten_asyncify_imports='@$(srcdir)/dists/emscripten/plugin-asyncify-imports.json'
+		else
+			_emscripten_asyncify_imports='["*"]'
+		fi
+_mak_plugins="
 PLUGIN_EXTRA_DEPS =
-PLUGIN_LDFLAGS  += -s SIDE_MODULE=1 -s ASYNCIFY=1 -s ASYNCIFY_IMPORTS=["*"] -s EXPORT_ALL=1
+PLUGIN_LDFLAGS  += -s SIDE_MODULE=1 -s ASYNCIFY=1 -s ASYNCIFY_IMPORTS=${_emscripten_asyncify_imports} -s EXPORT_ALL=1
 PRE_OBJS_FLAGS  := -s MAIN_MODULE=1 -s EXPORT_ALL=1
 POST_OBJS_FLAGS :=
-'
+"
 		;;
 	freebsd* | openbsd*)
 		_plugin_prefix="lib"
@@ -5141,6 +5265,18 @@ POST_OBJS_FLAGS := -Wl,-no-whole-archive
 		append_var DEFINES "-DUNCACHED_PLUGINS"
 _mak_plugins='
 PLUGIN_LDFLAGS		+= -Wl,-T$(srcdir)/backends/plugins/wii/plugin.ld
+'
+		;;
+	haiku*)
+		_plugin_prefix="lib"
+		_plugin_suffix=".so"
+		append_var CXXFLAGS "-fPIC"
+		append_var DEFINES "-DUNCACHED_PLUGINS"
+_mak_plugins='
+PLUGIN_EXTRA_DEPS =
+PLUGIN_LDFLAGS  += -shared
+PRE_OBJS_FLAGS  := -Wl,-export-dynamic -Wl,-whole-archive
+POST_OBJS_FLAGS := -Wl,-no-whole-archive
 '
 		;;
 	irix*)
@@ -5178,6 +5314,18 @@ PRE_OBJS_FLAGS  := -Wl,-export-dynamic -Wl,-whole-archive
 POST_OBJS_FLAGS := -Wl,-no-whole-archive
 '
 		;;
+	mintelf)
+		_elf_loader=yes
+		append_var DEFINES "-DM68K_TARGET"
+		append_var DEFINES "-DPLUGIN_DETECTION_NAME=\\\"detectio\\\""
+		append_var CXXFLAGS "-fuse-cxa-atexit"
+		append_var DEFINES "-DELF_LOADER_CXA_ATEXIT"
+		append_var DEFINES "-DUNCACHED_PLUGINS"
+		append_var DEFINES "-DELF_NO_MEM_MANAGER"
+_mak_plugins='
+PLUGIN_LDFLAGS		+= -Wl,-m,m68kelf,-T,$(srcdir)/backends/plugins/mintelf/plugin.ld
+'
+		;;
 	*cygwin* | *mingw32* | mingw64)
 		_plugin_prefix=""
 		_plugin_suffix=".dll"
@@ -5186,18 +5334,6 @@ PLUGIN_EXTRA_DEPS	= $(EXECUTABLE)
 PLUGIN_LDFLAGS		+= -Wl,--enable-auto-import -shared ./libscummvm.a
 PRE_OBJS_FLAGS		:= -Wl,--whole-archive
 POST_OBJS_FLAGS		:= -Wl,--export-all-symbols -Wl,--no-whole-archive -Wl,--out-implib,./libscummvm.a
-'
-		;;
-	morphos)
-		_plugin_prefix="lib"
-		_plugin_suffix=".so"
-		append_var CXXFLAGS "-fPIC"
-		append_var LIBS "-use-dynld"
-_mak_plugins='
-PLUGIN_EXTRA_DEPS =
-PLUGIN_LDFLAGS  += -shared
-PRE_OBJS_FLAGS  := -Wl,-export-dynamic -Wl,-whole-archive
-POST_OBJS_FLAGS := -Wl,-no-whole-archive
 '
 		;;
 	psp)
@@ -5264,8 +5400,16 @@ fi
 define_in_config_if_yes "$_dynamic_modules" 'DYNAMIC_MODULES'
 
 if test "$_dynamic_modules" = yes ; then
-	add_line_to_config_h "#define PLUGIN_PREFIX	\"$_plugin_prefix\""
-	add_line_to_config_h "#define PLUGIN_SUFFIX	\"$_plugin_suffix\""
+	if test ! -z "$_plugin_prefix" ; then
+		add_line_to_config_h "#define PLUGIN_PREFIX	\"$_plugin_prefix\""
+	else
+		add_line_to_config_h "#undef PLUGIN_PREFIX"
+	fi
+	if test ! -z "$_plugin_suffix" ; then
+		add_line_to_config_h "#define PLUGIN_SUFFIX	\"$_plugin_suffix\""
+	else
+		add_line_to_config_h "#undef PLUGIN_SUFFIX"
+	fi
 	add_line_to_config_mk "PLUGIN_PREFIX := $_plugin_prefix"
 	add_line_to_config_mk "PLUGIN_SUFFIX := $_plugin_suffix"
 fi
@@ -5382,17 +5526,46 @@ EOF
 			cc_check -lspeechd && _tts=yes
 			;;
 		darwin*)
-			# Check the API is available. The most recent API we need is for the NSSpeechSynthesizerDelegate protocol
-			cat > $TMPC << EOF
+			if test "$_osx_tts_backend" = "NSSpeechSynthesizer" ; then
+				# Check older NSSpeechSynthesizer API.
+				cat > $TMPC << EOF
+#include <AvailabilityMacros.h>
 #include <AppKit/NSSpeechSynthesizer.h>
+#if MAC_OS_X_VERSION_MIN_REQUIRED < 1050
+#error Not enough NSSpeechSynthesizerDelegate features available
+#endif
+#if MAC_OS_X_VERSION_MAX_ALLOWED < 1060
+@interface SpeechDelegate : NSObject {
+#else
 @interface SpeechDelegate : NSObject<NSSpeechSynthesizerDelegate> {
+#endif
+}
+@end
+int main(void) { return NSSpeechImmediateBoundary; }
+EOF
+				cc_objc_check && _tts=yes
+			else
+				# Check the newer AVSpeechSynthesizer API is available
+				cat > $TMPC << EOF
+#import <AVFoundation/AVFoundation.h>
+@interface SpeechDelegate : NSObject<AVSpeechSynthesizerDelegate> {
 }
 @end
 int main(void) { return 0; }
 EOF
-			cc_check -ObjC++ -lobjc && _tts=yes
+				cc_objc_check && _tts=yes
+			fi
 			;;
-		
+		iphoneos)
+			cat > $TMPC << EOF
+#import <AVFoundation/AVFoundation.h>
+@interface SpeechDelegate : NSObject<AVSpeechSynthesizerDelegate> {
+}
+@end
+int main(void) { return 0; }
+EOF
+			cc_objc_check && _tts=yes
+			;;
 		emscripten)
 			# Emscripten has the "Web Speech API" available
 			_tts=yes
@@ -5503,6 +5676,58 @@ if test "$_retrowave" = yes; then
 fi
 define_in_config_if_yes "$_retrowave" 'USE_RETROWAVE'
 echo "$_retrowave"
+
+#
+# Check for nFM OPL2/3 library
+#
+echocheck "nFM OPL2 / OPL3"
+if test "$_nfm" = auto ; then
+	_nfm=no
+	cat > $TMPC << EOF
+
+#include <nfmcore.h>
+#include <nfmutil.h>
+
+sOplInterface gOplIf;
+
+int main(void)
+{
+	nfInit(NULL, NULL);
+
+	sOplInterfaceConfiguration ifCfg;
+	ifCfg.deviceType = FMD_NULL;
+    ifCfg.soundchip = CM_OPL3;
+    ifCfg.operationMode = CO_OPL3;
+    ifCfg.setup = CC_SINGLE;
+    ifCfg.dualChipEmulationEnabled = false;
+
+    sInterfaceInitData params;
+	params.uParam.outputPort = OPT_INTERNAL;
+    params.uParam.param = 0;
+
+    gOplIf = nfCreateInterface(ifCfg);
+
+    const int32_t retval = nfInitialiseInterface(&gOplIf, &params);
+
+    if (retval >= 0)
+    {
+	 (void)nfDestroyInterface(&gOplIf);
+     return 0;
+    }
+
+  return -1;
+}
+EOF
+	cc_check $NFM_CFLAGS -DSC_ENABLE_MALLOC=0 -DNFM_OPL_SHADOW_REG_WRITE_ENABLE=1 $NFM_LIBS -lnfmcore -lnfmutil -ldrvcommon -ldrvnokturnfm -ldrvopl3Duo -ldrvopl3express -ldrvoplxlpt -ldrvopllcart -ldrvisasb -ldrvoplnull -lsyscore -lcontainers -lallocators &&\
+	_nfm=yes
+fi
+if test "$_nfm" = yes; then
+	append_var DEFINES "-DSC_ENABLE_MALLOC=0 -DNFM_OPL_SHADOW_REG_WRITE_ENABLE=1"
+	append_var LIBS "$NFM_LIBS -lnfmcore -lnfmutil -ldrvcommon -ldrvnokturnfm -ldrvopl3Duo -ldrvopl3express -ldrvoplxlpt -ldrvopllcart -ldrvisasb -ldrvoplnull -lsyscore -lcontainers -lallocators"
+	append_var INCLUDES "$NFM_CFLAGS"
+fi
+define_in_config_if_yes "$_nfm" 'USE_NFM'
+echo "$_nfm"
 
 #
 # Check for FLAC
@@ -5925,7 +6150,7 @@ case $_host_os in
 #include <Sparkle/Sparkle.h>
 int main(void) { SPUStandardUpdaterController *updater = [[SPUStandardUpdaterController alloc] initWithUpdaterDelegate:nil userDriverDelegate:nil]; return 0; }
 EOF
-				cc_check $SPARKLE_CFLAGS $SPARKLE_LIBS -framework Sparkle -ObjC++ -lobjc && _sparkle=yes
+				cc_objc_check $SPARKLE_CFLAGS $SPARKLE_LIBS -framework Sparkle && _sparkle=yes
 			fi
 			if test "$_sparkle" = yes ; then
 				append_var LIBS "$SPARKLE_LIBS -framework Sparkle"
@@ -6053,11 +6278,10 @@ echo "$_libcurl"
 define_in_config_if_yes "$_libcurl" "USE_LIBCURL"
 
 echocheck "Network client"
-if test "$_backend" = "emscripten" && test "$_cloud" = "yes"; then
-	append_var LDFLAGS "-sFETCH"
+if test "$_backend" = "emscripten"; then
 	_basicnet=no
 	_http=yes
-	echo "Emscripten (HTTP only)"
+	echo "Fetch API (HTTP only)"
 elif test "$_backend" = "android"; then
 	_basicnet=yes
 	_http=yes
@@ -6244,8 +6468,9 @@ case $_host_os in
 @interface ScummVMDockTilePlugIn : NSObject <NSDockTilePlugIn> {
 }
 @end
+int main(void) { return 0; }
 EOF
-			cc_check -c -ObjC++ && _osxdockplugin=yes
+			cc_objc_check && _osxdockplugin=yes
 		fi
 		define_in_config_if_yes "$_osxdockplugin" 'USE_DOCKTILEPLUGIN'
 		echo "$_osxdockplugin"
@@ -6629,7 +6854,9 @@ if test "$_opengl_mode" != none ; then
 		emscripten)
 			_opengl_mode=gles2
 			_opengl_glad=no # https://github.com/Dav1dde/glad-web/issues/12
-			append_var OPENGL_LIBS "-s FULL_ES2=1 -s MAX_WEBGL_VERSION=1"
+			# Force a WebGL2 context (no WebGL1 fallback) and emulate the full
+			# ES3 API, so GLSL-ES shader engines (e.g. HPL1) run out of the box.
+			append_var OPENGL_LIBS "-s FULL_ES3=1 -s MAX_WEBGL_VERSION=2 -s MIN_WEBGL_VERSION=2"
 			;;
 		ios7)
 			_opengl_mode=gles2
@@ -6657,6 +6884,10 @@ if test "$_opengl_mode" != none ; then
 					# this time, thus we limit us to OpenGL on that platform.
 					case $_host_os in
 						darwin*)
+							_opengl_mode=gl
+							;;
+						morphos)
+							_opengl_glad=no
 							_opengl_mode=gl
 							;;
 						*)
@@ -6752,6 +6983,9 @@ EOF
 				;;
 			mingw*)
 				OPENGL_LIBS="-lopengl32"
+				;;
+			morphos*)
+				_opengl_can_compile=yes
 				;;
 			serenity*)
 				OPENGL_LIBS="-lgl"
@@ -7192,6 +7426,21 @@ fi
 define_in_config_if_yes $_taskbar 'USE_TASKBAR'
 
 #
+# Check whether to build printing support
+#
+echo_n "Building system printing support... "
+case $_host_os in
+mingw*)
+	echo "win32"
+	append_var LIBS '-lwinspool'
+	;;
+*)
+	echo "no"
+	;;
+esac
+define_in_config_if_yes $_printing 'USE_SYSTEM_PRINTING'
+
+#
 # Check whether to build system dialogs support
 #
 echo_n "Building system dialogs support... "
@@ -7245,8 +7494,20 @@ else
 		append_var LIBS '-lsapi -lole32'
 		;;
 	darwin*)
-		echo "osx"
+		if test "$_osx_tts_backend" = "NSSpeechSynthesizer" ; then
+			echo "osx (NSSpeechSynthesizer)"
+			_tts=yes
+			define_in_config_if_yes $_tts 'USE_NS_SPEECH_SYNTHESIZER'
+		else
+			echo "osx (AVSpeechSynthesizer)"
+			_tts=yes
+			append_var LIBS "-framework AVFoundation"
+		fi
+		;;
+	iphoneos)
+		echo "ios (AVSpeechSynthesizer)"
 		_tts=yes
+		append_var LIBS "-framework AVFoundation"
 		;;
 	emscripten)
 		echo "Web Speech API"
@@ -7362,6 +7623,9 @@ case $_host in
 		;;
 	arm-*riscos)
 		append_var DEFINES "-DPLUGIN_DIRECTORY=\\\"\${datarootdir}/plugins\\\""
+		;;
+	ps3)
+		append_var DEFINES "-DPLUGIN_DIRECTORY=\\\"$exec_prefix/plugins\\\""
 		;;
 	*)
 		append_var DEFINES "-DPLUGIN_DIRECTORY=\\\"$libdir/scummvm\\\""
@@ -7650,7 +7914,7 @@ case $_host_os in
 			esac
 		done
 
-		LIBS="-Wl,-Bstatic $static_libs -Wl,-Bdynamic $system_libs -llog -landroid -ljnigraphics -lEGL"
+		LIBS="-Wl,-Bstatic $static_libs -Wl,-Bdynamic $system_libs -llog -landroid -loboe -ljnigraphics -lEGL"
 		;;
 	ds)
 		# Moved -Wl,--gc-sections here to avoid it interfering with the library checks
@@ -7727,6 +7991,14 @@ case $_host_os in
 			append_var CXXFLAGS "-ffunction-sections -fdata-sections"
 			append_var LDFLAGS "-Wl,--gc-sections"
 		fi
+		;;
+	ps3)
+		# Print enabled engines to 'configure.engines' file.
+		# It will help external build script to handle multiple builds per engine
+		awk -f "$_srcdir/engines.awk" -v _print_enabled_engines=yes < /dev/null
+		# This enable separate modules/executables and chaining execution
+		# between the launcher and engine processes
+		define_in_config_if_yes "$_release_build" "PS3_MULTI_MODULES"
 		;;
 esac
 

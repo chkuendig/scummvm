@@ -54,14 +54,11 @@ Midi::~Midi() {
 
 	Common::StackLock lock(_mutex);
 
-	if (_midiParser != nullptr)
-		delete _midiParser;
-	if (_midiData != nullptr)
-		delete[] _midiData;
-	if (_driver != nullptr) {
-		delete _driver;
-		_driver = nullptr;
-	}
+	delete _midiParser;
+	delete[] _midiData;
+	delete _driver;
+
+	_driver = nullptr;
 }
 
 int Midi::open() {
@@ -114,7 +111,7 @@ int Midi::open() {
 	_midiParser->property(MidiParser::mpSendSustainOffOnNotesOff, true);
 
 	// Open the MIDI driver.
-	int returnCode = _driver->open();
+	const int returnCode = _driver->open();
 	if (returnCode != 0)
 		error("Midi::open - Failed to open MIDI music driver - error code %d.", returnCode);
 
@@ -136,8 +133,7 @@ void Midi::load(byte* in, int32 size) {
 
 	_midiParser->unloadMusic();
 
-	if (_midiData != nullptr)
-		delete[] _midiData;
+	delete[] _midiData;
 	_midiData = new byte[size];
 
 	Common::copy(in, in + size, _midiData);
@@ -209,9 +205,9 @@ void Midi::midi_play(const char *name, int volume, bool loop, int trigger, int r
 	_midiEndTrigger = trigger;
 
 	// Load in the resource
-	Common::String fileName = expand_name_2_HMP(name, roomNum);
+	const Common::String fileName = expand_name_2_HMP(name, roomNum);
 	int32 assetSize;
-	MemHandle workHandle = rget(fileName, &assetSize);
+	const MemHandle workHandle = rget(fileName, &assetSize);
 	if (workHandle == nullptr)
 		error("Could not find music - %s", fileName.c_str());
 
@@ -269,7 +265,7 @@ void Midi::loop() {
 }
 
 void Midi::midi_fade_volume(int targetVolume, int duration) {
-	uint16 durationMsec = duration * 1000 / 30;
+	const uint16 durationMsec = duration * 1000 / 30;
 	startFade(durationMsec, targetVolume);
 	// TODO Should this stop playback when fade is completed?
 	// Should this call return after the fade has completed?

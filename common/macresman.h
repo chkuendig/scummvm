@@ -96,8 +96,8 @@ struct MacFinderInfo {
 
 	MacFinderInfoData toData() const;
 
-	byte type[4];
-	byte creator[4];
+	uint32 type;
+	uint32 creator;
 	uint16 flags;
 	Common::Point position;
 	int16 windowID;
@@ -298,6 +298,12 @@ public:
 	void setBaseFileName(Common::Path str) { _baseFileName = str; }
 
 	/**
+	 * Get the original Macintosh file name extracted from headers.
+	 * @return The original file name if available, otherwise an empty string.
+	 */
+	String getOriginalFileName() const { return _originalFileName; }
+
+	/**
 	 * Return list of resource IDs with specified type ID
 	 */
 	MacResIDArray getResIDArray(uint32 typeID);
@@ -347,17 +353,20 @@ public:
 private:
 	SeekableReadStream *_stream;
 	Path _baseFileName;
+	String _originalFileName;
 
 	bool load(SeekableReadStream *stream);
 
 	bool loadFromRawFork(SeekableReadStream *stream);
 	bool loadFromAppleDouble(SeekableReadStream *stream);
 
+public:
 	/**
 	 * Get Finder info from a file in MacBinary format
 	 */
 	static bool getFinderInfoFromMacBinary(SeekableReadStream *stream, MacFinderInfo &outFinderInfo, MacFinderExtendedInfo &outFinderExtendedInfo);
 
+private:
 	/**
 	 * Get Finder info from a file in AppleDouble format
 	 */

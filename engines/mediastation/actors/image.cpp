@@ -47,7 +47,7 @@ void ImageActor::readParameter(Chunk &chunk, ActorHeaderSectionType paramType) {
 		break;
 
 	case kActorHeaderLoadType:
-		_loadType = chunk.readTypedByte();
+		_decompressInPlace = chunk.readTypedByte();
 		break;
 
 	case kActorHeaderX:
@@ -60,14 +60,7 @@ void ImageActor::readParameter(Chunk &chunk, ActorHeaderSectionType paramType) {
 
 	case kActorHeaderActorReference: {
 		_actorReference = chunk.readTypedUint16();
-		Actor *referencedActor = g_engine->getActorById(_actorReference);
-		if (referencedActor == nullptr) {
-			error("%s: Referenced actor %d doesn't exist or has not been read yet in this title", __func__, _actorReference);
-		}
-		if (referencedActor->type() != kActorTypeImage) {
-			error("%s: Type mismatch of referenced actor %d", __func__, _actorReference);
-		}
-		ImageActor *referencedImage = static_cast<ImageActor *>(referencedActor);
+		ImageActor *referencedImage = static_cast<ImageActor *>(g_engine->getImtGod()->getActorByIdAndType(_actorReference, kActorTypeImage));
 		_asset = referencedImage->_asset;
 		break;
 	}
@@ -81,20 +74,21 @@ ScriptValue ImageActor::callMethod(BuiltInMethod methodId, Common::Array<ScriptV
 	ScriptValue returnValue;
 	switch (methodId) {
 	case kSpatialShowMethod: {
-		assert(args.empty());
+		ARGCOUNTCHECK(0);
 		spatialShow();
-		return returnValue;
+		break;
 	}
 
 	case kSpatialHideMethod: {
-		assert(args.empty());
+		ARGCOUNTCHECK(0);
 		spatialHide();
-		return returnValue;
+		break;
 	}
 
 	default:
 		return SpatialEntity::callMethod(methodId, args);
 	}
+	return returnValue;
 }
 
 void ImageActor::draw(DisplayContext &displayContext) {
@@ -121,8 +115,8 @@ Common::Rect ImageActor::getBbox() const {
 }
 
 void ImageActor::readChunk(Chunk &chunk) {
-	BitmapHeader *bitmapHeader = new BitmapHeader(chunk);
-	_asset->bitmap = new Bitmap(chunk, bitmapHeader);
+	ImageInfo bitmapHeader = ImageInfo(chunk);
+	_asset->bitmap = new PixMapImage(chunk, bitmapHeader, _decompressInPlace);
 }
 
 } // End of namespace MediaStation

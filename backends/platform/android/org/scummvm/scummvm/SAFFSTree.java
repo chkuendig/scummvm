@@ -1,3 +1,24 @@
+/* ScummVM - Graphic Adventure Engine
+ *
+ * ScummVM is the legal property of its developers, whose names
+ * are too numerous to list here. Please refer to the COPYRIGHT
+ * file distributed with this source distribution.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
+
 package org.scummvm.scummvm;
 
 import android.content.ContentResolver;
@@ -12,6 +33,7 @@ import android.provider.DocumentsContract;
 import android.system.OsConstants;
 import android.util.Log;
 
+import androidx.annotation.Keep;
 import androidx.annotation.RequiresApi;
 
 import java.io.FileNotFoundException;
@@ -199,6 +221,7 @@ public class SAFFSTree {
 	/** @noinspection unused
 	 * This version is used by the C++ side
 	 */
+	@Keep
 	public static void addNodeRef(long nodeId) {
 		assert(nodeId != 0);
 		SAFFSNode node = _nodes.get(nodeId);
@@ -211,6 +234,7 @@ public class SAFFSTree {
 	/** @noinspection unused
 	 * This version is used by the C++ side
 	 */
+	@Keep
 	public static void decNodeRef(long nodeId) {
 		assert(nodeId != 0);
 		SAFFSNode node = _nodes.get(nodeId);
@@ -222,6 +246,7 @@ public class SAFFSTree {
 	/** @noinspection unused
 	 * This version is used by the C++ side
 	 */
+	@Keep
 	public static SAFFSNode refToNode(long nodeId) {
 		assert(nodeId != 0);
 		return _nodes.get(nodeId);
@@ -234,9 +259,25 @@ public class SAFFSTree {
 		public static final int DELETABLE = 0x08;
 		public static final int REMOVABLE = 0x10;
 
+		/** @noinspection unused
+		 * Read by the C++ side
+		 */
+		@Keep
 		public SAFFSNode _parent;
+		/** @noinspection unused
+		 * Read by the C++ side
+		 */
+		@Keep
 		public String _path;
+		/** @noinspection unused
+		 * Read by the C++ side
+		 */
+		@Keep
 		public String _documentId;
+		/** @noinspection unused
+		 * Read by the C++ side
+		 */
+		@Keep
 		public int _flags;
 
 		private HashMap<String, SoftReference<SAFFSNode>> _children;
@@ -282,6 +323,10 @@ public class SAFFSTree {
 			return _path.compareTo(o._path);
 		}
 
+		/** @noinspection unused
+		 * Called by the C++ side
+		 */
+		@Keep
 		public synchronized long addRef() {
 			_refCnt += 1;
 			if (_refCnt > 1) {
@@ -309,7 +354,15 @@ public class SAFFSTree {
 	private final Context _context;
 	private final Uri _treeUri;
 
+	/** @noinspection unused
+	 * Read by the C++ side
+	 */
+	@Keep
 	private final SAFFSNode _root;
+	/** @noinspection unused
+	 * Read by the C++ side
+	 */
+	@Keep
 	private final String _treeName;
 
 	public SAFFSTree(Context context, Uri treeUri) {
@@ -327,6 +380,10 @@ public class SAFFSTree {
 		_treeName = treeName;
 	}
 
+	/** @noinspection unused
+	 * Called by the C++ side
+	 */
+	@Keep
 	public String getTreeId() {
 		return Uri.encode(DocumentsContract.getTreeDocumentId(_treeUri));
 	}
@@ -355,6 +412,10 @@ public class SAFFSTree {
 		}
 	}
 
+	/** @noinspection unused
+	 * Called by the C++ side
+	 */
+	@Keep
 	public SAFFSNode pathToNode(String path, boolean createDirIfNotExists) {
 		String[] components = path.split("/");
 
@@ -415,6 +476,7 @@ public class SAFFSTree {
 	/** @noinspection unused
 	 * This version is used by the C++ side
 	 */
+	@Keep
 	public SAFFSNode[] getChildren(long nodeId) {
 		SAFFSNode node = _nodes.get(nodeId);
 		assert(node != null);
@@ -536,6 +598,7 @@ public class SAFFSTree {
 	/** @noinspection unused
 	 * This version is used by the C++ side
 	 */
+	@Keep
 	public SAFFSNode getChild(long nodeId, String name) {
 		SAFFSNode node = _nodes.get(nodeId);
 		assert(node != null);
@@ -550,6 +613,7 @@ public class SAFFSTree {
 	/** @noinspection unused
 	 * This version is used by the C++ side
 	 */
+	@Keep
 	public SAFFSNode createDirectory(long nodeId, String name) {
 		SAFFSNode node = _nodes.get(nodeId);
 		assert(node != null);
@@ -564,6 +628,7 @@ public class SAFFSTree {
 	/** @noinspection unused
 	 * This version is used by the C++ side
 	 */
+	@Keep
 	public SAFFSNode createFile(long nodeId, String name) {
 		SAFFSNode node = _nodes.get(nodeId);
 		assert(node != null);
@@ -578,6 +643,7 @@ public class SAFFSTree {
 	/** @noinspection unused
 	 * This version is used by the C++ side
 	 */
+	@Keep
 	public int createReadStream(long nodeId) {
 		SAFFSNode node = _nodes.get(nodeId);
 		assert(node != null);
@@ -592,6 +658,7 @@ public class SAFFSTree {
 	/** @noinspection unused
 	 * This version is used by the C++ side
 	 */
+	@Keep
 	public int createWriteStream(long nodeId) {
 		SAFFSNode node = _nodes.get(nodeId);
 		assert(node != null);
@@ -645,6 +712,7 @@ public class SAFFSTree {
 	/** @noinspection unused
 	 * This version is used by the C++ side
 	 */
+	@Keep
 	public int removeNode(long nodeId) {
 		SAFFSNode node = _nodes.get(nodeId);
 		assert(node != null);
@@ -655,6 +723,7 @@ public class SAFFSTree {
 	/** @noinspection unused
 	 * This version is used by the C++ side
 	 */
+	@Keep
 	public void removeTree() {
 		final ContentResolver resolver = _context.getContentResolver();
 

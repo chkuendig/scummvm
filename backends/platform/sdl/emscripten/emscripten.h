@@ -23,18 +23,28 @@
 #define PLATFORM_SDL_EMSCRIPTEN_H
 
 #include "backends/platform/sdl/posix/posix.h"
+#include "common/fs.h"
 #ifdef USE_CLOUD
 #include "backends/networking/http/request.h"
 #include "common/ustr.h"
 typedef Common::BaseCallback<const Common::String *> *CloudConnectionCallback;
 #endif
 
-extern "C" {
-void cloud_connection_json_callback(char *str);       // pass cloud storage activation data from JS to setup wizard
+extern "C" { // External JavaScript API functions implemented in libscummvm.js
+// Backend functions
+bool OSystem_Emscripten_isFullscreen();
+void OSystem_Emscripten_toggleFullscreen(bool enable);
+void OSystem_Emscripten_downloadFile(const char *filenamePtr, char *dataPtr, int dataSize);
+// Cloud functions
+#ifdef USE_CLOUD
+void OSystem_Emscripten_cloudConnectionWizardCallback(char *str); // pass cloud storage activation data from JS to setup wizard
+bool OSystem_Emscripten_openCloudOAuthWindow(char const *url);
+#endif
 }
+
 class OSystem_Emscripten : public OSystem_POSIX {
 #ifdef USE_CLOUD
-	friend void ::cloud_connection_json_callback(char *str);
+	friend void ::OSystem_Emscripten_cloudConnectionWizardCallback(char *str);
 #endif
 protected:
 #ifdef USE_CLOUD
@@ -52,11 +62,20 @@ public:
 #ifdef USE_OPENGL
 	GraphicsManagerType getDefaultGraphicsManager() const override;
 #endif
+	/**
+	 * SDL mis-reports touch in the browser (touchpads register touch devices,
+	 * touchscreens also look like a mouse). Use navigator.maxTouchPoints instead.
+	 * Used by every graphics backend, so it must not be guarded by USE_OPENGL.
+	 */
+	bool hasTouchscreen() const override;
 	Common::MutexInternal *createMutex() override;
 	void exportFile(const Common::Path &filename);
 	void delayMillis(uint msecs) override;
 	void init() override;
 	void addSysArchivesToSearchSet(Common::SearchSet &s, int priority) override;
+	bool setGraphicsMode(int mode, uint flags = OSystem::kGfxModeNoFlags) override;
+	void applyBackendSettings() override;
+	void importExtrasFile(const Common::FSNode &node);
 
 #ifdef USE_CLOUD
 	void setCloudConnectionCallback(CloudConnectionCallback cb) { _cloudConnectionCallback = cb; }

@@ -104,19 +104,22 @@ void MainMenu::init() {
 
 	registerGraphics();
 
+	bool restoreAfterAd = ConfMan.hasKey("restore_after_ad", Common::ConfigManager::kTransientDomain);
+
 	// Disable continue if game was just started
 	// Perhaps could be enabled always, and just load the latest save?
 	if (!Scene::hasInstance()) {
-		_buttons[3]->setDisabled(true);
+		if (!restoreAfterAd) {
+			// Not returning to running game, disable Continue button
+			_buttons[3]->setDisabled(true);
+		}
 	} else {
 		if (NancySceneState.isRunningAd()) {
+			// We just returned from the ad to the main menu.
 			// Always destroy current state to make sure music starts again
 			NancySceneState.destroy();
 
-			if (ConfMan.hasKey("restore_after_ad", Common::ConfigManager::kTransientDomain)) {
-				// Returning to running game, restore second chance
-				ConfMan.setInt("save_slot", g_nancy->getMetaEngine()->getMaximumSaveSlot(), Common::ConfigManager::kTransientDomain);
-			} else {
+			if (!restoreAfterAd) {
 				// Not returning to running game, disable Continue button
 				_buttons[3]->setDisabled(true);
 			}
@@ -198,7 +201,7 @@ void MainMenu::stop() {
 		break;
 	case 6:
 		// Exit Game
-		if (g_nancy->getEngineData("SDLG") && Nancy::State::Scene::hasInstance() && !g_nancy->_hasJustSaved) {
+		if (g_nancy->getEngineData("SDLG") && Scene::hasInstance() && !g_nancy->_hasJustSaved) {
 			if (!ConfMan.hasKey("sdlg_return", Common::ConfigManager::kTransientDomain)) {
 				// Request the "Do you want to save before quitting" dialog
 				ConfMan.setInt("sdlg_id", 0, Common::ConfigManager::kTransientDomain);
@@ -262,6 +265,7 @@ void MainMenu::stop() {
 			// overwrite it when selecting the ad button multiple times in a row.
 			if (!ConfMan.hasKey("restore_after_ad", Common::ConfigManager::kTransientDomain)) {
 				g_nancy->secondChance();
+				ConfMan.setInt("save_slot", g_nancy->getMetaEngine()->getMaximumSaveSlot(), Common::ConfigManager::kTransientDomain);
 			}
 
 			ConfMan.setBool("restore_after_ad", true, Common::ConfigManager::kTransientDomain);

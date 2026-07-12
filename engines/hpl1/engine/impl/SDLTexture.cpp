@@ -38,33 +38,6 @@
 
 namespace hpl {
 
-static void getSettings(Bitmap2D *apSrc, int &alChannels, GLint &internalFormat, GLenum &format) {
-	alChannels = apSrc->getNumChannels();
-	tString sType = cString::ToLowerCase(apSrc->getType());
-	const Common::String bmpFormat = apSrc->format().toString();
-
-	if (alChannels == 4) {
-		internalFormat = GL_RGBA;
-		if (bmpFormat.contains("BGRA")) {
-			format = GL_BGRA;
-		} else {
-			format = GL_RGBA;
-		}
-	}
-	if (alChannels == 3) {
-		internalFormat = GL_RGB;
-		if (bmpFormat.contains("BGR")) {
-			format = GL_BGR;
-		} else {
-			format = GL_RGB;
-		}
-	}
-	if (alChannels == 1) {
-		format = GL_RED;
-		internalFormat = GL_RED;
-	}
-}
-
 //////////////////////////////////////////////////////////////////////////
 // CONSTRUCTORS
 //////////////////////////////////////////////////////////////////////////
@@ -77,6 +50,15 @@ cSDLTexture::cSDLTexture(const tString &asName, Graphics::PixelFormat *apPxlFmt,
 	: iTexture(asName, "OGL", apPxlFmt, apLowLevelGraphics, aType, abUseMipMaps, aTarget, abCompress) {
 	mbContainsData = false;
 
+#if USE_FORCED_GLES2
+	// GLES2 has no GL_TEXTURE_1D / GL_TEXTURE_RECTANGLE; we upload both as
+	// regular 2D textures. cCGProgram polyfills texture1D() / texture2DRect()
+	// accordingly (texture1D → texture2D with v=0.5, texture2DRect → normalized
+	// sample driven by a screen-size uniform).
+	if (mTarget == eTextureTarget_1D || mTarget == eTextureTarget_Rect)
+		mTarget = eTextureTarget_2D;
+#endif
+
 	if (aType == eTextureType_RenderTarget) {
 		Hpl1::logError(Hpl1::kDebugTextures, "use of render target%s", ".");
 		// mpPBuffer = hplNew( cPBuffer, (mpLowLevelGraphics,true) );
@@ -86,7 +68,7 @@ cSDLTexture::cSDLTexture(const tString &asName, Graphics::PixelFormat *apPxlFmt,
 	if (aTarget == eTextureTarget_CubeMap)
 		mbUseMipMaps = false;
 
-	mpGfxSDL = static_cast<cLowLevelGraphicsSDL *>(mpLowLevelGraphics);
+	mpGfxImpl = static_cast<cLowLevelGfxImpl *>(mpLowLevelGraphics);
 
 	mlTextureIndex = 0;
 	mfTimeCount = 0;
@@ -109,7 +91,6 @@ cSDLTexture::~cSDLTexture() {
 //-----------------------------------------------------------------------
 
 bool cSDLTexture::CreateFromBitmap(Bitmap2D *pBmp) {
-	// Generate handles
 	if (mvTextureHandles.empty()) {
 		mvTextureHandles.resize(1);
 		GL_CHECK(glGenTextures(1, &mvTextureHandles[0]));
@@ -150,7 +131,6 @@ bool cSDLTexture::CreateCubeFromBitmapVec(tBitmap2DVec *avBitmaps) {
 		return false;
 	}
 
-	// Generate handles
 	if (mvTextureHandles.empty()) {
 		mvTextureHandles.resize(1);
 		GL_CHECK(glGenTextures(1, &mvTextureHandles[0]));
@@ -161,16 +141,14 @@ bool cSDLTexture::CreateCubeFromBitmapVec(tBitmap2DVec *avBitmaps) {
 
 	GLenum GLTarget = InitCreation(0);
 
-	// Create the cube map sides
 	for (int i = 0; i < 6; i++) {
 		Bitmap2D *pSrc = static_cast<Bitmap2D *>((*avBitmaps)[i]);
 
 		GLenum target = GL_TEXTURE_CUBE_MAP_POSITIVE_X + i;
 
-		int lChannels;
-		GLenum format;
-		GLint internalFormat;
-		getSettings(pSrc, lChannels, internalFormat, format);
+		int lChannels = 4;
+		GLenum format = GL_RGBA;
+		GLint internalFormat = GL_RGBA;
 
 		glTexImage2D(target, 0, internalFormat, pSrc->getWidth(), pSrc->getHeight(),
 					 0, format, GL_UNSIGNED_BYTE, pSrc->getRawData());
@@ -206,9 +184,12 @@ bool cSDLTexture::Create(unsigned int alWidth, unsigned int alHeight, cColor aCo
 
 static void generateMipmaps(eTextureTarget target) {
 	// gl 1.4
+#if !USE_FORCED_GLES2
 	if (target == eTextureTarget_1D) {
 		GL_CHECK(glGenerateMipmap(GL_TEXTURE_1D))
-	} else {
+	} else
+#endif
+	{
 		GL_CHECK(glGenerateMipmap(GL_TEXTURE_2D))
 	}
 }
@@ -225,10 +206,20 @@ bool cSDLTexture::CreateFromArray(unsigned char *apPixelData, int alChannels, co
 	GLenum format = 0;
 	switch (lChannels) {
 	case 1:
+#if USE_FORCED_GLES2
+		// TODO: migrate to GL_R8 once single-channel sampler users are audited for `.r`-only access.
+		format = GL_LUMINANCE;
+#else
 		format = GL_R;
+#endif
 		break;
 	case 2:
+#if USE_FORCED_GLES2
+		// TODO: migrate to GL_RG8 once dual-channel sampler users are audited for `.r`/`.g` access.
+		format = GL_LUMINANCE_ALPHA;
+#else
 		format = GL_RG;
+#endif
 		break;
 	case 3:
 		format = GL_RGB;
@@ -246,16 +237,22 @@ bool cSDLTexture::CreateFromArray(unsigned char *apPixelData, int alChannels, co
 		Hpl1::logWarning(Hpl1::kDebugTextures, "Texture '%s' does not have a pow2 size", msName.c_str());
 	}
 
+#if !USE_FORCED_GLES2
 	if (mTarget == eTextureTarget_1D) {
 		GL_CHECK(glTexImage1D(GLTarget, 0, format, _width, 0, format,
 							  GL_UNSIGNED_BYTE, apPixelData));
-	} else if (mTarget == eTextureTarget_2D) {
+	} else
+#endif
+	if (mTarget == eTextureTarget_2D) {
 		GL_CHECK(glTexImage2D(GLTarget, 0, format, _width, _height,
 							  0, format, GL_UNSIGNED_BYTE, apPixelData));
-	} else if (mTarget == eTextureTarget_3D) {
+	}
+#if !USE_FORCED_GLES2
+	else if (mTarget == eTextureTarget_3D) {
 		GL_CHECK(glTexImage3D(GLTarget, 0, format, avSize.x, avSize.y, avSize.z,
 							  0, format, GL_UNSIGNED_BYTE, apPixelData));
 	}
+#endif
 
 	if (mbUseMipMaps && mTarget != eTextureTarget_Rect && mTarget != eTextureTarget_3D)
 		generateMipmaps(mTarget);
@@ -263,17 +260,6 @@ bool cSDLTexture::CreateFromArray(unsigned char *apPixelData, int alChannels, co
 	PostCreation(GLTarget);
 
 	return true;
-}
-
-//-----------------------------------------------------------------------
-
-void cSDLTexture::SetPixels2D(int alLevel, const cVector2l &avOffset, const cVector2l &avSize,
-							  eColorDataFormat aDataFormat, void *apPixelData) {
-	if (mTarget != eTextureTarget_2D && mTarget != eTextureTarget_Rect)
-		return;
-
-	GL_CHECK(glTexSubImage2D(TextureTargetToGL(mTarget), alLevel, avOffset.x, avOffset.y, avSize.x, avSize.y,
-							 ColorFormatToGL(aDataFormat), GL_UNSIGNED_BYTE, apPixelData));
 }
 
 //-----------------------------------------------------------------------
@@ -371,7 +357,7 @@ void cSDLTexture::SetFilter(eTextureFilter aFilter) {
 
 	mFilter = aFilter;
 	if (mbContainsData) {
-		GLenum GLTarget = mpGfxSDL->GetGLTextureTargetEnum(mTarget);
+		GLenum GLTarget = mpGfxImpl->GetGLTextureTargetEnum(mTarget);
 
 		GL_CHECK(glEnable(GLTarget));
 		for (size_t i = 0; i < mvTextureHandles.size(); ++i) {
@@ -404,7 +390,7 @@ void cSDLTexture::SetAnisotropyDegree(float afX) {
 
 	mfAnisotropyDegree = afX;
 
-	GLenum GLTarget = mpGfxSDL->GetGLTextureTargetEnum(mTarget);
+	GLenum GLTarget = mpGfxImpl->GetGLTextureTargetEnum(mTarget);
 
 	glEnable(GLTarget);
 	for(size_t i=0; i < mvTextureHandles.size(); ++i)
@@ -422,18 +408,24 @@ void cSDLTexture::SetAnisotropyDegree(float afX) {
 
 void cSDLTexture::SetWrapS(eTextureWrap aMode) {
 	if (mbContainsData) {
-		GLenum GLTarget = mpGfxSDL->GetGLTextureTargetEnum(mTarget);
+		GLenum GLTarget = mpGfxImpl->GetGLTextureTargetEnum(mTarget);
 
 		Hpl1::logInfo(Hpl1::kDebugTextures, "setting texture '%s' s wrap to %d\n", msName.c_str(), aMode);
 
+		// glEnable/glDisable(GL_TEXTURE_2D) is INVALID_ENUM in GLES2: there's
+		// no fixed-function texturing to enable, samplers do it implicitly.
+#if !USE_FORCED_GLES2
 		GL_CHECK(glEnable(GLTarget));
+#endif
 		for (size_t i = 0; i < mvTextureHandles.size(); ++i) {
 			glBindTexture(GLTarget, mvTextureHandles[i]);
 
 			glTexParameteri(GLTarget, GL_TEXTURE_WRAP_S, GetGLWrap(aMode));
 		}
 		GL_CHECK_FN();
+#if !USE_FORCED_GLES2
 		GL_CHECK(glDisable(GLTarget));
+#endif
 	}
 }
 
@@ -441,17 +433,21 @@ void cSDLTexture::SetWrapS(eTextureWrap aMode) {
 
 void cSDLTexture::SetWrapT(eTextureWrap aMode) {
 	if (mbContainsData) {
-		GLenum GLTarget = mpGfxSDL->GetGLTextureTargetEnum(mTarget);
+		GLenum GLTarget = mpGfxImpl->GetGLTextureTargetEnum(mTarget);
 
 		Hpl1::logInfo(Hpl1::kDebugTextures, "setting texture '%s' t wrap to %d\n", msName.c_str(), aMode);
 
+#if !USE_FORCED_GLES2
 		GL_CHECK(glEnable(GLTarget));
+#endif
 		for (size_t i = 0; i < mvTextureHandles.size(); ++i) {
 			glBindTexture(GLTarget, mvTextureHandles[i]);
 
 			glTexParameteri(GLTarget, GL_TEXTURE_WRAP_T, GetGLWrap(aMode));
 		}
+#if !USE_FORCED_GLES2
 		GL_CHECK(glDisable(GLTarget));
+#endif
 	}
 }
 
@@ -459,8 +455,11 @@ void cSDLTexture::SetWrapT(eTextureWrap aMode) {
 
 void cSDLTexture::SetWrapR(eTextureWrap aMode) {
 	if (mbContainsData) {
-		GLenum GLTarget = mpGfxSDL->GetGLTextureTargetEnum(mTarget);
+		GLenum GLTarget = mpGfxImpl->GetGLTextureTargetEnum(mTarget);
 
+		// GLES2 has no GL_TEXTURE_WRAP_R for 2D textures (cube/3D not used
+		// here either), so the body is desktop-only.
+#if !USE_FORCED_GLES2
 		GL_CHECK(glEnable(GLTarget));
 		glEnable(GLTarget);
 		for (size_t i = 0; i < mvTextureHandles.size(); ++i) {
@@ -471,6 +470,7 @@ void cSDLTexture::SetWrapR(eTextureWrap aMode) {
 		GL_CHECK(glDisable(GLTarget));
 
 		glDisable(GLTarget);
+#endif
 	}
 }
 
@@ -514,10 +514,9 @@ bool cSDLTexture::CreateFromBitmapToHandle(Bitmap2D *pBmp, int alHandleIdx) {
 	if ((!cMath::IsPow2(_height) || !cMath::IsPow2(_width)) && mTarget != eTextureTarget_Rect)
 		Hpl1::logWarning(Hpl1::kDebugTextures, "Texture '%s' does not have a pow2 size", msName.c_str());
 
-	int lChannels = 0;
-	GLint internalFormat = 0;
-	GLenum format = 0;
-	getSettings(pBitmapSrc, lChannels, internalFormat, format);
+	int lChannels = 4;
+	GLint internalFormat = GL_RGBA;
+	GLenum format = GL_RGBA;
 
 	_bpp = lChannels * 8;
 
@@ -576,10 +575,14 @@ bool cSDLTexture::CreateFromBitmapToHandle(Bitmap2D *pBmp, int alHandleIdx) {
 	// Clear error flags
 	GL_CHECK_FN();
 
+#if !USE_FORCED_GLES2
 	if (mTarget == eTextureTarget_1D)
 		glTexImage1D(GLTarget, 0, internalFormat, _width, 0, format,
 					 GL_UNSIGNED_BYTE, pPixelSrc);
 	else
+#endif
+		// In GLES2 mTarget was remapped 1D→2D in the constructor so this
+		// covers both 1D and 2D sources.
 		glTexImage2D(GLTarget, 0, internalFormat, _width, _height,
 					 0, format, GL_UNSIGNED_BYTE, pPixelSrc);
 
@@ -599,9 +602,12 @@ bool cSDLTexture::CreateFromBitmapToHandle(Bitmap2D *pBmp, int alHandleIdx) {
 //-----------------------------------------------------------------------
 
 GLenum cSDLTexture::InitCreation(int alHandleIdx) {
-	GLenum GLTarget = mpGfxSDL->GetGLTextureTargetEnum(mTarget);
+	GLenum GLTarget = mpGfxImpl->GetGLTextureTargetEnum(mTarget);
 
+#if !USE_FORCED_GLES2
+	// glEnable(GL_TEXTURE_*) is INVALID_ENUM in GLES2 (no fixed function).
 	GL_CHECK(glEnable(GLTarget));
+#endif
 	GL_CHECK(glBindTexture(GLTarget, mvTextureHandles[alHandleIdx]));
 
 	return GLTarget;
@@ -620,12 +626,18 @@ void cSDLTexture::PostCreation(GLenum aGLTarget) {
 	}
 	GL_CHECK_FN();
 	GL_CHECK(glTexParameteri(aGLTarget, GL_TEXTURE_MAG_FILTER, GL_LINEAR));
+#if !USE_FORCED_GLES2
+	// Rectangle textures and GL_TEXTURE_WRAP_R don't exist in GLES2 for 2D.
 	if (aGLTarget != GL_TEXTURE_RECTANGLE) {
 		GL_CHECK(glTexParameteri(aGLTarget, GL_TEXTURE_WRAP_S, GL_REPEAT));
 		GL_CHECK(glTexParameteri(aGLTarget, GL_TEXTURE_WRAP_T, GL_REPEAT));
 		GL_CHECK(glTexParameteri(aGLTarget, GL_TEXTURE_WRAP_R, GL_REPEAT));
 	}
 	GL_CHECK(glDisable(aGLTarget));
+#else
+	GL_CHECK(glTexParameteri(aGLTarget, GL_TEXTURE_WRAP_S, GL_REPEAT));
+	GL_CHECK(glTexParameteri(aGLTarget, GL_TEXTURE_WRAP_T, GL_REPEAT));
+#endif
 
 	mbContainsData = true;
 }
@@ -635,13 +647,24 @@ void cSDLTexture::PostCreation(GLenum aGLTarget) {
 GLenum cSDLTexture::GetGLWrap(eTextureWrap aMode) {
 	switch (aMode) {
 	case eTextureWrap_Clamp:
+#if USE_FORCED_GLES2
+		// GL_CLAMP doesn't exist in GLES2; GL_CLAMP_TO_EDGE is the only
+		// non-repeat mode the driver offers.
+		return GL_CLAMP_TO_EDGE;
+#else
 		return GL_CLAMP;
+#endif
 	case eTextureWrap_Repeat:
 		return GL_REPEAT;
 	case eTextureWrap_ClampToEdge:
 		return GL_CLAMP_TO_EDGE;
 	case eTextureWrap_ClampToBorder:
+#if USE_FORCED_GLES2
+		// GL_CLAMP_TO_BORDER doesn't exist in core GLES2 either.
+		return GL_CLAMP_TO_EDGE;
+#else
 		return GL_CLAMP_TO_BORDER;
+#endif
 	default:
 		break;
 	}

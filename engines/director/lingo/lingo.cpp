@@ -109,6 +109,10 @@ Symbol& Symbol::operator=(const Symbol &s) {
 }
 
 bool Symbol::operator==(Symbol &s) const {
+	if ((s.type == VOIDSYM) && (type == VOIDSYM))
+		return true;
+	if ((!name || !s.name))
+		return false;
 	return ctx == s.ctx && (name->equalsIgnoreCase(*s.name));
 }
 
@@ -160,6 +164,9 @@ LingoState::~LingoState() {
 		if (callstack[i]->retContext) {
 			callstack[i]->retContext->decRefCount();
 		}
+		if (callstack[i]->retWindow) {
+			callstack[i]->retWindow->decRefCount();
+		}
 		delete callstack[i];
 	}
 	if (localVars)
@@ -174,7 +181,6 @@ Lingo::Lingo(DirectorEngine *vm) : _vm(vm) {
 	g_lingo = this;
 
 	_state = nullptr;
-	_currentChannelId = -1;
 	_globalCounter = 0;
 	_freezeState = false;
 	_freezePlay = false;
@@ -398,6 +404,7 @@ void LingoArchive::addCode(const Common::U32String &code, ScriptType type, uint1
 
 	ScriptContext *sc = g_lingo->_compiler->compileLingo(code, this, type, CastMemberID(id, cast->_castLibID), contextName, false, preprocFlags);
 	if (sc) {
+		sc->setCast(cast);
 		scriptContexts[type][id] = sc;
 		sc->incRefCount();
 	}
@@ -422,7 +429,7 @@ Common::String Lingo::formatStack() {
 
 	for (uint i = 0; i < _state->stack.size(); i++) {
 		Datum d = _state->stack[i];
-		stack += Common::String::format("<%s> ", d.asString(true).c_str());
+		stack += Common::String::format("<%s> ", formatStringForDump(d.asString(true)).c_str());
 	}
 	return stack;
 }
@@ -648,7 +655,7 @@ bool Lingo::execute(int targetFrame) {
 
 		// process events every so often
 		if (localCounter > 0 && localCounter % 100 == 0) {
-			_vm->processEvents();
+			_vm->processSysEvents();
 			// Also process update widgets!
 			Movie *movie = g_director->getCurrentMovie();
 			Score *score = movie->getScore();
@@ -722,6 +729,10 @@ bool Lingo::execute(int targetFrame) {
 		while (_state->callstack.size()) {
 			popContext(true);
 		}
+		if (_playDone) {
+			_playDone = false;
+			requeuePlayState();
+		}
 	}
 	_abort = false;
 	_freezeState = false;
@@ -760,10 +771,9 @@ void Lingo::executeScript(ScriptType type, CastMemberID id) {
 
 void Lingo::executeHandler(const Common::String &name, int numargs) {
 	debugC(1, kDebugLingoExec, "Executing script handler : %s", name.c_str());
-	Symbol sym = getHandler(name);
 
 	int frame = _state->callstack.size();
-	LC::call(sym, numargs, false);
+	LC::call(name, numargs, false);
 	execute(frame);
 }
 
@@ -780,6 +790,9 @@ void Lingo::lingoError(const char *s, ...) {
 		_caughtError = true;
 	} else {
 		warning("BUILDBOT: Uncaught Lingo error: %s", buf);
+		debug("Movie: %s", _vm->getCurrentMovie()->getArchive()->getPathName().toString(Common::Path::kNativeSeparator).c_str());
+		debugN("%s", formatCallStack(_state->pc).c_str());
+
 		if (debugChannelSet(-1, kDebugLingoStrict)) {
 			error("Uncaught Lingo error");
 		}
@@ -1734,6 +1747,7 @@ void Lingo::varAssign(const Datum &var, const Datum &value) {
 		// So while we require other variable types to be initialized before assigning to them,
 		// let's not enforce that for globals.
 		_globalvars[*var.u.s] = value;
+		g_debugger->varWriteHook(*var.u.s);
 		break;
 	case LOCALREF:
 		{

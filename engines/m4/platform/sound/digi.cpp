@@ -163,7 +163,7 @@ void Digi::stop(uint channel, bool calledFromUnload) {
 
 	Channel &c = _channels[channel];
 	if (!c._name.empty()) {
-		Common::String name = c._name;
+		const Common::String name = c._name;
 
 		_mixer->stopHandle(c._soundHandle);
 		c._trigger = -1;
@@ -188,7 +188,7 @@ void Digi::read_another_chunk() {
 
 		// Check if the channel has a sound playing that finished
 		if (c._trigger != -1 && !_mixer->isSoundHandleActive(c._soundHandle)) {
-			int trigger = c._trigger;
+			const int trigger = c._trigger;
 			c._trigger = -1;
 			stop(channel);
 
@@ -208,9 +208,9 @@ void Digi::change_volume(int channel, int vol) {
 
 int32 Digi::ticks_to_play(const char *name, int roomNum) {
 	// Get the file and retrieve it's size
-	Common::String filename = expand_name_2_RAW(name, roomNum);
+	const Common::String filename = expand_name_2_RAW(name, roomNum);
 	SysFile sf(filename);
-	double size = sf.size();
+	const double size = sf.size();
 	sf.close();
 
 	term_message("  digi_ticks_to_play");

@@ -43,22 +43,30 @@ public:
 	~ScriptFunction();
 
 	ScriptValue execute(Common::Array<ScriptValue> &args);
+	Common::String decompile() const;
+	uint32 bytecodeSize() const { return _bytecodeSize; }
 
 	uint _contextId = 0;
 	uint _id = 0;
 
 private:
-	CodeChunk *_code = nullptr;
+	byte *_bytecodeBuffer = nullptr;
+	uint32 _bytecodeSize = 0;
 };
 
 class FunctionManager : public ParameterClient {
+friend class Debugger;
+
 public:
 	FunctionManager() {};
 	virtual ~FunctionManager();
 
 	virtual bool attemptToReadFromStream(Chunk &chunk, uint sectionType) override;
 	ScriptValue call(uint functionId, Common::Array<ScriptValue> &args);
+	ScriptFunction *getFunctionById(uint functionId);
 	void deleteFunctionsForContext(uint contextId);
+
+	uint _scriptBlockCallDepth = 0;
 
 private:
 	Common::HashMap<uint, ScriptFunction *> _functions;
@@ -86,6 +94,9 @@ private:
 	void script_MazeSolve(Common::Array<ScriptValue> &args, ScriptValue &returnValue);
 	void script_BeginTimedInterval(Common::Array<ScriptValue> &args, ScriptValue &returnValue);
 	void script_EndTimedInterval(Common::Array<ScriptValue> &args, ScriptValue &returnValue);
+
+	// Hercules.
+	void script_Checkers(Common::Array<ScriptValue> &args, ScriptValue &returnValue);
 
 	// IBM/Crayola.
 	void script_Drawing(Common::Array<ScriptValue> &args, ScriptValue &returnValue);

@@ -23,8 +23,6 @@
 #ifndef M4_ADV_R_ADV_GAME_H
 #define M4_ADV_R_ADV_GAME_H
 
-#include "common/serializer.h"
-#include "m4/adv_r/adv.h"
 #include "m4/m4_types.h"
 
 namespace M4 {

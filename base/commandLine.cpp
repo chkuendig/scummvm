@@ -180,7 +180,13 @@ static const char HELP_STRING4[] =
 	"  --enable-gs              Enable Roland GS mode for MIDI playback\n"
 	"  --output-channels=CHANNELS Select output channel count (e.g. 2 for stereo)\n"
 	"  --output-rate=RATE       Select output sample rate in Hz (e.g. 22050)\n"
-	"  --opl-driver=DRIVER      Select AdLib (OPL) emulator (db, mame"
+	"  --opl-driver=DRIVER      Select AdLib (OPL) emulator ("
+#ifndef DISABLE_MAME_OPL
+																	 "mame"
+#endif
+#ifndef DISABLE_DOSBOX_OPL
+																	 ", db"
+#endif
 #ifndef DISABLE_NUKED_OPL
 																	 ", nuked"
 #endif
@@ -396,6 +402,7 @@ void registerDefaults() {
 	ConfMan.registerDefault("gui_return_to_launcher_at_exit", false);
 	ConfMan.registerDefault("gui_launcher_chooser", "list");
 	ConfMan.registerDefault("grid_items_per_row", 4);
+	ConfMan.registerDefault("gui_kinetic_scrolling", true);
 	// Specify threshold for scanning directories in the launcher
 	// If number of game entries in scummvm.ini exceeds the specified
 	// number, then skip scanning. -1 = scan always
@@ -994,6 +1001,10 @@ Common::String parseCommandLine(Common::StringMap &settings, int argc, const cha
 			DO_LONG_OPTION_PATH("themepath")
 			END_OPTION
 
+			// This is for internal use only, intentianally not documented
+			DO_LONG_OPTION_BOOL("dump-all-dialogs")
+			END_OPTION
+
 			DO_LONG_OPTION("shader")
 				Common::SearchSet _shaderSet;
 				Common::generateZipSet(_shaderSet, "shaders.dat", "shaders*.dat");
@@ -1562,7 +1573,7 @@ static Common::Error listSaves(const Common::String &singleTarget) {
 					   "  ---- ------------------------------------------------------\n");
 
 			for (const auto &x : saveList) {
-				printf("  %-4d %s\n", x.getSaveSlot(), x.getDescription().encode().c_str());
+				printf("  %-4d %s\n", x.getSaveSlot(), x.getDescription().c_str());
 				// TODO: Could also iterate over the full hashmap, printing all key-value pairs
 			}
 			atLeastOneFound = true;
@@ -2227,7 +2238,7 @@ bool processSettings(Common::String &command, Common::StringMap &settings, Commo
 			Common::Path fileName = Filename.getLastComponent();
 
 			Common::MacResManager macResMan;
-			if (macResMan.open(fileName, dir)) {
+			if (macResMan.open(fileName, dir) && macResMan.isMacFile()) {
 				warning("Mac resources detected");
 				command = "md5mac";
 			}
@@ -2308,6 +2319,7 @@ bool processSettings(Common::String &command, Common::StringMap &settings, Commo
 		"render-mode",
 		"random-seed",
 		"renderer",
+		"dump-all-dialogs",
 		nullptr
 	};
 

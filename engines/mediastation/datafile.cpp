@@ -130,22 +130,12 @@ ChannelIdent ParameterReadStream::readTypedChannelIdent() {
 	return readUint32BE();
 }
 
-Polygon ParameterReadStream::readTypedPolygon() {
-	Polygon polygon;
-	uint totalPoints = readTypedUint16();
-	for (uint i = 0; i < totalPoints; ++i) {
-		Common::Point point = readTypedGraphicSize();
-		polygon.push_back(point);
-	}
-	return polygon;
-}
-
 Chunk::Chunk(Common::SeekableReadStream *stream) : _parentStream(stream) {
 	_id = _parentStream->readUint32BE();
 	_length = _parentStream->readUint32LE();
 	_dataStartOffset = pos();
 	_dataEndOffset = _dataStartOffset + _length;
-	debugC(5, kDebugLoading, "Chunk::Chunk(): Got chunk with ID \"%s\" and size 0x%x", tag2str(_id), _length);
+	debugC(5, kDebugLoading, "%s: Got chunk with ID \"%s\" and size 0x%x", __func__, tag2str(_id), _length);
 }
 
 uint32 Chunk::bytesRemaining() {
@@ -168,10 +158,10 @@ bool Chunk::seek(int64 offset, int whence) {
 
 	if (pos() < _dataStartOffset) {
 		uint overrun = _dataStartOffset - offset;
-		error("Attempted to seek 0x%x bytes before start of chunk (@0x%llx)", overrun, static_cast<long long int>(pos()));
+		error("%s: Attempted to seek 0x%x bytes before start of chunk (@0x%llx)", __func__, overrun, static_cast<long long int>(pos()));
 	} else if (pos() > _dataEndOffset) {
 		uint overrun = offset - _dataEndOffset;
-		error("Attempted to seek 0x%x bytes past end of chunk (@0x%llx)", overrun, static_cast<long long int>(pos()));
+		error("%s: Attempted to seek 0x%x bytes past end of chunk (@0x%llx)", __func__, overrun, static_cast<long long int>(pos()));
 	}
 	return true;
 }
@@ -220,14 +210,14 @@ bool Subfile::atEnd() {
 }
 
 void CdRomStream::openStream(uint streamId) {
-	const StreamInfo &streamInfo = g_engine->streamInfoForIdent(streamId);
+	const StreamInfo &streamInfo = g_engine->getImtGod()->streamInfoForIdent(streamId);
 	if (streamInfo._fileId == 0) {
 		error("%s: Stream %d not found in current title", __func__, streamId);
 	}
 
-	const FileInfo &fileInfo = g_engine->fileInfoForIdent(streamInfo._fileId);
+	const FileInfo &fileInfo = g_engine->getImtGod()->fileInfoForIdent(streamInfo._fileId);
 	if (fileInfo._id == 0) {
-		error("%s: File %d for stream %d not found in current title", __func__, streamInfo._fileId, streamId);
+		error("%s: File %s for stream %d not found in current title", __func__, g_engine->formatFileName(streamInfo._fileId).c_str(), streamId);
 	}
 
 	bool requestedStreamAlreadyOpen = isOpen() && _fileId == streamInfo._fileId;
@@ -293,7 +283,7 @@ void ImtStreamFeed::readData() {
 	Subfile subfile = _stream->getNextSubfile();
 	Chunk chunk = subfile.nextChunk();
 	g_engine->getDocument()->streamWillRead(_id);
-	g_engine->readHeaderSections(subfile, chunk);
+	g_engine->getImtGod()->readHeaderSections(subfile, chunk);
 	g_engine->getDocument()->streamDidFinish(_id);
 }
 
@@ -312,7 +302,7 @@ void StreamFeedManager::closeStreamFeed(StreamFeed *streamFeed) {
 
 void StreamFeedManager::registerChannelClient(ChannelClient *client) {
 	if (_channelClients.getValOrDefault(client->channelIdent()) != nullptr) {
-		error("%s: Channel ident %d already has a client", __func__, client->channelIdent());
+		warning("%s: Channel %s already has a client", __func__, g_engine->formatAssetNameForChannelIdent(client->channelIdent()).c_str());
 	}
 	_channelClients.setVal(client->channelIdent(), client);
 }

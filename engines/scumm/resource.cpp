@@ -65,7 +65,6 @@ static bool checkTryMedia(BaseScummFile *handle);
 /* Open a room */
 void ScummEngine::openRoom(const int room) {
 	bool result;
-	byte encByte = 0;
 
 	debugC(DEBUG_GENERAL, "openRoom(%d)", room);
 	assert(room >= 0);
@@ -102,22 +101,11 @@ void ScummEngine::openRoom(const int room) {
 
 		Common::Path filename(generateFilename(room));
 
-		// Determine the encryption, if any.
-		if (_game.features & GF_USE_KEY) {
-			if (_game.version <= 3)
-				encByte = 0xFF;
-			else if ((_game.version == 4) && (room == 0 || room >= 900))
-				encByte = 0;
-			else
-				encByte = 0x69;
-		} else
-			encByte = 0;
-
 		if (room > 0 && (_game.version == 8))
 			VAR(VAR_CURRENTDISK) = diskNumber;
 
 		// Try to open the file
-		result = openResourceFile(filename, encByte);
+		result = openResourceFile(filename, getEncByte(room));
 
 		if (result) {
 			if (room == 0)
@@ -138,7 +126,7 @@ void ScummEngine::openRoom(const int room) {
 	do {
 		char buf[16];
 		snprintf(buf, sizeof(buf), "%.3d.lfl", room);
-		encByte = 0;
+		byte encByte = 0;
 		if (openResourceFile(buf, encByte))
 			break;
 		askForDisk(buf, diskNumber);
@@ -203,6 +191,19 @@ bool ScummEngine::openFile(BaseScummFile &file, const Common::Path &filename, bo
 	}
 
 	return result;
+}
+
+byte ScummEngine::getEncByte(int room) {
+	// Determine the encryption, if any.
+	if (_game.features & GF_USE_KEY) {
+		if (_game.version <= 3)
+			return 0xFF;
+		else if ((_game.version == 4) && (room == 0 || room >= 900))
+			return 0;
+		else
+			return 0x69;
+	} else
+		return 0;
 }
 
 bool ScummEngine::openResourceFile(const Common::Path &filename, byte encByte) {
@@ -663,6 +664,20 @@ int ScummEngine::loadResource(ResType type, ResId idx) {
 	if (roomNr == 0)
 		roomNr = _roomResource;
 
+	if (_game.id == GID_BASEBALL2001) {
+		Common::Path resFilename = Common::Path(Common::String::format("room-%d-%d.scr", roomNr, idx));
+		if (Common::File::exists(resFilename)) {
+			Common::File resFile;
+			if (resFile.open(resFilename)) {
+				size = resFile.size();
+				resFile.read(_res->createResource(type, idx, size), size);
+				debug(1, "loadResource(%s,%d): resource loaded from file %s", nameOfResType(type), idx, resFilename.toString().c_str());
+
+				return 1;
+			}
+		}
+	}
+
 	fileOffs = getResourceRoomOffset(type, idx);
 	if (fileOffs == RES_INVALID_OFFSET)
 		return 0;
@@ -865,13 +880,13 @@ byte *ResourceManager::createResource(ResType type, ResId idx, uint32 size) {
 	}
 
 	// HE70+ reuses the resource without deallocating it if it has the same size.
-	// 
+	//
 	// Not replicating this behavior this can creare very rare gfx corruption issues, e.g.
 	// #13864 ("SCUMM/HE: Blue's Treasure Hunt - Missing Backgrounds during some animations"),
 	// in which a WIZ transparent (color 5) image is prepared for it to serve as a canvas for
 	// some Smacker videos, only for the former to be nuked and replaced with an all 0 (black)
 	// empty image.
-	// 
+	//
 	// This is just one of the many differences of our system versus the HE resource allocation system...
 	// The whole thing should probably be rewritten at some point to match the source code. ;-)
 	if (_vm->_game.heversion >= 70 && _types[type][idx]._address && _types[type][idx]._size == size) {
@@ -1718,6 +1733,52 @@ void ScummEngine::applyWorkaroundIfNeeded(ResType type, int idx) {
 		return;
 
 	int size = getResourceSize(type, idx);
+
+	// WORKAROUND: Maniac Mansion (NES) logo scroll gets stuck because ScummVM uses a 256px wide view.
+	// The original expects a 224px wide screen, so the camera never reaches the script's wait threshold.
+	// Patch script 120 at runtime by locating the camera-wait loop and changing its compare.
+
+	if (_game.id == GID_MANIAC &&
+		_game.platform == Common::kPlatformNES) {
+
+		if (type == rtScript && idx == 120) {
+			byte *scriptRes = getResourceAddress(type, idx);
+			const uint32 scriptResSize = (size > 0) ? (uint32)size : 0;
+
+			if (scriptRes && scriptResSize >= 8) {
+				byte *code = scriptRes + 8;
+				const uint32 codeSize = scriptResSize - 8;
+
+				const byte logoCamWaitPrefix[] = {
+					0x32, 0x0A,
+					0x12, 0x46,
+					0x80,
+					0x38, 0x02
+				};
+
+				const uint32 prefixSize = (uint32)sizeof(logoCamWaitPrefix);
+
+				if (codeSize >= prefixSize + 5) {
+					for (uint32 i = 0; i + prefixSize + 5 <= codeSize; ++i) {
+						if (memcmp(code + i, logoCamWaitPrefix, prefixSize) == 0) {
+							const uint32 immOff = i + 7;
+							const uint32 tailOff = i + 8;
+
+							if (code[tailOff + 0] == 0x00 &&
+								code[tailOff + 1] == 0xF9 &&
+								code[tailOff + 2] == 0xFF &&
+								code[tailOff + 3] == 0x62) {
+
+								code[immOff] = 0x2C;
+								break;
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
 
 	// WORKAROUND: FM-TOWNS Zak used the extra 40 pixels at the bottom to increase the inventory to 10 items
 	// if we trim to 200 pixels, we can show only 6 items

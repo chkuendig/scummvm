@@ -23,7 +23,7 @@
 #define NUVIE_CORE_EVENT_H
 
 #include "ultima/shared/std/containers.h"
-#include "ultima/shared/std/string.h"
+#include "common/str.h"
 #include "ultima/nuvie/misc/call_back.h"
 #include "ultima/nuvie/keybinding/keys_enum.h"
 #include "ultima/nuvie/core/obj_manager.h"
@@ -161,7 +161,7 @@ struct EventInput_s {
 	Common::KeyCode key; // last key entered, if capturing input
 	ActionKeyType action_key_type; // last ActionKeyType entered if capturing input
 	MapCoord *loc; // target location, or direction if relative ???
-	Std::string *str; // ???
+	Common::String *str; // ???
 //    };
 	void set_loc(const MapCoord &c);
 	EventInput_s() : loc(0), str(0), obj(0), actor(0), get_direction(false), get_text(false),
@@ -203,7 +203,7 @@ private:
 	Common::Event event;
 	EventMode mode, last_mode;
 	EventInput input; // collected/received input (of any type)
-// Std::vector<EventMode> mode_stack; // current mode is at the end of the list
+// Common::Array<EventMode> mode_stack; // current mode is at the end of the list
 	int ts; //timestamp for TimeLeft() method.
 	int altCodeVal;
 	uint16 active_alt_code; // alt-code that needs more input

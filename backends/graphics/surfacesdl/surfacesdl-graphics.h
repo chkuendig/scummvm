@@ -111,14 +111,16 @@ public:
 	void clearFocusRectangle() override;
 
 	Graphics::PixelFormat getOverlayFormat() const override { return _overlayFormat; }
+	void showOverlay(bool inGUI) override;
+	void hideOverlay() override;
 	void clearOverlay() override;
 	void grabOverlay(Graphics::Surface &surface) const override;
 	void copyRectToOverlay(const void *buf, int pitch, int x, int y, int w, int h) override;
 	int16 getOverlayHeight() const override { return _videoMode.overlayHeight; }
 	int16 getOverlayWidth() const override { return _videoMode.overlayWidth; }
 
-	void setMouseCursor(const void *buf, uint w, uint h, int hotspotX, int hotspotY, uint32 keycolor, bool dontScale = false, const Graphics::PixelFormat *format = NULL, const byte *mask = NULL) override;
-	void setMouseCursor(const void *buf, uint w, uint h, int hotspotX, int hotspotY, uint32 keycolor, bool dontScale, const Graphics::PixelFormat *format, const byte *mask, bool disableKeyColor);
+	void setMouseCursor(const void *buf, uint w, uint h, int hotspotX, int hotspotY, uint32 keycolor, const Graphics::PixelFormat *format, const byte *mask, frac_t scaleX, frac_t scaleY) override;
+	void setMouseCursor(const void *buf, uint w, uint h, int hotspotX, int hotspotY, uint32 keycolor, const Graphics::PixelFormat *format, const byte *mask, frac_t scaleX, frac_t scaleY, bool disableKeyColor);
 	void setCursorPalette(const byte *colors, uint start, uint num) override;
 
 #ifdef USE_OSD
@@ -245,9 +247,7 @@ protected:
 		bool needTextureUpdate;
 		bool needDisplayResize;
 #endif
-#ifdef USE_RGB_COLOR
 		bool formatChanged;
-#endif
 
 		TransactionDetails() {
 			sizeChanged = false;
@@ -258,9 +258,7 @@ protected:
 			needTextureUpdate = false;
 			needDisplayResize = false;
 #endif
-#ifdef USE_RGB_COLOR
 			formatChanged = false;
-#endif
 		}
 	};
 	TransactionDetails _transactionDetails;
@@ -285,9 +283,7 @@ protected:
 		int screenWidth, screenHeight;
 		int overlayWidth, overlayHeight;
 		int hardwareWidth, hardwareHeight;
-#ifdef USE_RGB_COLOR
 		Graphics::PixelFormat format;
-#endif
 
 		VideoState() {
 			setup = false;
@@ -311,9 +307,7 @@ protected:
 			overlayHeight = 0;
 			hardwareWidth = 0;
 			hardwareHeight = 0;
-#ifdef USE_RGB_COLOR
 			// format set to 0 values by Graphics::PixelFormat constructor
-#endif
 		}
 	};
 	VideoState _videoMode, _oldVideoMode;
@@ -389,14 +383,11 @@ protected:
 
 	SDL_Rect _mouseLastRect, _mouseNextRect;
 	MousePos _mouseCurState;
-#ifdef USE_RGB_COLOR
 	uint32 _mouseKeyColor;
-#else
-	byte _mouseKeyColor;
-#endif
 	bool _disableMouseKeyColor;
 	byte _mappedMouseKeyColor;
-	bool _cursorDontScale;
+	frac_t _cursorScaleX;
+	frac_t _cursorScaleY;
 	bool _cursorPaletteDisabled;
 	SDL_Surface *_mouseOrigSurface;
 	SDL_Surface *_mouseSurface;

@@ -3,6 +3,7 @@ MODULE := engines/nancy
 MODULE_OBJS = \
   action/actionmanager.o \
   action/actionrecord.o \
+  action/actionzone.o \
   action/arfactory.o \
   action/autotext.o \
   action/datarecords.o \
@@ -19,16 +20,26 @@ MODULE_OBJS = \
   action/puzzle/arcadepuzzle.o \
   action/puzzle/assemblypuzzle.o \
   action/puzzle/bballpuzzle.o \
+  action/puzzle/beadpuzzle.o \
+  action/puzzle/boardgamepuzzle.o \
   action/puzzle/bulpuzzle.o \
   action/puzzle/bombpuzzle.o \
+  action/puzzle/cardgamepuzzle.o \
   action/puzzle/collisionpuzzle.o \
   action/puzzle/cubepuzzle.o \
   action/puzzle/cuttingpuzzle.o \
+  action/puzzle/dotconnectpuzzle.o \
+  action/puzzle/drivingpuzzle.o \
+  action/puzzle/gridmappuzzle.o \
   action/puzzle/hamradiopuzzle.o \
   action/puzzle/leverpuzzle.o \
+  action/puzzle/magnetmazepuzzle.o \
   action/puzzle/mazechasepuzzle.o \
   action/puzzle/matchpuzzle.o \
   action/puzzle/memorypuzzle.o \
+  action/puzzle/mindpuzzle.o \
+  action/puzzle/minigolfpuzzle.o \
+  action/puzzle/mirrorlightpuzzle.o \
   action/puzzle/mouselightpuzzle.o \
   action/puzzle/multibuildpuzzle.o \
   action/puzzle/onebuildpuzzle.o \
@@ -43,7 +54,9 @@ MODULE_OBJS = \
   action/puzzle/rotatinglockpuzzle.o \
   action/puzzle/safedialpuzzle.o \
   action/puzzle/setplayerclock.o \
+  action/puzzle/sewingmachinepuzzle.o \
   action/puzzle/sliderpuzzle.o \
+  action/puzzle/sortpuzzle.o \
   action/puzzle/soundequalizerpuzzle.o \
   action/puzzle/soundmatchpuzzle.o \
   action/puzzle/spigotpuzzle.o \
@@ -52,14 +65,21 @@ MODULE_OBJS = \
   action/puzzle/towerpuzzle.o \
   action/puzzle/turningpuzzle.o \
   action/puzzle/twodialpuzzle.o \
+  action/puzzle/typingquizpuzzle.o \
   action/puzzle/whalesurvivorpuzzle.o \
   ui/fullscreenimage.o \
   ui/animatedbutton.o \
   ui/button.o \
   ui/clock.o \
+  ui/cellphonepopup.o \
+  ui/conversationpopup.o \
   ui/inventorybox.o \
+  ui/inventorypopup.o \
+  ui/notebookpopup.o \
   ui/ornaments.o \
   ui/scrollbar.o \
+  ui/scrolltextbox.o \
+  ui/taskbar.o \
   ui/textbox.o \
   ui/viewport.o \
   state/credits.o \
@@ -84,6 +104,7 @@ MODULE_OBJS = \
   font.o \
   graphics.o \
   iff.o \
+  movieplayer.o \
   input.o \
   metaengine.o \
   nancy.o \
@@ -91,6 +112,7 @@ MODULE_OBJS = \
   renderobject.o \
   resource.o \
   sound.o \
+  sound_vorbis.o \
   util.o \
   video.o
 

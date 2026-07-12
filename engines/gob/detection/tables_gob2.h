@@ -338,7 +338,7 @@
 // -- Windows --
 
 {
-	{
+	{ // Used by ADI4 unlockable games
 		"gob2",
 		"v1.02",
 		AD_ENTRY2s("intro.stk", "285d7340f98ebad65d465585da12910b", 837286,

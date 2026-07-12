@@ -153,14 +153,6 @@ void ScummEngine::resetPalette(bool isBootUp) {
 		{ 0x00, 0x00, 0x00, 0x55, 0xFF, 0xFF, 0xFF, 0x55, 0xFF, 0xFF, 0xFF, 0xFF }
 	};
 
-	static const byte tableHercAPalette[] = {
-		0x00, 0x00, 0x00,	0xAE, 0x69, 0x38
-	};
-
-	static const byte tableHercGPalette[] = {
-		0x00, 0x00, 0x00,	0x00, 0xFF, 0x00
-	};
-
 	// Palette based on Apple IIgs Technical Notes: IIgs 2523063 Master Color Values
 	// Rearranged to match C64 color positions
 	static const byte tableApple2gsPalette[] = {
@@ -195,9 +187,9 @@ void ScummEngine::resetPalette(bool isBootUp) {
 	_enableEGADithering = false;
 
 	if (_renderMode == Common::kRenderHercA) {
-		setPaletteFromTable(tableHercAPalette, sizeof(tableHercAPalette) / 3);
+		setPaletteFromTable(Graphics::HGC_A_PALETTE, sizeof(Graphics::HGC_A_PALETTE) / 3);
 	} else if (_renderMode == Common::kRenderHercG) {
-		setPaletteFromTable(tableHercGPalette, sizeof(tableHercGPalette) / 3);
+		setPaletteFromTable(Graphics::HGC_G_PALETTE, sizeof(Graphics::HGC_G_PALETTE) / 3);
 	} else if (_renderMode == Common::kRenderCGA || _renderMode == Common::kRenderCGAComp) {
 		setPaletteFromTable(_cgaColors[cgaPalIndex * 2 + cgaPalIntensity], sizeof(_cgaColors[0]) / 3);
 		// Cursor palette
@@ -1497,9 +1489,11 @@ void ScummEngine::setCurrentPalette(int palindex) {
 			// Might be glitchy, though...
 			const byte *p = getPalettePtr(_curPalIndex, _roomResource);
 			for (int i = 0; i < 256; ++i) {
-				byte col = egaFindBestMatch(p[0], p[1], p[2]);
-				_egaColorMap[0][i] = col & 0x0F;
-				_egaColorMap[1][i] = col >> 4;
+				if (_game.version < 6 || i == 15 || p[0] < 252 || p[1] < 252 || p[2] < 252) {
+					byte col = egaFindBestMatch(p[0], p[1], p[2]);
+					_egaColorMap[0][i] = col & 0x0F;
+					_egaColorMap[1][i] = col >> 4;
+				}
 				p += 3;
 			}
 		} else {
@@ -1509,6 +1503,8 @@ void ScummEngine::setCurrentPalette(int palindex) {
 				_egaColorMap[1][i] = *pals++ >> 4;
 			}
 		}
+		_virtscr[kMainVirtScreen].setDirtyRange(0, _virtscr[kMainVirtScreen].h);
+		_virtscr[kVerbVirtScreen].setDirtyRange(0, _virtscr[kVerbVirtScreen].h);
 	} else {
 		setPaletteFromPtr(pals);
 	}
