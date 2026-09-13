@@ -190,12 +190,18 @@ bool BoxStorage::uploadStreamSupported() {
 	return false;
 }
 
-Networking::Request *BoxStorage::streamFileById(const Common::String &id, Networking::NetworkReadStreamCallback callback, Networking::ErrorCallback errorCallback) {
+Networking::Request *BoxStorage::streamFileById(const Common::String &id, Networking::NetworkReadStreamCallback callback, Networking::ErrorCallback errorCallback, uint64 startPos, uint64 length) {
 	if (callback) {
 		Common::String url = Common::String::format(BOX_API_FILES_CONTENT, id.c_str());
 		Common::String header = "Authorization: Bearer " + _token;
 		Networking::RequestHeaders *headersList = new Networking::RequestHeaders();
 		headersList->push_back(header);
+		// Add Range header if needed
+		if (startPos > 0 || length > 0) {
+			Common::String rangeHeader = Common::String::format("Range: bytes=%llu-%s", startPos,
+					length > 0 ? Common::String::format("%llu", startPos + length - 1).c_str() : "");
+			headersList->push_back(rangeHeader);
+		}
 		Networking::NetworkReadStream *stream = Networking::NetworkReadStream::make(url.c_str(), headersList, "");
 		(*callback)(Networking::NetworkReadStreamResponse(nullptr, stream));
 	}
