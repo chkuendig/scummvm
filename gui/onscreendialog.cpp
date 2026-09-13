@@ -53,6 +53,32 @@ void OnScreenDialog::reflowLayout() {
 	Dialog::reflowLayout();
 
 	_x = _y = 0;
+
+#ifdef EMSCRIPTEN
+	// Position the panel inside the *game* draw area instead of the window
+	// corner. The browser canvas is always fullscreen, so the game is
+	// letterboxed into it (black bars) whenever the aspect ratios differ (e.g.
+	// a phone in portrait). The pointer is clipped to the game rect, so a panel
+	// left in the black bars is visible but unreachable. The game rect is not
+	// exposed to the GUI, so estimate it as the aspect-fit-centered game area
+	// within the overlay - the same mapping EventRecorder::notifyEvent() uses to
+	// translate clicks, so the two stay consistent. Place the panel at the
+	// top-center of that area (the center column is inside the rect for any
+	// letterboxing). On desktop the game fills its window, so the stock (0,0)
+	// window corner is already reachable and this is skipped.
+	const int overlayW = g_system->getOverlayWidth();
+	const int overlayH = g_system->getOverlayHeight();
+	const int gameW = g_system->getWidth();
+	const int gameH = g_system->getHeight();
+	_x = MAX(0, (overlayW - _w) / 2);
+	if (gameW > 0 && gameH > 0) {
+		// Aspect-fit height of the game area within the overlay/window.
+		int fitH = overlayH;
+		if ((int64)overlayW * gameH < (int64)overlayH * gameW)
+			fitH = (int)(((int64)overlayW * gameH) / gameW);
+		_y = MAX(0, (overlayH - fitH) / 2);
+	}
+#endif
 }
 
 void OnScreenDialog::releaseFocus() {

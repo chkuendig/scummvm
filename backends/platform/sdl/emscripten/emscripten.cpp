@@ -33,6 +33,9 @@
 #include "backends/platform/sdl/emscripten/emscripten.h"
 #include "backends/printing/emscripten/emscripten-printman.h"
 #include "backends/timer/emscripten/emscripten-timer.h"
+#ifdef ENABLE_EVENTRECORDER
+#include "gui/EventRecorder.h"
+#endif
 #include "common/file.h"
 #include "common/fs.h"
 #include "common/translation.h"
@@ -205,11 +208,34 @@ void OSystem_Emscripten::delayMillis(uint msecs) {
 		return;
 	}
 #ifdef ENABLE_EVENTRECORDER
-	if (!g_eventRec.processDelayMillis())
-#endif
+	// The recorder suppresses real delays for deterministic timing, but on
+	// Emscripten SDL_Delay is the asyncify suspend point — never yielding
+	// would spin the wasm main loop synchronously and hang the tab. Yield
+	// with a zero-length delay instead; determinism comes from the
+	// recorder's fake timer, not the wall-clock delay.
+	if (g_eventRec.processDelayMillis())
+		SDL_Delay(0);
+	else
+		SDL_Delay(msecs);
+#else
 	SDL_Delay(msecs);
+#endif
 
+	// SDL timers don't work in this port, so timers are pumped cooperatively
+	// from here. With the event recorder enabled the active timer manager is
+	// owned by the recorder (and swapped on record/playback transitions) —
+	// but only after initBackend() has handed it over; the config/index
+	// downloads run before that, so fall back to the backend member until
+	// the recorder has one.
+#ifdef ENABLE_EVENTRECORDER
+	DefaultTimerManager *timerManager = g_eventRec.getTimerManager();
+	if (!timerManager)
+		timerManager = dynamic_cast<DefaultTimerManager *>(_timerManager);
+	if (timerManager)
+		timerManager->checkTimers();
+#else
 	((EmscriptenTimerManager *)_timerManager)->checkTimers();
+#endif
 	lastSleep = getMillis();
 }
 

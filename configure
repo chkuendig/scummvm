@@ -5237,12 +5237,10 @@ PLUGIN_LDFLAGS		+= -Wl,-T$(srcdir)/backends/plugins/ds/plugin.ld -mthumb -mthumb
 		# (e.g. missing theoradec) lacks entire suspend subgraphs and yields an
 		# incomplete list that corrupts asyncify state in engines using them.
 		#
-		# The narrowing is a release-only size/compile-memory optimization: it
-		# is only applied for --enable-release. Debug/dev builds keep the
-		# always-correct ASYNCIFY_IMPORTS=["*"] so an out-of-date list can never
-		# corrupt asyncify state while iterating (and so features not covered by
-		# a CI-parity harvest, e.g. --enable-eventrecorder, are unaffected).
-		if test "$_release_build" = yes ; then
+		# Narrow imports only for release builds without the event recorder.
+		# The checked-in list was harvested without recorder support, so both
+		# recorder and debug/dev builds keep ASYNCIFY_IMPORTS=["*"].
+		if test "$_release_build" = yes && test "$_eventrec" != yes ; then
 			_emscripten_asyncify_imports='@$(srcdir)/dists/emscripten/plugin-asyncify-imports.json'
 		else
 			_emscripten_asyncify_imports='["*"]'
