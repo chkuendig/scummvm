@@ -19,20 +19,20 @@
  *
  */
 
-#ifndef BACKENDS_PLATFORM_IOS7_IOS7_GAMEPAD_CONTROLLER_H
-#define BACKENDS_PLATFORM_IOS7_IOS7_GAMEPAD_CONTROLLER_H
+#ifndef BACKENDS_PLATFORM_SDL_TOUCH_ACTION_H
+#define BACKENDS_PLATFORM_SDL_TOUCH_ACTION_H
 
-#include "backends/platform/ios7/ios7_game_controller.h"
+/**
+ * Finger-action type for the SDL on-screen touch controls. Shared between the
+ * event source (on-screen mode-toggle hit-testing) and the on-screen gamepad
+ * module, so the event source does not need to pull in the whole gamepad
+ * (touchcontrols.h) just to name a finger action.
+ */
+enum TouchAction {
+	kActionDown = 0,
+	kActionMove = 1,
+	kActionUp = 2,
+	kActionCancel = 3
+};
 
-API_AVAILABLE(ios(7.0))
-@interface GamepadController : GameController
-
-- (id)initWithView:(iPhoneView *)view;
-- (void)virtualController:(bool)connect;
-// True when a physical controller (excluding the on-screen virtual one) is
-// currently connected.
-- (BOOL)isPhysicalControllerConnected;
-
-@end
-
-#endif /* BACKENDS_PLATFORM_IOS7_IOS7_GAMEPAD_CONTROLLER_H */
+#endif

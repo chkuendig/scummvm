@@ -29,8 +29,11 @@
 #include "backends/events/sdl/sdl-events.h"
 #include "backends/log/log.h"
 #include "backends/platform/sdl/sdl-window.h"
+#include "backends/platform/sdl/touchcontrols.h"
 
 #include "common/array.h"
+#include "common/rect.h"
+#include "common/touch-mode.h"
 
 #ifdef USE_OPENGL
 #define USE_MULTIPLE_RENDERERS
@@ -59,6 +62,36 @@ public:
 	void setFeatureState(Feature f, bool enable) override;
 	bool getFeatureState(Feature f) override;
 
+	/**
+	 * True if the system has a real touchscreen. Base SDL trusts SDL's touch
+	 * device list; Emscripten overrides this because browsers mis-report touch.
+	 */
+	virtual bool hasTouchscreen() const;
+
+	/**
+	 * On-screen touch controls (gamepad overlay), rendered by the active SDL
+	 * graphics manager. The mode values are shared with the GUI and the other
+	 * backends via common/touch-mode.h.
+	 */
+	typedef Common::TouchMode TouchMode;
+
+	TouchControls &getTouchControls() { return _touchControls; }
+	TouchMode getTouchMode() const { return _touchMode; }
+	/**
+	 * Marks the GUI/launcher as up and running: past this point it is safe to
+	 * load loose /data/ files, so we defer loading the gamepad asset until here.
+	 */
+	void setTouchUiReady() { _touchUiReady = true; }
+	bool isTouchUiReady() const { return _touchUiReady; }
+	/** Cycle to the next touch mode (used by the on-screen toggle button). */
+	void cycleTouchMode();
+	/** Recompute the active touch mode from the per-context presets. */
+	void applyTouchSettings();
+	/** True if the on-screen mode-toggle button should be shown/hit-tested. */
+	bool isTouchToggleVisible() const;
+	/** Rectangle of the on-screen mode-toggle button, in the given screen size. */
+	Common::Rect getTouchToggleRect(int screenW, int screenH) const;
+
 	// Override functions from ModularBackend and OSystem
 	void initBackend() override;
 	void engineInit() override;
@@ -85,6 +118,12 @@ public:
 #if SDL_VERSION_ATLEAST(2, 0, 14)
 	bool openUrl(const Common::String &url) override;
 #endif
+
+	/**
+	 * Inject a synthetic event into the SDL event source so it is routed
+	 * through the keymapper (used by the on-screen touch controls).
+	 */
+	void pushEvent(const Common::Event &ev);
 
 	void setWindowCaption(const Common::U32String &caption) override;
 	void addSysArchivesToSearchSet(Common::SearchSet &s, int priority = 0) override;
@@ -143,6 +182,24 @@ protected:
 	SdlWindow *_window;
 
 	SdlGraphicsManager::State _gfxManagerState;
+
+	// On-screen touch controls (owned here; rendered by the active SDL graphics manager).
+	TouchControls _touchControls;
+	TouchMode _touchMode;
+	bool _touchUiReady = false;
+
+	// The touch presets are keyed per context (GUI/menus, 2D game, 3D game).
+	// applyTouchSettings() re-reads the preset on every overlay show/hide and
+	// screen change; the on-screen toggle (cycleTouchMode) stores its choice in
+	// the ConfMan session domain so it survives those re-applications until the
+	// application is relaunched.
+	enum TouchContext {
+		kTouchContextMenus = 0,
+		kTouchContext2d = 1,
+		kTouchContext3d = 2
+	};
+	TouchContext currentTouchContext();
+	static const char *touchModeKeyForContext(TouchContext context);
 
 #if defined(USE_OPENGL_GAME) || defined(USE_OPENGL_SHADERS)
 	// Graphics capabilities
