@@ -19,39 +19,20 @@
  *
  */
 
-/*
- * Copyright (C) 2006-2010 - Frictional Games
- *
- * This file is part of HPL1 Engine.
- */
+precision highp float;
 
-#ifndef HPL_OCCLUSION_QUERY_OGL_H
-#define HPL_OCCLUSION_QUERY_OGL_H
+attribute vec4 a_position;
+attribute vec2 a_uv;
+attribute vec4 a_color;
 
-#include "common/scummsys.h"
-#include "hpl1/engine/graphics/OcclusionQuery.h"
-#include "hpl1/opengl.h"
+varying vec2 v_uv;
+varying vec4 v_color;
 
-#if defined(HPL1_USE_OPENGL) && !USE_FORCED_GLES2
+uniform mat4 worldViewProj;
 
-namespace hpl {
-
-class cOcclusionQueryOGL : public iOcclusionQuery {
-public:
-	cOcclusionQueryOGL();
-	~cOcclusionQueryOGL();
-
-	void Begin();
-	void End();
-	bool FetchResults();
-	unsigned int GetSampleCount();
-
-public:
-	int mlLastSampleCount;
-	unsigned int mlQueryId;
-};
-
-} // namespace hpl
-
-#endif // defined(HPL1_USE_OPENGL) && !USE_FORCED_GLES2
-#endif // HPL_OCCLUSION_QUERY_H
+void main()
+{
+	gl_Position = worldViewProj * a_position;
+	v_uv = a_uv;
+	v_color = a_color;
+}

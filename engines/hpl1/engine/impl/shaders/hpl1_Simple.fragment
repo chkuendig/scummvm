@@ -19,39 +19,21 @@
  *
  */
 
-/*
- * Copyright (C) 2006-2010 - Frictional Games
- *
- * This file is part of HPL1 Engine.
- */
+precision highp float;
 
-#ifndef HPL_OCCLUSION_QUERY_OGL_H
-#define HPL_OCCLUSION_QUERY_OGL_H
+varying vec2 v_uv;
+varying vec4 v_color;
 
-#include "common/scummsys.h"
-#include "hpl1/engine/graphics/OcclusionQuery.h"
-#include "hpl1/opengl.h"
+uniform sampler2D diffuseMap;
 
-#if defined(HPL1_USE_OPENGL) && !USE_FORCED_GLES2
-
-namespace hpl {
-
-class cOcclusionQueryOGL : public iOcclusionQuery {
-public:
-	cOcclusionQueryOGL();
-	~cOcclusionQueryOGL();
-
-	void Begin();
-	void End();
-	bool FetchResults();
-	unsigned int GetSampleCount();
-
-public:
-	int mlLastSampleCount;
-	unsigned int mlQueryId;
-};
-
-} // namespace hpl
-
-#endif // defined(HPL1_USE_OPENGL) && !USE_FORCED_GLES2
-#endif // HPL_OCCLUSION_QUERY_H
+// _hpl1_alphaOverride / _hpl1_constantColor are declared in the
+// hpl1_gles2compat.fragment preamble that CGProgram prepends to every
+// fragment shader on GLES2. Default is 0/(1,1,1,1) — texture alpha
+// passes through unchanged.
+void main()
+{
+	vec4 tex = texture2D(diffuseMap, v_uv);
+	gl_FragColor = tex * v_color;
+	if (_hpl1_alphaOverride > 0.5)
+		gl_FragColor.a = _hpl1_constantColor.a;
+}
