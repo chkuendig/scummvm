@@ -191,7 +191,6 @@
       setStatus: function (text) {
         if (!Module.setStatus.last) {
           Module.setStatus.last = '';
-          document.getElementById('download-modal-progress-fill').style.transition = 'width 0.5s ease';
         }
         document.getElementById('download-modal').style.display = 'block';
         if (text === Module.setStatus.last) { return; }
