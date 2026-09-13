@@ -394,6 +394,25 @@ if [[ "make" =~ $(echo ^\(${TASKS}\)$) || "build" =~ $(echo ^\(${TASKS}\)$) ]]; 
     sed -i 's/var silence_callback = function() {/var silence_callback = function() { if (typeof Asyncify !== "undefined" \&\& Asyncify.state !== Asyncify.State.Normal) return;/g' "${ROOT_FOLDER}/scummvm.js"
     echo "Patched asyncify guard into silence_callback ($(grep -c 'Asyncify.State.Normal) return;' "${ROOT_FOLDER}/scummvm.js") site(s))"
   fi
+
+  # The silence_callback guard above only covers the autoplay-blocked
+  # fallback timer. SDL3's *real* ScriptProcessorNode.onaudioprocess handlers
+  # (playback and recording) share the identical raw dynCall('ip', ...)
+  # shape and were called out as an open gap in that fix ("could in theory
+  # hit the same race mid-game"). They fire continuously once an audio
+  # graph is running, independent of autoplay-block state, so any Asyncify
+  # busy-wait during active playback - e.g. VirtualFileSystemNode::
+  # waitForDirectoryCache() while the GUI file browser lists an HTTP-backed
+  # folder (the "Add Game" dialog's bundled data entry) - can re-enter and
+  # corrupt the asyncify state the same way. Guard both real handlers too.
+  if [[ -f "${ROOT_FOLDER}/scummvm.js" ]] && ! grep -q 'function(audioProcessingEvent) { if (typeof Asyncify' "${ROOT_FOLDER}/scummvm.js"; then
+    sed -i 's/function(audioProcessingEvent) { if ((SDL3 === undefined) || (SDL3.audio_recording === undefined)) { return; }/function(audioProcessingEvent) { if (typeof Asyncify !== "undefined" \&\& Asyncify.state !== Asyncify.State.Normal) return; if ((SDL3 === undefined) || (SDL3.audio_recording === undefined)) { return; }/' "${ROOT_FOLDER}/scummvm.js"
+    echo "Patched asyncify guard into audio_recording onaudioprocess"
+  fi
+  if [[ -f "${ROOT_FOLDER}/scummvm.js" ]] && ! grep -q 'function (e) { if (typeof Asyncify' "${ROOT_FOLDER}/scummvm.js"; then
+    sed -i 's/function (e) { if ((SDL3 === undefined) || (SDL3.audio_playback === undefined)) { return; }/function (e) { if (typeof Asyncify !== "undefined" \&\& Asyncify.state !== Asyncify.State.Normal) return; if ((SDL3 === undefined) || (SDL3.audio_playback === undefined)) { return; }/' "${ROOT_FOLDER}/scummvm.js"
+    echo "Patched asyncify guard into audio_playback onaudioprocess"
+  fi
 fi
 
 #################################
