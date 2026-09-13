@@ -28,9 +28,35 @@
 #include "common/debug.h"
 #include "common/system.h"
 
+namespace {
+// Chunk downloads share the hosting behind this demo with everything else on
+// the CDN/origin, so a transient 429 (rate limit) or 502/503/504 (upstream
+// hiccup) - or the connection being interrupted before headers arrive, coded
+// here as HTTP code 0 - is expected occasionally, not exceptional. Retrying a
+// handful of times with a short linear backoff is enough for those to clear;
+// anything else (404 etc.) is a real failure and stays fatal below.
+const int kMaxDownloadAttempts = 4;
+const uint32 kRetryBaseDelayMs = 500;
+
+bool isRetryableHttpStatus(long httpResponseCode) {
+	switch (httpResponseCode) {
+	case 0: // request interrupted/aborted before a status was received
+	case 429:
+	case 500:
+	case 502:
+	case 503:
+	case 504:
+		return true;
+	default:
+		return false;
+	}
+}
+} // End of anonymous namespace
+
 HttpReadStream::HttpReadStream(const Common::String &url, const Common::String &displayName,
 							   const Common::String &cachePath, uint64 fileSize)
-	: VirtualReadStream(displayName, cachePath, fileSize), _url(url) {
+	: VirtualReadStream(displayName, cachePath, fileSize), _url(url),
+	  _lastDownloadFailed(false), _lastDownloadRetryable(false), _lastHttpResponseCode(0) {
 }
 
 HttpReadStream::~HttpReadStream() {
@@ -43,8 +69,15 @@ void HttpReadStream::downloadFileCallback(const Networking::DataResponse &respon
 }
 
 void HttpReadStream::errorCallbackDownloadFile(const Networking::ErrorResponse &errorResponse) {
-	error("HttpReadStream::errorCallbackDownloadFile called - %s", errorResponse.response.c_str());
-	// Error is handled by SessionRequest
+	_lastDownloadFailed = true;
+	_lastHttpResponseCode = errorResponse.httpResponseCode;
+	_lastErrorMessage = errorResponse.response;
+	_lastDownloadRetryable = isRetryableHttpStatus(errorResponse.httpResponseCode);
+	warning("HttpReadStream::errorCallbackDownloadFile called - %s (HTTP %ld)%s",
+			errorResponse.response.c_str(), errorResponse.httpResponseCode,
+			_lastDownloadRetryable ? ", will retry" : "");
+	// Fatal handling (if not retried) happens in downloadChunk() once the
+	// request has fully settled, so we don't abort mid-callback here.
 }
 
 void HttpReadStream::downloadChunk(uint32 chunkIndex, uint64 chunkStart, uint64 chunkLength) {
@@ -52,35 +85,52 @@ void HttpReadStream::downloadChunk(uint32 chunkIndex, uint64 chunkStart, uint64 
 
 	Common::String chunkPath = getChunkPath(chunkIndex);
 
-	debug(5, "HttpReadStream: Downloading chunk %u: bytes %llu-%llu",
-		  chunkIndex + 1, chunkStart, chunkStart + chunkLength - 1);
+	for (int attempt = 1; attempt <= kMaxDownloadAttempts; attempt++) {
+		debug(5, "HttpReadStream: Downloading chunk %u: bytes %llu-%llu (attempt %d/%d)",
+			  chunkIndex + 1, chunkStart, chunkStart + chunkLength - 1, attempt, kMaxDownloadAttempts);
 
-	Networking::DataCallback callback = new Common::Callback<HttpReadStream, const Networking::DataResponse &>((HttpReadStream *)this, &HttpReadStream::downloadFileCallback);
-	Networking::ErrorCallback errorCallback = new Common::Callback<HttpReadStream, const Networking::ErrorResponse &>((HttpReadStream *)this, &HttpReadStream::errorCallbackDownloadFile);
+		_lastDownloadFailed = false;
+		_lastDownloadRetryable = false;
 
-	// Create and start the download request using SessionRequest
-	Networking::SessionRequest *request = new Networking::SessionRequest(_url, Common::Path(chunkPath), callback, errorCallback);
+		Networking::DataCallback callback = new Common::Callback<HttpReadStream, const Networking::DataResponse &>((HttpReadStream *)this, &HttpReadStream::downloadFileCallback);
+		Networking::ErrorCallback errorCallback = new Common::Callback<HttpReadStream, const Networking::ErrorResponse &>((HttpReadStream *)this, &HttpReadStream::errorCallbackDownloadFile);
 
-	// Add Range header for chunk download
-	Common::String rangeHeaderLine = Common::String::format("Range: bytes=%llu-%llu", chunkStart, chunkStart + chunkLength - 1);
-	request->addHeader(rangeHeaderLine);
+		// Create and start the download request using SessionRequest
+		Networking::SessionRequest *request = new Networking::SessionRequest(_url, Common::Path(chunkPath), callback, errorCallback);
 
-	// Start the download - this sets state to PROCESSING
-	request->start();
+		// Add Range header for chunk download
+		Common::String rangeHeaderLine = Common::String::format("Range: bytes=%llu-%llu", chunkStart, chunkStart + chunkLength - 1);
+		request->addHeader(rangeHeaderLine);
 
-	startDownloadProgress(chunkIndex, chunkLength);
-	uint32 downloadStartTime = g_system->getMillis();
-	while (request->state() == Networking::RequestState::PROCESSING) {
-		updateDownloadProgress(request->getProgress() * chunkLength, chunkLength, downloadStartTime, chunkIndex);
-		g_system->delayMillis(10);
+		// Start the download - this sets state to PROCESSING
+		request->start();
+
+		startDownloadProgress(chunkIndex, chunkLength);
+		uint32 downloadStartTime = g_system->getMillis();
+		while (request->state() == Networking::RequestState::PROCESSING) {
+			updateDownloadProgress(request->getProgress() * chunkLength, chunkLength, downloadStartTime, chunkIndex);
+			g_system->delayMillis(10);
+		}
+		debug(5, "HTTPFilesystemNode::createReadStream() download completed for %s", chunkPath.c_str());
+
+		bool ok = request->success() && !_lastDownloadFailed;
+		request->close();
+
+		if (ok) {
+			completeDownloadProgress(chunkLength);
+			return;
+		}
+
+		if (!_lastDownloadRetryable || attempt == kMaxDownloadAttempts) {
+			completeDownloadProgress(chunkLength);
+			error("HttpReadStream: Failed to download chunk %u: %s (HTTP %ld)",
+				  chunkIndex + 1, _lastErrorMessage.c_str(), _lastHttpResponseCode);
+		}
+
+		warning("HttpReadStream: Chunk %u download failed (HTTP %ld), retrying (%d/%d)...",
+				chunkIndex + 1, _lastHttpResponseCode, attempt, kMaxDownloadAttempts);
+		g_system->delayMillis(kRetryBaseDelayMs * attempt);
 	}
-	debug(5, "HTTPFilesystemNode::createReadStream() download completed for %s", chunkPath.c_str());
-	if (!request->success()) {
-		error("HttpReadStream: Failed to download chunk %u", chunkIndex + 1);
-	}
-	completeDownloadProgress(chunkLength);
-
-	request->close();
 }
 
 #endif // EMSCRIPTEN

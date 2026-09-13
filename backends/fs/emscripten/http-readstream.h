@@ -35,6 +35,10 @@
 class HttpReadStream : public VirtualReadStream {
 private:
 	Common::String _url;
+	bool _lastDownloadFailed;
+	bool _lastDownloadRetryable;
+	long _lastHttpResponseCode;
+	Common::String _lastErrorMessage;
 	void downloadFileCallback(const Networking::DataResponse &response);
 	void errorCallbackDownloadFile(const Networking::ErrorResponse &error);
 
