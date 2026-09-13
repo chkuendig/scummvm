@@ -6,7 +6,11 @@ function httpShowProgressBar(filename) {
 	// Reset and initialize the progress bar
 	window.progressBarStartTime = Date.now();
 
-	// Reset progress bar state
+	// Reset progress bar state. The fill never uses a CSS width transition:
+	// with a transition in place, each chunk re-targets the animation before
+	// the previous one finishes, so the rendered width can lag well behind
+	// the byte counts in the text below it (which update instantly) - most
+	// visibly on the last, largest jump to completion.
 	document.getElementById("download-modal-progress-fill").style.transition = "none";
 	document.getElementById("download-modal-progress-fill").style.width = "0%";
 
@@ -15,11 +19,6 @@ function httpShowProgressBar(filename) {
 
 	// Show the modal
 	document.getElementById("download-modal").style.display = "block";
-
-	// Enable smooth transition after a short delay
-	setTimeout(() => {
-		document.getElementById("download-modal-progress-fill").style.transition = "width 0.5s ease";
-	}, 10);
 };
 
 function httpUpdateProgressBar(currentBytes, totalBytes) {
@@ -34,9 +33,16 @@ function httpUpdateProgressBar(currentBytes, totalBytes) {
 		}
 		return(n.toFixed(n < 10 && l > 0 ? 1 : 0) + ' ' + units[l]);
 	};
-	const progressPercent = (currentBytes / totalBytes) * 100 + "%";
-	document.getElementById("download-modal-progress-fill").style.width = progressPercent;
-	const progressText = "Downloaded " + formatBytes(currentBytes) + " / " + formatBytes(totalBytes);
+	// totalBytes can be unknown (missing Content-Length) or, for compressed
+	// transfers, smaller than the decompressed bytes actually read; guard
+	// against NaN/Infinity/negative percentages, which the browser would
+	// otherwise silently reject, leaving the fill stuck at a stale width.
+	const knownTotal = isFinite(totalBytes) && totalBytes > 0;
+	if (knownTotal) {
+		const progressPercent = Math.min(100, Math.max(0, (currentBytes / totalBytes) * 100));
+		document.getElementById("download-modal-progress-fill").style.width = progressPercent + "%";
+	}
+	const progressText = "Downloaded " + formatBytes(currentBytes) + (knownTotal ? " / " + formatBytes(totalBytes) : "");
 	document.getElementById("download-modal-progress-text").innerHTML = progressText;
 
 	// Calculate download speed
