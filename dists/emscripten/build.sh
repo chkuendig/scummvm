@@ -399,6 +399,8 @@ fi
 #################################
 # Regenerate the narrowed plugin ASYNCIFY_IMPORTS list
 #################################
+# NOTE: configure currently links plugins with ASYNCIFY_IMPORTS=["*"] and
+# does not use this list (it misses plugin-internal calls through imports).
 # Relinks the main module once with -sASYNCIFY_ADVISE, then resolves the
 # advise output (alias-aware, via the wasm export table + name section)
 # against the union of all plugin imports. The result is UNIONED into
