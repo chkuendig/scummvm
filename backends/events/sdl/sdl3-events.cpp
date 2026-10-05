@@ -25,6 +25,7 @@
 
 #include "backends/events/sdl/sdl-events.h"
 #include "backends/platform/sdl/sdl.h"
+#include "backends/platform/sdl/touch-action.h"
 #include "backends/graphics/graphics.h"
 #include "common/config-manager.h"
 #include "common/textconsole.h"
@@ -614,6 +615,13 @@ void SdlEventSource::preprocessFingerMotion(SDL_Event *event) {
 }
 
 bool SdlEventSource::pollEvent(Common::Event &event) {
+	// Drain synthetic events (e.g. from the on-screen touch controls) first so
+	// they are routed through the keymapper like any other input event.
+	if (!_eventQueue.empty()) {
+		event = _eventQueue.pop();
+		return true;
+	}
+
 	finishSimulatedMouseClicks();
 
 	// In case we still need to send a key up event for a key down from a
@@ -654,6 +662,25 @@ bool SdlEventSource::pollEvent(Common::Event &event) {
 		// right mouse click: second finger short tap while first finger is still down
 		// pointer motion: single finger drag
 		if (ev.type == SDL_EVENT_FINGER_DOWN || ev.type == SDL_EVENT_FINGER_UP || ev.type == SDL_EVENT_FINGER_MOTION) {
+			{
+				int action = (ev.type == SDL_EVENT_FINGER_DOWN) ? kActionDown :
+				             (ev.type == SDL_EVENT_FINGER_UP) ? kActionUp : kActionMove;
+				// On-screen mode-toggle button takes precedence over everything.
+				if (handleTouchToggle(action, ev.tfinger.x, ev.tfinger.y)) {
+					continue;
+				}
+				// In gamepad mode (no physical controller — applyTouchSettings
+				// falls back otherwise), drive the on-screen gamepad and consume
+				// the finger, like the Android backend does from JNI.
+				OSystem_SDL *sdlSystem = dynamic_cast<OSystem_SDL *>(g_system);
+				if (sdlSystem && sdlSystem->getTouchMode() == Common::kTouchModeGamepad &&
+				    sdlSystem->getTouchControls().isInitialized()) {
+					Common::Point size = getTouchscreenSizePixels();
+					sdlSystem->getTouchControls().update((TouchAction)action,
+						(int)(ev.tfinger.fingerID & 0x7fffffff), (int)(ev.tfinger.x * size.x), (int)(ev.tfinger.y * size.y));
+					continue;
+				}
+			}
 			// front (0) or back (1) panel
 			SDL_TouchID port = ev.tfinger.touchID;
 			// touchpad_mouse_mode off: use only front panel for direct touch control of pointer
@@ -953,6 +980,12 @@ bool SdlEventSource::handleJoystickAdded(const SDL_JoyDeviceEvent &device, Commo
 	closeJoystick();
 	openJoystick(joystick_num);
 
+	// The on-screen gamepad is only a fallback when no physical controller is
+	// connected, so re-evaluate the touch preset now that one was plugged in.
+	if (OSystem_SDL *sdlSystem = dynamic_cast<OSystem_SDL *>(g_system)) {
+		sdlSystem->applyTouchSettings();
+	}
+
 	event.type = Common::EVENT_INPUT_CHANGED;
 	return true;
 }
@@ -978,6 +1011,12 @@ bool SdlEventSource::handleJoystickRemoved(const SDL_JoyDeviceEvent &device, Com
 	debug(5, "SdlEventSource: Newly removed joystick with instance id '%d' matches currently used joystick, closing current joystick", device.which);
 
 	closeJoystick();
+
+	// A physical controller went away; the on-screen gamepad fallback may now
+	// apply again, so re-evaluate the touch preset.
+	if (OSystem_SDL *sdlSystem = dynamic_cast<OSystem_SDL *>(g_system)) {
+		sdlSystem->applyTouchSettings();
+	}
 
 	event.type = Common::EVENT_INPUT_CHANGED;
 	return true;
