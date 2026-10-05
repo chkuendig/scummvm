@@ -391,57 +391,6 @@ if [[ "make" =~ $(echo ^\(${TASKS}\)$) || "build" =~ $(echo ^\(${TASKS}\)$) ]]; 
     echo "Patched asyncify guard into silence_callback ($(grep -c 'Asyncify.State.Normal) return;' "${ROOT_FOLDER}/scummvm.js") site(s))"
   fi
 
-  # The silence_callback guard above only covers the autoplay-blocked
-  # fallback timer. SDL3's *real* ScriptProcessorNode.onaudioprocess handlers
-  # (playback and recording) share the identical raw dynCall('ip', ...)
-  # shape and were called out as an open gap in that fix ("could in theory
-  # hit the same race mid-game"). They fire continuously once an audio
-  # graph is running, independent of autoplay-block state, so any Asyncify
-  # busy-wait during active playback - e.g. VirtualFileSystemNode::
-  # waitForDirectoryCache() while the GUI file browser lists an HTTP-backed
-  # folder (the "Add Game" dialog's bundled data entry) - can re-enter and
-  # corrupt the asyncify state the same way. Guard both real handlers too.
-  if [[ -f "${ROOT_FOLDER}/scummvm.js" ]] && ! grep -q 'function(audioProcessingEvent) { if (typeof Asyncify' "${ROOT_FOLDER}/scummvm.js"; then
-    sed -i 's/function(audioProcessingEvent) { if ((SDL3 === undefined) || (SDL3.audio_recording === undefined)) { return; }/function(audioProcessingEvent) { if (typeof Asyncify !== "undefined" \&\& Asyncify.state !== Asyncify.State.Normal) return; if ((SDL3 === undefined) || (SDL3.audio_recording === undefined)) { return; }/' "${ROOT_FOLDER}/scummvm.js"
-    echo "Patched asyncify guard into audio_recording onaudioprocess"
-  fi
-  if [[ -f "${ROOT_FOLDER}/scummvm.js" ]] && ! grep -q 'function (e) { if (typeof Asyncify' "${ROOT_FOLDER}/scummvm.js"; then
-    sed -i 's/function (e) { if ((SDL3 === undefined) || (SDL3.audio_playback === undefined)) { return; }/function (e) { if (typeof Asyncify !== "undefined" \&\& Asyncify.state !== Asyncify.State.Normal) return; if ((SDL3 === undefined) || (SDL3.audio_playback === undefined)) { return; }/' "${ROOT_FOLDER}/scummvm.js"
-    echo "Patched asyncify guard into audio_playback onaudioprocess"
-  fi
-fi
-
-#################################
-# Regenerate the narrowed plugin ASYNCIFY_IMPORTS list
-#################################
-# NOTE: configure currently links plugins with ASYNCIFY_IMPORTS=["*"] and
-# does not use this list (it misses plugin-internal calls through imports).
-# Relinks the main module once with -sASYNCIFY_ADVISE, then resolves the
-# advise output (alias-aware, via the wasm export table + name section)
-# against the union of all plugin imports. The result is UNIONED into
-# dists/emscripten/plugin-asyncify-imports.json (additive-only - a missing
-# entry corrupts asyncify state at runtime, an extra one only costs size).
-# REQUIREMENTS: a configured FULL-FEATURE tree (CI-parity flags - see
-# .github/workflows/main.yml) and built plugins. Rebuild plugins afterwards
-# so they pick up the updated list, and re-run 'make' for a clean main link.
-if [[ "asyncify-imports" =~ $(echo ^\(${TASKS}\)$) ]]; then
-  cd "${ROOT_FOLDER}"
-  if [[ ! -f config.mk ]]; then echo "asyncify-imports: run the configure task first"; exit 1; fi
-  if ! ls plugins/*.so >/dev/null 2>&1; then echo "asyncify-imports: build the plugins first (make)"; exit 1; fi
-  echo "Relinking main module with -sASYNCIFY_ADVISE (advise harvest)"
-  rm -f scummvm.js scummvm.wasm scummvm.html
-  num_cpus=$(nproc || grep -c ^processor /proc/cpuinfo || echo 1)
-  EMCC_CFLAGS="-sASYNCIFY_ADVISE ${EMCC_CFLAGS:-}" emmake make -j ${num_cpus} > "${ROOT_FOLDER}/asyncify-advise.log" 2>&1
-  echo "Advise lines harvested: $(grep -c 'can change the state\|can unwind' "${ROOT_FOLDER}/asyncify-advise.log" || true)"
-  node "${ROOT_FOLDER}/dists/emscripten/gen-asyncify-imports.js" \
-    "${ROOT_FOLDER}/asyncify-advise.log" \
-    "${ROOT_FOLDER}/scummvm.wasm" \
-    "${ROOT_FOLDER}/plugins" \
-    "$(dirname "$(which emcc)")/../bin/llvm-cxxfilt" \
-    "${ROOT_FOLDER}/dists/emscripten/plugin-asyncify-imports.json"
-  # advise-linked main is functionally fine but relink clean for good measure
-  rm -f scummvm.js scummvm.wasm scummvm.html
-  echo "asyncify-imports: list updated. Re-run 'make' to relink main and rebuild plugins."
 fi
 
 #################################
