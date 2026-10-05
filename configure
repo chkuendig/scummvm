@@ -3381,13 +3381,29 @@ EOF
 		append_var DEFINES "-DEMSCRIPTEN"
 		add_line_to_config_mk 'EMSCRIPTEN = 1'
 		_port_mk="backends/platform/sdl/emscripten/emscripten.mk"
-		append_var LDFLAGS "-s INITIAL_MEMORY=128MB -s STACK_SIZE=32MB -s ALLOW_MEMORY_GROWTH=1"
+		# MAXIMUM_MEMORY: 512MB made large demos (wintermute:ritter needs ~537MB)
+		# abort cleanly but unplayably; a real-device trace showed ~640MB total
+		# was fine on iOS, while 1GB is known to get the tab jetsamed (iOS
+		# reserves against the declared max). 640MB is the measured sweet spot.
+		append_var LDFLAGS "-s INITIAL_MEMORY=128MB -s STACK_SIZE=8MB -s MAXIMUM_MEMORY=640MB -s ALLOW_MEMORY_GROWTH=1"
 		append_var LDFLAGS "-s FORCE_FILESYSTEM -lidbfs.js"
 		append_var LDFLAGS "-s ASYNCIFY=1 -s ASYNCIFY_STACK_SIZE=1048576"
-
-		append_var LDFLAGS "-s EXPORTED_FUNCTIONS=[_main,_malloc,_free,_raise]"
-		append_var LDFLAGS "-s EXPORTED_RUNTIME_METHODS=[ccall,lengthBytesUTF8,setValue,writeArrayToMemory]"
-		append_var LDFLAGS "--js-library backends/networking/http/emscripten/networkreadstream-emscripten.js"
+		append_var LDFLAGS "--js-library backends/fs/emscripten/emscripten-fs-factory.js"
+        append_var LDFLAGS "--js-library backends/networking/http/emscripten/networkreadstream-emscripten.js"
+        append_var LDFLAGS "--js-library backends/platform/sdl/emscripten/emscripten.js"
+		append_var LDFLAGS "--js-library backends/fs/emscripten/dragdrop-fs.js"
+		if test "$_tts" != "no" ; then
+			append_var LDFLAGS "--js-library backends/text-to-speech/emscripten/emscripten-text-to-speech.js"
+		fi
+		if test "$_midi" != "no" ; then
+			append_var LDFLAGS "--js-library backends/midi/webmidi.js"
+		fi
+		# custom_shell-post.js calls Module._raise() on unload to send SIGINT
+		# (releases RetroWave/MIDI devices). Export it in the dynamic-plugin
+		# build too - it was only exported for the static build, so the dynamic
+		# build DCE'd raise (nothing in C references it) and Module._raise was
+		# undefined, throwing on every page unload.
+		append_var LDFLAGS "-s EXPORTED_FUNCTIONS=[_main,_raise]"
 
 		append_var LDFLAGS "-O2"
 		_optimization_level=-O2
@@ -3401,6 +3417,8 @@ EOF
 		else
 			embuilder build sdl3
 		fi
+		define_in_config_if_yes yes 'USE_IMGUI_SDLRENDERER3'
+
 		_pkg_config=yes
 		PKG_CONFIG_LIBDIR="$EMSDK/upstream/emscripten/cache/sysroot/local/lib/pkgconfig:$EMSDK/upstream/emscripten/cache/sysroot/lib/pkgconfig"
 		_sdlconfig="pkg-config sdl3"
@@ -3768,9 +3786,10 @@ if test -n "$_host"; then
 			;;
 		wasm*-emscripten)
 			_backend="emscripten"
+			_vkeybd=yes # No hardware keyboard in the browser; use the rendered virtual keyboard
 			_enet=no    # Disable ENet (no sockets in the browser)
 			_sdlnet=no  # Disable SDL_Net (no sockets in the browser)
-			_libcurl=no # Emscripten backend uses emscripten_fetch not libcurl
+			_libcurl=no # Emscripten backend uses Fetch API not libcurl
 			if test "$_cloud" != yes; then
 				_cloud=no
 			fi
@@ -5197,12 +5216,21 @@ PLUGIN_LDFLAGS		+= -Wl,-T$(srcdir)/backends/plugins/ds/plugin.ld -mthumb -mthumb
 		append_var DEFINES "-DUNCACHED_PLUGINS"
 		append_var CXXFLAGS "-fPIC"
 		append_var LIBS ""
-_mak_plugins='
+		# ASYNCIFY_IMPORTS: treat every plugin import as a possible suspend
+		# point. The narrowed list in dists/emscripten/plugin-asyncify-imports.json
+		# only covers main-module functions, but plugins also call their own
+		# default-visibility functions through imports (the dynamic linker
+		# resolves them back to the plugin), e.g. SCI's Portrait::init() calling
+		# SpanImpl::allocateFromStream(). Calls missing from the list get no
+		# Asyncify handling, so a file read that suspends there corrupts the
+		# suspended stack. Keep ["*"] until the list covers those calls.
+		_emscripten_asyncify_imports='["*"]'
+_mak_plugins="
 PLUGIN_EXTRA_DEPS =
-PLUGIN_LDFLAGS  += -s SIDE_MODULE=1 -s ASYNCIFY=1 -s ASYNCIFY_IMPORTS=["*"] -s EXPORT_ALL=1
+PLUGIN_LDFLAGS  += -s SIDE_MODULE=1 -s ASYNCIFY=1 -s ASYNCIFY_IMPORTS=${_emscripten_asyncify_imports} -s EXPORT_ALL=1
 PRE_OBJS_FLAGS  := -s MAIN_MODULE=1 -s EXPORT_ALL=1
 POST_OBJS_FLAGS :=
-'
+"
 		;;
 	freebsd* | openbsd*)
 		_plugin_prefix="lib"
@@ -6241,11 +6269,10 @@ echo "$_libcurl"
 define_in_config_if_yes "$_libcurl" "USE_LIBCURL"
 
 echocheck "Network client"
-if test "$_backend" = "emscripten" && test "$_cloud" = "yes"; then
-	append_var LDFLAGS "-sFETCH"
+if test "$_backend" = "emscripten"; then
 	_basicnet=no
 	_http=yes
-	echo "Emscripten (HTTP only)"
+	echo "Fetch API (HTTP only)"
 elif test "$_backend" = "android"; then
 	_basicnet=yes
 	_http=yes
@@ -6818,7 +6845,9 @@ if test "$_opengl_mode" != none ; then
 		emscripten)
 			_opengl_mode=gles2
 			_opengl_glad=no # https://github.com/Dav1dde/glad-web/issues/12
-			append_var OPENGL_LIBS "-s FULL_ES2=1 -s MAX_WEBGL_VERSION=1"
+			# Force a WebGL2 context (no WebGL1 fallback) and emulate the full
+			# ES3 API, so GLSL-ES shader engines (e.g. HPL1) run out of the box.
+			append_var OPENGL_LIBS "-s FULL_ES3=1 -s MAX_WEBGL_VERSION=2 -s MIN_WEBGL_VERSION=2"
 			;;
 		ios7)
 			_opengl_mode=gles2

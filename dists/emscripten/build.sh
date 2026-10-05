@@ -32,7 +32,7 @@ TASKS=()
 CONFIGURE_ARGS=()
 _bundle_games=()
 _verbose=false
-EMSDK_VERSION="${EMSDK_VERSION:-4.0.10}"
+EMSDK_VERSION="${EMSDK_VERSION:-6.0.11}"
 EMSCRIPTEN_VERSION="$EMSDK_VERSION"
 
 usage="\
@@ -135,11 +135,7 @@ for i in "$@"; do
   esac
 done
 
-TASKS="${TASKS:1}"
-if [[ -z "$TASKS" ]]; then
-  echo "$usage"
-  exit
-fi
+
 
 # print commands
 if [[ "$_verbose" = true ]]; then
@@ -174,6 +170,12 @@ if [[ $ret != 0 ]]; then
   ./emsdk activate ${EMSCRIPTEN_VERSION}
 fi
 
+TASKS="${TASKS:1}"
+if [[ -z "$TASKS" ]]; then
+  echo "$usage"
+  exit
+fi
+
 source "$DIST_FOLDER/emsdk-$EMSDK_VERSION/emsdk_env.sh"
 
 # export node_path - so we can use all node_modules bundled with emscripten (e.g. requests)
@@ -196,9 +198,10 @@ if [ "$_liba52" = true ]; then
   if [[ ! -f "$LIBS_FOLDER/build/lib/liba52.a" ]]; then
     echo "building a52dec-0.7.4"
     cd "$LIBS_FOLDER"
-    wget -nc "https://code.videolan.org/videolan/liba52/-/archive/0.7.4/liba52-0.7.4.tar.gz"
-    tar -xf liba52-0.7.4.tar.gz
-    cd "$LIBS_FOLDER/liba52-0.7.4/"
+    wget -nc "https://deb.debian.org/debian/pool/main/a/a52dec/a52dec_0.7.4.orig.tar.gz"
+    echo "a21d724ab3b3933330194353687df82c475b5dfb997513eef4c25de6c865ec33  a52dec_0.7.4.orig.tar.gz" | sha256sum -c -
+    tar -xf a52dec_0.7.4.orig.tar.gz
+    cd "$LIBS_FOLDER/a52dec-0.7.4/"
     autoreconf -i
     CFLAGS="-fPIC -Oz" emconfigure ./configure --host=wasm32-unknown-none --build=wasm32-unknown-none --prefix="$LIBS_FOLDER/build/"
     emmake make -j 5
@@ -211,9 +214,10 @@ if [ "$_libfaad" = true ]; then
   if [[ ! -f "$LIBS_FOLDER/build/lib/libfaad.a" ]]; then
     echo "building faad2-2.8.8"
     cd "$LIBS_FOLDER"
-    wget -nc "https://sourceforge.net/projects/faac/files/faad2-src/faad2-2.8.0/faad2-2.8.8.tar.gz"
-    tar -xf faad2-2.8.8.tar.gz
-    cd "$LIBS_FOLDER/faad2-2.8.8/"
+    wget -nc --content-disposition "https://github.com/knik0/faad2/archive/refs/tags/2_8_8.tar.gz"
+    tar -xf faad2-2_8_8.tar.gz
+    cd "$LIBS_FOLDER/faad2-2_8_8/"
+    autoreconf -i
     CFLAGS="-fPIC -Oz" emconfigure ./configure --host=wasm32-unknown-none --build=wasm32-unknown-none --prefix="$LIBS_FOLDER/build/"
     emmake make -j 5
     emmake make install
@@ -309,12 +313,12 @@ fi
 
 if [ "$_retrowave" = true ]; then
   if [[ ! -f "$LIBS_FOLDER/build/lib/libRetroWave.a" ]]; then
-    echo "build libRetroWave-e6bf60e"
+    echo "build libRetroWave-ddb5b34"
     cd "$LIBS_FOLDER"
-    wget -nc --content-disposition "https://github.com/SudoMaker/RetroWave/archive/e6bf60eed2d2bd1deff688d645be71a32bbf05bb.tar.gz"
-    tar -xf RetroWave-e6bf60eed2d2bd1deff688d645be71a32bbf05bb.tar.gz
-    cd "$LIBS_FOLDER/RetroWave-e6bf60eed2d2bd1deff688d645be71a32bbf05bb/"
-    CFLAGS="-fPIC -s USE_ZLIB=1 -Oz"  emcmake cmake -B "build/" -DRETROWAVE_BUILD_PLAYER=0  -DCMAKE_INSTALL_PREFIX="$LIBS_FOLDER/build/" -DCMAKE_INSTALL_LIBDIR="lib"
+    wget -nc --content-disposition "https://github.com/SudoMaker/RetroWave/archive/ddb5b34f25d23b075dec8fffe65dedb629a78e86.tar.gz"
+    tar -xf RetroWave-ddb5b34f25d23b075dec8fffe65dedb629a78e86.tar.gz
+    cd "$LIBS_FOLDER/RetroWave-ddb5b34f25d23b075dec8fffe65dedb629a78e86/"
+    CFLAGS="-fPIC -s USE_ZLIB=1 -Oz -DEMSCRIPTEN"  emcmake cmake -B "build/" -DRETROWAVE_BUILD_PLAYER=0  -DCMAKE_INSTALL_PREFIX="$LIBS_FOLDER/build/" -DCMAKE_INSTALL_LIBDIR="lib"
     cmake --build "build/"  
     cmake --install "build/"  
   fi
@@ -323,12 +327,12 @@ fi
 
 if [ "$_libtheoradec" = true ]; then
   if [[ ! -f "$LIBS_FOLDER/build/lib/libtheora.a" ]]; then
-    echo "build libtheora-1.1.1"
+    echo "build libtheora-1.2.0"
     cd "$LIBS_FOLDER"
-    wget -nc "https://downloads.xiph.org/releases/theora/libtheora-1.1.1.tar.xz"
-    tar -xf libtheora-1.1.1.tar.xz
-    cd "$LIBS_FOLDER/libtheora-1.1.1/"
-    CFLAGS="-fPIC -s USE_OGG=1 -Oz" emconfigure ./configure --host=wasm32-unknown-none --build=wasm32-unknown-none --prefix="$LIBS_FOLDER/build/" --disable-asm
+    wget -nc "https://downloads.xiph.org/releases/theora/libtheora-1.2.0.tar.xz"
+    tar -xf libtheora-1.2.0.tar.xz
+    cd "$LIBS_FOLDER/libtheora-1.2.0/"
+    CFLAGS="-fPIC -s USE_OGG=1 -Oz" emconfigure ./configure --host=wasm32-unknown-none --build=wasm32-unknown-none --prefix="$LIBS_FOLDER/build/" --disable-asm --disable-examples
     emmake make -j 5
     emmake make install
   fi
@@ -370,6 +374,74 @@ if [[ "make" =~ $(echo ^\(${TASKS}\)$) || "build" =~ $(echo ^\(${TASKS}\)$) ]]; 
   echo "Running make"
   num_cpus=$(nproc || grep -c ^processor /proc/cpuinfo || echo 1)
   emmake make -j ${num_cpus}
+
+  # SDL3's emscripten audio backend arms a setInterval("silence_callback")
+  # while the AudioContext is autoplay-blocked (always the case on mobile
+  # before the first user gesture) that dynCall()s into wasm on every tick.
+  # If such a tick fires while ASYNCIFY has the main stack unwound (e.g. the
+  # HTTP virtual-fs busy-wait during a chunk download), the raw re-entry
+  # corrupts the asyncify state and traps ("call_indirect to a signature that
+  # does not match" / "Unreachable code should not be executed" in doRewind -
+  # observed on iOS Safari). Guard the callback to skip ticks while asyncify
+  # is not in its normal state. The SDL port source ships inside the emsdk
+  # cache, so patch the generated JS post-link instead (idempotent; anchors
+  # on the SDL EM_ASM text carried verbatim into scummvm.js).
+  if [[ -f "${ROOT_FOLDER}/scummvm.js" ]] && ! grep -q 'silence_callback = function() { if (typeof Asyncify' "${ROOT_FOLDER}/scummvm.js"; then
+    sed -i 's/var silence_callback = function() {/var silence_callback = function() { if (typeof Asyncify !== "undefined" \&\& Asyncify.state !== Asyncify.State.Normal) return;/g' "${ROOT_FOLDER}/scummvm.js"
+    echo "Patched asyncify guard into silence_callback ($(grep -c 'Asyncify.State.Normal) return;' "${ROOT_FOLDER}/scummvm.js") site(s))"
+  fi
+
+  # The silence_callback guard above only covers the autoplay-blocked
+  # fallback timer. SDL3's *real* ScriptProcessorNode.onaudioprocess handlers
+  # (playback and recording) share the identical raw dynCall('ip', ...)
+  # shape and were called out as an open gap in that fix ("could in theory
+  # hit the same race mid-game"). They fire continuously once an audio
+  # graph is running, independent of autoplay-block state, so any Asyncify
+  # busy-wait during active playback - e.g. VirtualFileSystemNode::
+  # waitForDirectoryCache() while the GUI file browser lists an HTTP-backed
+  # folder (the "Add Game" dialog's bundled data entry) - can re-enter and
+  # corrupt the asyncify state the same way. Guard both real handlers too.
+  if [[ -f "${ROOT_FOLDER}/scummvm.js" ]] && ! grep -q 'function(audioProcessingEvent) { if (typeof Asyncify' "${ROOT_FOLDER}/scummvm.js"; then
+    sed -i 's/function(audioProcessingEvent) { if ((SDL3 === undefined) || (SDL3.audio_recording === undefined)) { return; }/function(audioProcessingEvent) { if (typeof Asyncify !== "undefined" \&\& Asyncify.state !== Asyncify.State.Normal) return; if ((SDL3 === undefined) || (SDL3.audio_recording === undefined)) { return; }/' "${ROOT_FOLDER}/scummvm.js"
+    echo "Patched asyncify guard into audio_recording onaudioprocess"
+  fi
+  if [[ -f "${ROOT_FOLDER}/scummvm.js" ]] && ! grep -q 'function (e) { if (typeof Asyncify' "${ROOT_FOLDER}/scummvm.js"; then
+    sed -i 's/function (e) { if ((SDL3 === undefined) || (SDL3.audio_playback === undefined)) { return; }/function (e) { if (typeof Asyncify !== "undefined" \&\& Asyncify.state !== Asyncify.State.Normal) return; if ((SDL3 === undefined) || (SDL3.audio_playback === undefined)) { return; }/' "${ROOT_FOLDER}/scummvm.js"
+    echo "Patched asyncify guard into audio_playback onaudioprocess"
+  fi
+fi
+
+#################################
+# Regenerate the narrowed plugin ASYNCIFY_IMPORTS list
+#################################
+# NOTE: configure currently links plugins with ASYNCIFY_IMPORTS=["*"] and
+# does not use this list (it misses plugin-internal calls through imports).
+# Relinks the main module once with -sASYNCIFY_ADVISE, then resolves the
+# advise output (alias-aware, via the wasm export table + name section)
+# against the union of all plugin imports. The result is UNIONED into
+# dists/emscripten/plugin-asyncify-imports.json (additive-only - a missing
+# entry corrupts asyncify state at runtime, an extra one only costs size).
+# REQUIREMENTS: a configured FULL-FEATURE tree (CI-parity flags - see
+# .github/workflows/main.yml) and built plugins. Rebuild plugins afterwards
+# so they pick up the updated list, and re-run 'make' for a clean main link.
+if [[ "asyncify-imports" =~ $(echo ^\(${TASKS}\)$) ]]; then
+  cd "${ROOT_FOLDER}"
+  if [[ ! -f config.mk ]]; then echo "asyncify-imports: run the configure task first"; exit 1; fi
+  if ! ls plugins/*.so >/dev/null 2>&1; then echo "asyncify-imports: build the plugins first (make)"; exit 1; fi
+  echo "Relinking main module with -sASYNCIFY_ADVISE (advise harvest)"
+  rm -f scummvm.js scummvm.wasm scummvm.html
+  num_cpus=$(nproc || grep -c ^processor /proc/cpuinfo || echo 1)
+  EMCC_CFLAGS="-sASYNCIFY_ADVISE ${EMCC_CFLAGS:-}" emmake make -j ${num_cpus} > "${ROOT_FOLDER}/asyncify-advise.log" 2>&1
+  echo "Advise lines harvested: $(grep -c 'can change the state\|can unwind' "${ROOT_FOLDER}/asyncify-advise.log" || true)"
+  node "${ROOT_FOLDER}/dists/emscripten/gen-asyncify-imports.js" \
+    "${ROOT_FOLDER}/asyncify-advise.log" \
+    "${ROOT_FOLDER}/scummvm.wasm" \
+    "${ROOT_FOLDER}/plugins" \
+    "$(dirname "$(which emcc)")/../bin/llvm-cxxfilt" \
+    "${ROOT_FOLDER}/dists/emscripten/plugin-asyncify-imports.json"
+  # advise-linked main is functionally fine but relink clean for good measure
+  rm -f scummvm.js scummvm.wasm scummvm.html
+  echo "asyncify-imports: list updated. Re-run 'make' to relink main and rebuild plugins."
 fi
 
 #################################

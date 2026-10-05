@@ -100,20 +100,23 @@ endif
 
 ifdef EMSCRIPTEN
 MODULE_OBJS += \
+	fs/emscripten/dragdrop-fs.o \
+	fs/emscripten/dragdrop-readstream.o \
 	fs/emscripten/emscripten-fs-factory.o \
 	fs/emscripten/emscripten-posix-fs.o \
 	fs/emscripten/http-fs.o \
+	fs/emscripten/http-readstream.o \
+	fs/emscripten/virtual-fs.o \
+	fs/emscripten/virtual-readstream.o \
 	midi/webmidi.o \
 	mixer/emscriptensdl/emscriptensdl-mixer.o \
+	networking/http/emscripten/connectionmanager-emscripten.o \
+	networking/http/emscripten/networkreadstream-emscripten.o \
+	printing/emscripten/emscripten-printman.o \
 	timer/emscripten/emscripten-timer.o
 ifdef USE_CLOUD
 MODULE_OBJS += \
 	fs/emscripten/cloud-fs.o
-endif
-ifdef USE_HTTP
-MODULE_OBJS += \
-	networking/http/emscripten/connectionmanager-emscripten.o \
-	networking/http/emscripten/networkreadstream-emscripten.o
 endif
 ifdef USE_TTS
 MODULE_OBJS += \

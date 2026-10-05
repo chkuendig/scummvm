@@ -19,29 +19,19 @@
  *
  */
 
-#ifndef EMSCRIPTEN_FILESYSTEM_FACTORY_H
-#define EMSCRIPTEN_FILESYSTEM_FACTORY_H
+#ifndef BACKENDS_PRINTING_EMSCRIPTEN_PRINTMAN_H
+#define BACKENDS_PRINTING_EMSCRIPTEN_PRINTMAN_H
 
-#include "backends/fs/emscripten/http-fs.h"
-#include "backends/fs/fs-factory.h"
-#include "common/singleton.h"
+#ifdef __EMSCRIPTEN__
 
-/**
- * Creates POSIXFilesystemNode objects.
- *
- * Parts of this class are documented in the base interface class, FilesystemFactory.
- */
-class EmscriptenFilesystemFactory : public FilesystemFactory {
-public:
-	EmscriptenFilesystemFactory();
-	AbstractFSNode *makeRootFileNode() const override;
-	AbstractFSNode *makeCurrentDirectoryFileNode() const override;
-	AbstractFSNode *makeFileNodePath(const Common::String &path) const override;
-
-};
-
-extern "C" {
-void EmscriptenFilesystemFactory_initDefaultConfigFile(const char *pathPtr);
+namespace Common {
+class PrintingManager;
 }
 
-#endif /*EMSCRIPTEN_FILESYSTEM_FACTORY_H*/
+/**
+ * Create a PrintingManager that downloads print-outs via the browser
+ */
+Common::PrintingManager *createEmscriptenPrintingManager();
+
+#endif
+#endif
