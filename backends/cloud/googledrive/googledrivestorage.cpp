@@ -161,12 +161,18 @@ Networking::Request *GoogleDriveStorage::upload(const Common::String &path, Comm
 	return addRequest(new GoogleDriveUploadRequest(this, path, contents, callback, errorCallback));
 }
 
-Networking::Request *GoogleDriveStorage::streamFileById(const Common::String &id, Networking::NetworkReadStreamCallback callback, Networking::ErrorCallback errorCallback) {
+Networking::Request *GoogleDriveStorage::streamFileById(const Common::String &id, Networking::NetworkReadStreamCallback callback, Networking::ErrorCallback errorCallback, uint64 startPos, uint64 length) {
 	if (callback) {
 		Common::String url = Common::String::format(GOOGLEDRIVE_API_FILES_ALT_MEDIA, Common::percentEncodeString(id).c_str());
 		Common::String header = "Authorization: Bearer " + _token;
 		Networking::RequestHeaders *headersList = new Networking::RequestHeaders();
 		headersList->push_back(header);
+		// Add Range header if needed
+		if (startPos > 0 || length > 0) {
+			Common::String rangeHeader = Common::String::format("Range: bytes=%llu-%s", startPos,
+					length > 0 ? Common::String::format("%llu", startPos + length - 1).c_str() : "");
+			headersList->push_back(rangeHeader);
+		}
 		Networking::NetworkReadStream *stream = Networking::NetworkReadStream::make(url.c_str(), headersList, "");
 		(*callback)(Networking::NetworkReadStreamResponse(nullptr, stream));
 	}
