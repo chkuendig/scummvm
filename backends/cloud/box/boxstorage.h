@@ -93,7 +93,7 @@ public:
 	bool uploadStreamSupported() override;
 
 	/** Returns pointer to Networking::NetworkReadStream. */
-	Networking::Request *streamFileById(const Common::String &path, Networking::NetworkReadStreamCallback callback, Networking::ErrorCallback errorCallback) override;
+	Networking::Request *streamFileById(const Common::String &path, Networking::NetworkReadStreamCallback callback, Networking::ErrorCallback errorCallback, uint64 startPos = 0, uint64 length = 0) override;
 
 	/** Returns the StorageInfo struct. */
 	Networking::Request *info(StorageInfoCallback callback, Networking::ErrorCallback errorCallback) override;
@@ -113,8 +113,6 @@ public:
 	static void removeFromConfig(const Common::String &keyPrefix);
 
 	Common::String getRootDirectoryId() override;
-
-	Common::String accessToken() const { return _token; }
 };
 
 } // End of namespace Box
