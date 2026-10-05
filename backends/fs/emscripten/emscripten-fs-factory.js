@@ -33,6 +33,14 @@ mergeInto(LibraryManager.library, {
         try {
             const settingsPath = UTF8ToString(pathPtr);
             const path = settingsPath.substring(0, settingsPath.lastIndexOf('/'));
+            const exists = (p) => {
+                try {
+                    FS.stat(p);
+                    return true;
+                } catch (err) {
+                    return false;
+                }
+            };
 
             // Request persistent storage before relying on IDBFS, so the
             // settings + saved games survive automatic eviction. Without this
@@ -57,7 +65,7 @@ mergeInto(LibraryManager.library, {
             });
 
             // Check if the settings file exists and download a default copy if needed.
-            if (!FS.analyzePath(settingsPath).exists) {
+            if (!exists(settingsPath)) {
                 console.debug('EmscriptenFilesystemFactory_initDefaultConfigFile: Download default scummvm.ini');
                 const response = await fetch('scummvm.ini');
                 if (response.ok) {
@@ -67,7 +75,7 @@ mergeInto(LibraryManager.library, {
             }
 
             // Check if the extras folder exists and create it if needed.
-            if (!FS.analyzePath(path + "/extras").exists) {
+            if (!exists(path + "/extras")) {
                 console.debug("Create empty settings folder at " + path + "/extras");
                 FS.mkdir(path + "/extras");
             }
