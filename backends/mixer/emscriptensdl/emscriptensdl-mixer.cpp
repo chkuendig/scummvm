@@ -108,8 +108,15 @@ void EmscriptenSdlMixerManager::stopTimer() {
 
 void EmscriptenSdlMixerManager::emscriptenSdl3Callback(void *userdata, SDL_AudioStream *stream, int additional_amount, int total_amount) {
 	static int emptyBufferCount = 0;
-	static int lastEmptyBufferPrint = 0;
+	static Uint64 lastEmptyBufferPrint = 0;
 	EmscriptenSdlMixerManager *manager = (EmscriptenSdlMixerManager *)userdata;
+
+	// This runs from a WebAudio callback, usually while the main loop is
+	// suspended by Asyncify. Don't use g_system->getMillis() here: with the
+	// event recorder active it runs timers and mixer updates, which can
+	// suspend again (e.g. waiting for HTTP game data) and corrupt the
+	// suspended main stack, and during playback it consumes recorded events.
+	const Uint64 now = SDL_GetTicks();
 
 	if (manager->_dataBuffers->size() > 0) {
 		// Put the data into the stream
@@ -119,10 +126,10 @@ void EmscriptenSdlMixerManager::emscriptenSdl3Callback(void *userdata, SDL_Audio
 	} else {
 		emptyBufferCount++;
 	}
-	if (g_system->getMillis() - 5000 > lastEmptyBufferPrint && emptyBufferCount > 0) {
+	if (now - lastEmptyBufferPrint > 5000 && emptyBufferCount > 0) {
 		debug(5, "EmscriptenSdlMixerManager::emscriptenSdl3Callback called %d times in last 5 second with empty buffer", emptyBufferCount);
 		emptyBufferCount = 0;
-		lastEmptyBufferPrint = g_system->getMillis();
+		lastEmptyBufferPrint = now;
 	}
 	// Just store the requested amount, updateMixer will process it
 	manager->_lastRequestedAmount = additional_amount;
