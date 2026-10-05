@@ -94,6 +94,7 @@ MODULE_OBJS := \
 	engine/impl/CharacterBodyNewton.o \
 	engine/impl/CollideShapeNewton.o \
 	engine/impl/LowLevelGraphicsSDL.o \
+	engine/impl/LowLevelGraphicsGLES.o \
 	engine/impl/LowLevelPhysicsNewton.o \
 	engine/impl/LowLevelSoundOpenAL.o \
 	engine/impl/MeshLoaderCollada.o \

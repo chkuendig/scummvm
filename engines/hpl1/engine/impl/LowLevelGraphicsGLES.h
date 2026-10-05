@@ -19,23 +19,30 @@
  *
  */
 
-/*
- * Copyright (C) 2006-2010 - Frictional Games
- *
- * This file is part of HPL1 Engine.
- */
-
-#ifndef HPL_LOWLEVELGRAPHICS_SDL_H
-#define HPL_LOWLEVELGRAPHICS_SDL_H
+#ifndef HPL_LOWLEVELGRAPHICS_GLES_H
+#define HPL_LOWLEVELGRAPHICS_GLES_H
 
 #include "common/ptr.h"
+#include "common/stack.h"
 #include "graphics/pixelformat.h"
 #include "graphics/surface.h"
 #include "hpl1/engine/graphics/LowLevelGraphics.h"
 #include "hpl1/engine/math/MathTypes.h"
 #include "hpl1/opengl.h"
 
-#if defined(HPL1_USE_OPENGL) && !USE_FORCED_GLES2
+
+#ifdef HPL1_USE_OPENGL
+#if USE_FORCED_GLES2
+
+// Generic vertex attribute locations used by the GLES2 path. Bound by
+// cCGProgram via glBindAttribLocation and consumed by cVertexBufferVBO /
+// cLowLevelGraphicsGLES's batch arrays. Desktop GL doesn't need these — the
+// fixed-function client-state arrays handle vertex data routing.
+#define eVtxAttr_Position 0
+#define eVtxAttr_Normal   1
+#define eVtxAttr_Color0   2
+#define eVtxAttr_Texture0 3
+#define eVtxAttr_Tangent  4
 
 namespace hpl {
 
@@ -45,10 +52,10 @@ GLenum TextureTargetToGL(eTextureTarget target);
 
 //-------------------------------------------------
 
-class cLowLevelGraphicsSDL : public iLowLevelGraphics {
+class cLowLevelGraphicsGLES : public iLowLevelGraphics {
 public:
-	cLowLevelGraphicsSDL();
-	~cLowLevelGraphicsSDL();
+	cLowLevelGraphicsGLES();
+	~cLowLevelGraphicsGLES();
 
 	bool Init(int alWidth, int alHeight, int alBpp, int abFullscreen, int alMultisampling,
 			  const tString &asWindowCaption);
@@ -84,6 +91,7 @@ public:
 	Graphics::PixelFormat *GetPixelFormat();
 
 	iGpuProgram *CreateGpuProgram(const tString &vertex, const tString &fragment);
+	iGpuProgram *GetSimpleShader() override { return mSimpleShader; }
 
 	void SaveScreenToBMP(const tString &asFile);
 
@@ -220,7 +228,7 @@ public:
 	void FlushRendering();
 	void SwapBuffers();
 
-	///// SDL Specific ////////////////////////////
+	///// GL Specific /////////////////////////////
 
 	void SetupGL();
 
@@ -271,6 +279,14 @@ private:
 
 	iTexture *_screenBuffer;
 	iGpuProgram *_gammaCorrectionProgram;
+	// FBO state for SetRenderTarget. Created lazily on first non-null
+	// target. The depth renderbuffer is reallocated when the bound target
+	// changes size — usually post-effect refraction textures are small
+	// and stable, so this happens at most a handful of times per session.
+	unsigned int mFBO = 0;
+	unsigned int mFBODepthRB = 0;
+	int mFBODepthW = 0;
+	int mFBODepthH = 0;
 
 	// CG Compiler Variables
 	// CGcontext mCG_Context;
@@ -307,9 +323,58 @@ private:
 
 	// Vtx helper
 	void SetVtxBatchStates(tVtxBatchFlag flags);
+
+public:
+	// Read the top of a matrix stack. Used by cCGProgram::SetMatrixf when a
+	// material shader needs the current modelview/projection (the GLES2
+	// equivalent of glGetFloatv(GL_MODELVIEW_MATRIX) on desktop GL).
+	const cMatrixf &GetMatrixStackTop(eMatrix aMtxType) const { return mMatrixStack[aMtxType].top(); }
+
+private:
+	// OpenGL ES software matrix stack
+	Common::Stack<cMatrixf> mMatrixStack[eMatrix_LastEnum];
+	void UploadShaderMatrix();
+	// Common setup for the legacy immediate-mode debug-draw helpers
+	// (DrawLine, DrawBoxMaxMin, DrawSphere, DrawLineRect2D, ...). Binds
+	// mSimpleShader when nothing else is active, pushes the current
+	// proj*modelview, and writes a constant vertex color via
+	// glVertexAttrib4f so the caller doesn't need to upload a per-vertex
+	// color buffer. Then issues glDrawArrays(`aMode`, ...).
+	void DrawPrimitiveLines(unsigned int aMode, const float *positions,
+							int aVertexCount, const cColor &aColor);
+
+	// Simple shader used to drive the GLES2 fixed-function emulation path
+	// (DrawQuad / FlushTriBatch / FlushQuadBatch).
+	iGpuProgram *mSimpleShader = nullptr;
+	// Most-recently bound program, tracked via cCGProgram::Bind/UnBind so
+	// DrawQuad's fallback (binds mSimpleShader if nothing else is in use)
+	// doesn't clobber a caller's shader, and UploadShaderMatrix writes to
+	// the program that's actually live rather than always to mSimpleShader.
+public:
+	void NotifyShaderBound(iGpuProgram *prog);
+	void NotifyShaderUnbound(iGpuProgram *prog) { if (mpActiveShader == prog) mpActiveShader = nullptr; }
+	iGpuProgram *GetActiveShader() const { return mpActiveShader; }
+	// Shader-side alpha-test threshold — pushed to whichever program is
+	// bound. 0 means "don't discard". See injectAlphaTest in CGProgram.cpp.
+	float GetAlphaTestRef() const { return mAlphaTestRef; }
+private:
+	iGpuProgram *mpActiveShader = nullptr;
+	float mAlphaTestRef = 0.0f;
+	// Combiner emulation: SetTextureConstantColor stores into mConstantColor,
+	// and the SetTextureEnv(AlphaSource0=Constant, AlphaFunc=Replace) pair
+	// flips mAlphaOverride to 1 so mSimpleShader's fragment substitutes the
+	// constant's alpha for the texture's. Default is 0 (no override) so plain
+	// DrawQuad / batch flushes keep the texture's native alpha.
+	float mConstantColor[4] = {1.0f, 1.0f, 1.0f, 1.0f};
+	float mAlphaOverride = 0.0f;
+	bool mAlphaUsesConstant = false;
+	// 1x1 white default texture bound when SetTexture is called with NULL,
+	// since GLES2 lacks fixed-function texture disable.
+	iTexture *mDefaultTexture = nullptr;
 };
 
 } // namespace hpl
 
-#endif // defined(HPL1_USE_OPENGL) && !USE_FORCED_GLES2
-#endif // HPL_LOWLEVELGRAPHICS_SDL_H
+#endif // USE_FORCED_GLES2
+#endif // HPL1_USE_OPENGL
+#endif // HPL_LOWLEVELGRAPHICS_GLES_H

@@ -27,6 +27,7 @@
 
 #include "hpl1/penumbra-overture/MapHandler.h"
 
+#include "hpl1/engine/system/String.h"
 #include "hpl1/penumbra-overture/FadeHandler.h"
 #include "hpl1/penumbra-overture/GameArea.h"
 #include "hpl1/penumbra-overture/GameDamageArea.h"
