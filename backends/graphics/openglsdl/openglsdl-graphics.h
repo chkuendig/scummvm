@@ -25,11 +25,12 @@
 #include "backends/graphics/opengl/opengl-graphics.h"
 #include "backends/graphics/sdl/sdl-graphics.h"
 #include "backends/platform/sdl/sdl-sys.h"
+#include "backends/platform/sdl/touchcontrols.h"
 
 #include "common/array.h"
 #include "common/events.h"
 
-class OpenGLSdlGraphicsManager : public OpenGL::OpenGLGraphicsManager, public SdlGraphicsManager {
+class OpenGLSdlGraphicsManager : public OpenGL::OpenGLGraphicsManager, public SdlGraphicsManager, public TouchControlsDrawer {
 public:
 	OpenGLSdlGraphicsManager(SdlEventSource *eventSource, SdlWindow *window);
 	virtual ~OpenGLSdlGraphicsManager();
@@ -42,6 +43,19 @@ public:
 	void updateScreen() override;
 
 	float getHiDPIScreenFactor() const override;
+
+	/** Register the backend-owned on-screen touch controls (nullptr to disable). */
+	void setTouchControls(TouchControls *touchControls) { _touchControls = touchControls; }
+	/** True if the currently running game uses the 3D renderer. */
+	bool isRendering3D() const;
+
+	// TouchControlsDrawer API
+	void touchControlInitSurface(const Graphics::ManagedSurface &surf) override;
+	void touchControlNotifyChanged() override;
+	void touchControlDraw(uint8 alpha, int16 x, int16 y, int16 w, int16 h, const Common::Rect &clip) override;
+
+	void showOverlay(bool inGUI) override;
+	void hideOverlay() override;
 
 	// EventObserver API
 	bool notifyEvent(const Common::Event &event) override;
@@ -74,6 +88,24 @@ private:
 	bool setupMode(uint width, uint height);
 
 	void deinitOpenGLContext();
+
+	// On-screen touch controls (gamepad overlay). The TouchControls object is
+	// owned by OSystem_SDL; we only own the GL surface used to render it.
+	OpenGL::Surface *_touchControlsSurface = nullptr;
+	TouchControls *_touchControls = nullptr;
+	// Re-entrancy guard: on Emscripten, loading the SVG performs a blocking
+	// network fetch that pumps the main loop and re-enters updateScreen(); we
+	// must not start a second init() while one is in progress.
+	bool _touchControlsIniting = false;
+
+	// On-screen mode-toggle button: a small labelled, colour-coded pill drawn
+	// with the GUI font (no loose-file asset, so it is safe during early init).
+	OpenGL::Surface *_touchToggleSurface = nullptr;
+	int _touchToggleRenderedMode = -1;
+	void drawTouchToggle();
+	// Tracks the 3D-renderer state so the per-context touch preset can be
+	// re-applied when a game switches between 2D and 3D.
+	bool _touchWasRendering3D = false;
 
 #if SDL_VERSION_ATLEAST(2, 0, 0)
 	int _glContextProfileMask, _glContextMajor, _glContextMinor;
