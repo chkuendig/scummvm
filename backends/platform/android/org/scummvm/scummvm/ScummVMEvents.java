@@ -22,6 +22,8 @@
 package org.scummvm.scummvm;
 
 import android.os.Build;
+import android.content.Context;
+import android.hardware.input.InputManager;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.Message;
@@ -46,7 +48,8 @@ public class ScummVMEvents implements
 		android.view.View.OnKeyListener,
 		android.view.View.OnTouchListener,
 		android.view.GestureDetector.OnGestureListener,
-		android.view.GestureDetector.OnDoubleTapListener {
+		android.view.GestureDetector.OnDoubleTapListener,
+		InputManager.InputDeviceListener {
 
 	public static final int JE_SYS_KEY = 0;
 	public static final int JE_KEY = 1;
@@ -75,6 +78,8 @@ public class ScummVMEvents implements
 	public static final int JE_TV_REMOTE = 24;
 	public static final int JE_QUIT = 0x1000;
 	public static final int JE_MENU = 0x1001;
+	public static final int JE_TOUCH_MODE_CHANGED = 0x1002;
+	public static final int JE_INPUT_CHANGED = 0x1003;
 
 	public static final int JACTION_DOWN = 0;
 	public static final int JACTION_MOVE = 1;
@@ -114,7 +119,8 @@ public class ScummVMEvents implements
 	final protected MultitouchHelper _multitouchHelper;
 
 	protected View _currentView;
-	protected int _touchMode;
+	protected volatile int _touchMode;
+	private final InputManager _inputManager;
 
 	protected boolean _doubleTapMode;
 
@@ -204,6 +210,8 @@ public class ScummVMEvents implements
 
 	public ScummVMEvents(ScummVMActivity activity, ScummVM scummvm, MouseHelper mouseHelper) {
 		_activity = activity;
+		_inputManager = (InputManager)activity.getSystemService(Context.INPUT_SERVICE);
+		_inputManager.registerInputDeviceListener(this, _handler);
 		_scummvm = scummvm;
 		// Careful, _mouseHelper can be null (if HoverListener is not available for the device API -- old devices, API < 9)
 		_mouseHelper = mouseHelper;
@@ -281,21 +289,32 @@ public class ScummVMEvents implements
 			// We were in gamepad mode and we leave it
 			_scummvm.updateTouch(JACTION_CANCEL, 0, 0, 0);
 		}
-		int oldTouchMode = _touchMode;
 		_touchMode = touchMode;
-		_scummvm.setupTouchMode(oldTouchMode, _touchMode);
 	}
 
-	final public int nextTouchMode() {
-		if (_touchMode == TOUCH_MODE_GAMEPAD) {
-			// We leave gamepad mode
-			_scummvm.updateTouch(JACTION_CANCEL, 0, 0, 0);
-		}
-		int oldTouchMode = _touchMode;
-		_touchMode = (_touchMode + 1) % TOUCH_MODE_MAX;
-		_scummvm.setupTouchMode(oldTouchMode, _touchMode);
+	final public void nextTouchMode() {
+		// Resolve and remember the mode on the engine thread, like the other backends.
+		_scummvm.pushEvent(JE_TOUCH_MODE_CHANGED, 0, 0, 0, 0, 0, 0);
+	}
 
-		return _touchMode;
+	@Override
+	public void onInputDeviceAdded(int deviceId) {
+		_scummvm.pushEvent(JE_INPUT_CHANGED, 0, 0, 0, 0, 0, 0);
+	}
+
+	@Override
+	public void onInputDeviceRemoved(int deviceId) {
+		_scummvm.pushEvent(JE_INPUT_CHANGED, 0, 0, 0, 0, 0, 0);
+	}
+
+	@Override
+	public void onInputDeviceChanged(int deviceId) {
+		_scummvm.pushEvent(JE_INPUT_CHANGED, 0, 0, 0, 0, 0, 0);
+	}
+
+	public void destroy() {
+		_inputManager.unregisterInputDeviceListener(this);
+		clearEventHandler();
 	}
 
 	public void clearEventHandler() {
