@@ -52,6 +52,7 @@ public:
 	~TouchControls();
 
 	void init(float scale);
+	bool isInitialized() const { return _svg != nullptr; }
 	void setDrawer(TouchControlsDrawer *drawer, int width, int height);
 	void beforeDraw();
 	void draw();
