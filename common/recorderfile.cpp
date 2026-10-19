@@ -442,6 +442,14 @@ void PlaybackFile::readEvent(RecorderEvent& event) {
 			event.time = _tmpPlaybackFile.readUint32BE();
 			event.customType = _tmpPlaybackFile.readUint32BE();
 			break;
+		case EVENT_CUSTOM_ENGINE_ACTION_AXIS:
+			event.time = _tmpPlaybackFile.readUint32BE();
+			event.customType = _tmpPlaybackFile.readUint32BE();
+			event.joystick.position = _tmpPlaybackFile.readSint16BE();
+			event.joystick.hasMouseMotion = _tmpPlaybackFile.readByte();
+			event.joystick.mouseMotion = _tmpPlaybackFile.readSint16BE();
+			event.joystick.mouseMotionEnd = _tmpPlaybackFile.readByte();
+			break;
 		case EVENT_JOYAXIS_MOTION:
 		case EVENT_JOYBUTTON_UP:
 		case EVENT_JOYBUTTON_DOWN:
@@ -641,6 +649,14 @@ void PlaybackFile::writeEvent(const RecorderEvent &event) {
 		case EVENT_CUSTOM_ENGINE_ACTION_END:
 			_tmpRecordFile.writeUint32BE(event.time);
 			_tmpRecordFile.writeUint32BE(event.customType);
+			break;
+		case EVENT_CUSTOM_ENGINE_ACTION_AXIS:
+			_tmpRecordFile.writeUint32BE(event.time);
+			_tmpRecordFile.writeUint32BE(event.customType);
+			_tmpRecordFile.writeSint16BE(event.joystick.position);
+			_tmpRecordFile.writeByte(event.joystick.hasMouseMotion);
+			_tmpRecordFile.writeSint16BE(event.joystick.mouseMotion);
+			_tmpRecordFile.writeByte(event.joystick.mouseMotionEnd);
 			break;
 		case EVENT_JOYAXIS_MOTION:
 		case EVENT_JOYBUTTON_UP:
