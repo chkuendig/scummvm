@@ -93,15 +93,13 @@ void Mouse::processEvent(const Common::Event &ev) {
 		return;
 	if (ev.type == Common::EVENT_MOUSEMOVE) {
 		_absMousePos = cVector2f(ev.mouse.x, ev.mouse.y);
-		_relMousePos += cVector2f(ev.relMouse.x, ev.relMouse.y);
 	} else {
 		setMouseState(ev.type, _buttonState);
 	}
+	_relMousePos = cVector2f(ev.relMouse.x, ev.relMouse.y);
 }
 
 void Mouse::Update() {
-	// Accumulate motion for this frame, including virtual-mouse movement before a warp.
-	_relMousePos = cVector2f(0, 0);
 	for (const Common::Event &ev : _lowLevelInputSDL->_events)
 		processEvent(ev);
 }
