@@ -22,13 +22,13 @@
 #include "hpl1/metaengine.h"
 #include "backends/keymapper/action.h"
 #include "backends/keymapper/keymap.h"
-#include "backends/keymapper/virtual-mouse.h"
 #include "common/savefile.h"
 #include "common/system.h"
 #include "common/translation.h"
 #include "graphics/scaler.h"
 #include "graphics/thumbnail.h"
 #include "hpl1/detection.h"
+#include "hpl1/engine/input/InputTypes.h"
 #include "hpl1/graphics.h"
 #include "hpl1/hpl1.h"
 
@@ -69,9 +69,9 @@ Common::Action *createMouseAction(const char *id, const Common::U32String &desc,
 	return act;
 }
 
-Common::Action *createVirtualMouseAxisAction(const char *id, const Common::U32String &desc, const char *defaultMap, const Common::CustomEventType type) {
+Common::Action *createGamepadAxisAction(const char *id, const Common::U32String &desc, const char *defaultMap, const Common::CustomEventType type) {
 	Common::Action *act = new Common::Action(id, desc);
-	act->setCustomBackendActionAxisEvent(type);
+	act->setCustomEngineActionAxisEvent(type);
 	act->addDefaultInputMapping(defaultMap);
 	return act;
 }
@@ -112,11 +112,11 @@ Common::Array<Common::Keymap *> Hpl1MetaEngine::initKeymaps(const char *target) 
 	act = createKeyBoardAction("CROUCH", _("Crouch"), "LCTRL", Common::KEYCODE_LCTRL);
 	act->addDefaultInputMapping("JOY_Y");
 	movement->addAction(act);
-	// Right analog stick: mouse-look camera (via the backend virtual mouse).
-	movement->addAction(createVirtualMouseAxisAction("LOOK_UP", _("Look up"), "JOY_RIGHT_STICK_Y-", Common::VirtualMouse::kCustomActionVirtualAxisUp));
-	movement->addAction(createVirtualMouseAxisAction("LOOK_DOWN", _("Look down"), "JOY_RIGHT_STICK_Y+", Common::VirtualMouse::kCustomActionVirtualAxisDown));
-	movement->addAction(createVirtualMouseAxisAction("LOOK_LEFT", _("Look left"), "JOY_RIGHT_STICK_X-", Common::VirtualMouse::kCustomActionVirtualAxisLeft));
-	movement->addAction(createVirtualMouseAxisAction("LOOK_RIGHT", _("Look right"), "JOY_RIGHT_STICK_X+", Common::VirtualMouse::kCustomActionVirtualAxisRight));
+	// Right analog stick: native camera look.
+	movement->addAction(createGamepadAxisAction("LOOK_UP", _("Look up"), "JOY_RIGHT_STICK_Y-", hpl::eGamepadAction_LookUp));
+	movement->addAction(createGamepadAxisAction("LOOK_DOWN", _("Look down"), "JOY_RIGHT_STICK_Y+", hpl::eGamepadAction_LookDown));
+	movement->addAction(createGamepadAxisAction("LOOK_LEFT", _("Look left"), "JOY_RIGHT_STICK_X-", hpl::eGamepadAction_LookLeft));
+	movement->addAction(createGamepadAxisAction("LOOK_RIGHT", _("Look right"), "JOY_RIGHT_STICK_X+", hpl::eGamepadAction_LookRight));
 
 	Keymap *actions = new Keymap(Keymap::kKeymapTypeGame, "HPL1_ACTIONS", "Actions");
 	act = createKeyBoardAction("INTERACTMODE", _("Interact mode"), "r", Common::KEYCODE_r);
