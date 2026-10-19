@@ -95,6 +95,7 @@ void EventDispatcher::dispatch() {
 				assert(event.type != EVENT_CUSTOM_BACKEND_ACTION_END);
 				assert(event.type != EVENT_CUSTOM_ENGINE_ACTION_START);
 				assert(event.type != EVENT_CUSTOM_ENGINE_ACTION_END);
+				assert(event.type != EVENT_CUSTOM_ENGINE_ACTION_AXIS);
 
 				for (auto &m : _mappers) {
 					if (!mappedEvents.empty())

@@ -187,6 +187,13 @@ bool Keymapper::mapEvent(const Event &ev, List<Event> &mappedEvents) {
 	Keymap::ActionArray actions;
 	getMappedActions(ev, actions);
 
+	Keymap::ActionArray motionActions;
+	if (ev.type == EVENT_JOYAXIS_MOTION && ev.joystick.hasMouseMotion && ev.joystick.position == 0) {
+		Event lookupEvent(ev);
+		lookupEvent.joystick.position = ev.joystick.mouseMotion < 0 ? -1 : 1;
+		getMappedActions(lookupEvent, motionActions);
+	}
+	Event *lastEngineMotion = nullptr;
 	bool matchedAction = !actions.empty();
 	for (const auto &action : actions) {
 		if (ev.type == EVENT_JOYAXIS_MOTION && ev.joystick.hasMouseMotion &&
@@ -196,6 +203,14 @@ bool Keymapper::mapEvent(const Event &ev, List<Event> &mappedEvents) {
 			continue;
 		}
 		Event mappedEvent = executeAction(action, ev);
+		if (mappedEvent.type == EVENT_CUSTOM_ENGINE_ACTION_AXIS && mappedEvent.joystick.hasMouseMotion && ev.joystick.position == 0) {
+			auto match = Common::find(motionActions.begin(), motionActions.end(), action);
+			if (match == motionActions.end()) {
+				mappedEvent.joystick.hasMouseMotion = false;
+			} else {
+				motionActions.erase(match);
+			}
+		}
 		if (mappedEvent.type == EVENT_INVALID) {
 			continue;
 		}
@@ -213,6 +228,12 @@ bool Keymapper::mapEvent(const Event &ev, List<Event> &mappedEvents) {
 		}
 
 		mappedEvents.push_back(mappedEvent);
+		if (mappedEvent.type == EVENT_CUSTOM_ENGINE_ACTION_AXIS && mappedEvent.joystick.hasMouseMotion) {
+			if (lastEngineMotion) {
+				lastEngineMotion->joystick.mouseMotionEnd = false;
+			}
+			lastEngineMotion = &mappedEvents.back();
+		}
 	}
 
 	if (ev.type == EVENT_JOYAXIS_MOTION && ev.joystick.axis < ARRAYSIZE(_joystickAxisPreviouslyPressed)) {
@@ -351,12 +372,21 @@ Event Keymapper::executeAction(const Action *action, const Event &incomingEvent)
 	IncomingEventType incomingType = convertToIncomingEventType(incomingEvent);
 
 	if (outgoingEvent.type == EVENT_JOYAXIS_MOTION
-	        || outgoingEvent.type == EVENT_CUSTOM_BACKEND_ACTION_AXIS) {
+	        || outgoingEvent.type == EVENT_CUSTOM_BACKEND_ACTION_AXIS
+	        || outgoingEvent.type == EVENT_CUSTOM_ENGINE_ACTION_AXIS) {
 		if (incomingEvent.type == EVENT_JOYAXIS_MOTION) {
 			// At the moment only half-axes can be bound to actions, hence taking
 			//  the absolute value. If full axes were to be mappable, the action
 			//  could carry the information allowing to distinguish cases here.
 			outgoingEvent.joystick.position = ABS(incomingEvent.joystick.position);
+			if (outgoingEvent.type == EVENT_CUSTOM_ENGINE_ACTION_AXIS) {
+				outgoingEvent.joystick.position = MIN<int32>(ABS<int32>(incomingEvent.joystick.position), JOYAXIS_MAX);
+				outgoingEvent.joystick.hasMouseMotion = incomingEvent.joystick.hasMouseMotion;
+				int sourceSign = incomingEvent.joystick.position < 0 ||
+						(incomingEvent.joystick.position == 0 && incomingEvent.joystick.mouseMotion < 0) ? -1 : 1;
+				outgoingEvent.joystick.mouseMotion = incomingEvent.joystick.mouseMotion * sourceSign;
+				outgoingEvent.joystick.mouseMotionEnd = incomingEvent.joystick.mouseMotionEnd;
+			}
 		} else if (incomingType == kIncomingEventStart) {
 			outgoingEvent.joystick.position = JOYAXIS_MAX;
 		} else if (incomingType == kIncomingEventEnd) {

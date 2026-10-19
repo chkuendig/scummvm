@@ -49,6 +49,13 @@ class KeymapperMouseMotionTestSuite : public CxxTest::TestSuite {
 		keymap->registerMapping(action, Common::HardwareInput::createJoystickHalfAxis("", axis, positive, Common::U32String()));
 	}
 
+	void bindEngine(Common::Keymap *keymap, const char *id, uint32 type, byte axis, bool positive) {
+		Common::Action *action = new Common::Action(id, Common::U32String());
+		action->setCustomEngineActionAxisEvent(type);
+		keymap->addAction(action);
+		keymap->registerMapping(action, Common::HardwareInput::createJoystickHalfAxis("", axis, positive, Common::U32String()));
+	}
+
 	Common::Keymap *keymap(Common::Keymapper &mapper) {
 		mapper.registerHardwareInputSet(new Common::JoystickHardwareInputSet(Common::defaultJoystickButtons, Common::defaultJoystickAxes), nullptr);
 		Common::Keymap *map = new Common::Keymap(Common::Keymap::kKeymapTypeGlobal, "motion-test", Common::U32String());
@@ -124,6 +131,64 @@ public:
 		TS_ASSERT(!mapper.mapEvent(event, result));
 		TS_ASSERT(result.empty());
 		TS_ASSERT_EQUALS(event.joystick.position, -24000);
+	}
+
+	void test_native_engine_axis_retains_motion_when_reversing() {
+		Events events;
+		Common::Keymapper mapper(&events);
+		Common::Keymap *map = keymap(mapper);
+		bindEngine(map, "look", 42, Common::JOYSTICK_AXIS_RIGHT_STICK_X, false);
+		Common::List<Common::Event> result;
+		mapper.mapEvent(axis(Common::JOYSTICK_AXIS_RIGHT_STICK_X, -16000, 7, true), result);
+		TS_ASSERT_EQUALS(result.size(), 1U);
+		TS_ASSERT_EQUALS(result.front().type, Common::EVENT_CUSTOM_ENGINE_ACTION_AXIS);
+		TS_ASSERT_EQUALS(result.front().customType, 42U);
+		TS_ASSERT_EQUALS(result.front().joystick.position, 16000);
+		TS_ASSERT(result.front().joystick.hasMouseMotion);
+		TS_ASSERT_EQUALS(result.front().joystick.mouseMotion, -7);
+	}
+
+	void test_native_engine_centre_has_only_one_relative_half() {
+		Events events;
+		Common::Keymapper mapper(&events);
+		Common::Keymap *map = keymap(mapper);
+		bindEngine(map, "right", 42, Common::JOYSTICK_AXIS_RIGHT_STICK_X, true);
+		bindEngine(map, "left", 43, Common::JOYSTICK_AXIS_RIGHT_STICK_X, false);
+		Common::List<Common::Event> result;
+		mapper.mapEvent(axis(Common::JOYSTICK_AXIS_RIGHT_STICK_X, 0, -37, true), result);
+		TS_ASSERT_EQUALS(result.size(), 2U);
+		TS_ASSERT(!result.front().joystick.hasMouseMotion);
+		TS_ASSERT_EQUALS(result.back().customType, 43U);
+		TS_ASSERT(result.back().joystick.hasMouseMotion);
+		TS_ASSERT_EQUALS(result.back().joystick.mouseMotion, 37);
+		TS_ASSERT(result.back().joystick.mouseMotionEnd);
+	}
+
+	void test_native_engine_motion_end_follows_all_mapped_axes() {
+		Events events;
+		Common::Keymapper mapper(&events);
+		Common::Keymap *map = keymap(mapper);
+		bindEngine(map, "x", 42, Common::JOYSTICK_AXIS_RIGHT_STICK_Y, true);
+		bindEngine(map, "y", 43, Common::JOYSTICK_AXIS_RIGHT_STICK_Y, true);
+		Common::List<Common::Event> result;
+		mapper.mapEvent(axis(Common::JOYSTICK_AXIS_RIGHT_STICK_Y, 1000, 11, true), result);
+		TS_ASSERT_EQUALS(result.size(), 2U);
+		TS_ASSERT(!result.front().joystick.mouseMotionEnd);
+		TS_ASSERT(result.back().joystick.mouseMotionEnd);
+	}
+
+	void test_native_engine_hardware_axis_handles_full_negative_range() {
+		Events events;
+		Common::Keymapper mapper(&events);
+		Common::Keymap *map = keymap(mapper);
+		bindEngine(map, "look", 42, Common::JOYSTICK_AXIS_RIGHT_STICK_X, false);
+		Common::Event event = axis(Common::JOYSTICK_AXIS_RIGHT_STICK_X, Common::JOYAXIS_MIN, 0, true);
+		event.joystick.hasMouseMotion = false;
+		Common::List<Common::Event> result;
+		mapper.mapEvent(event, result);
+		TS_ASSERT_EQUALS(result.size(), 1U);
+		TS_ASSERT_EQUALS(result.front().joystick.position, Common::JOYAXIS_MAX);
+		TS_ASSERT(!result.front().joystick.hasMouseMotion);
 	}
 
 	void test_hardware_axes_keep_velocity_mapping() {
