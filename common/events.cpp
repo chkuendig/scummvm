@@ -77,7 +77,13 @@ void EventDispatcher::dispatch() {
 	for (auto &source : _sources) {
 		if (source.ignore)
 			continue;
-		while (source.source->pollEvent(event)) {
+		for (;;) {
+			// Sources may only fill their own payload; optional axis data must
+			// not carry over from a previous software-controller event.
+			event.joystick = JoystickState();
+			if (!source.source->pollEvent(event)) {
+				break;
+			}
 			// We only try to process the events via the setup event mapper, when
 			// we have a setup mapper and when the event source allows mapping.
 			if (source.source->allowMapping()) {
