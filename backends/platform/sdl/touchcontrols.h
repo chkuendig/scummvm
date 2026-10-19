@@ -21,10 +21,10 @@
 
 // On-screen touch gamepad controls for the SDL backend (used by Emscripten).
 //
-// A floating digital D-pad, analog right stick, independent A/B/X/Y buttons,
-// and a top cluster for the main menu, shoulders and Start. Controls emit
-// joystick events through the backend event queue; engines choose their actions
-// through the keymapper. The pad is hidden outside gamepad touch mode.
+// A floating digital D-pad, mouse-look region, independent A/B/X/Y buttons,
+// and a top cluster for the main menu, shoulders and Start. Buttons use the
+// keymapper; mouse-look retains its existing relative-motion response.
+// The pad is hidden outside gamepad touch mode.
 
 #ifndef BACKENDS_PLATFORM_SDL_TOUCHCONTROLS_H_
 #define BACKENDS_PLATFORM_SDL_TOUCHCONTROLS_H_
@@ -84,7 +84,8 @@ private:
 	uint8 _baseAlpha;
 	void refreshConfig();
 
-	// Draws the right-stick ring and knob into the spare row of the surface.
+	// Draws the thumbstick ring/knob and the L1/R1 pills from primitives into
+	// the spare bottom row of the gamepad surface (called once after load).
 	void renderPrimitives();
 
 	// Home (resting) centre of a control, in fixed-point screen pixels.
@@ -141,18 +142,18 @@ private:
 	Function *getZombieFunctionFromPos(int x, int y);
 
 	enum FunctionId {
-		kFunctionNone       = -1,
-		kFunctionDpad       = 0, // visible D-pad (DPAD_UP/DOWN/LEFT/RIGHT buttons)
-		kFunctionButtonY    = 1, // A/B/X/Y diamond (independent hotspots)
-		kFunctionButtonB    = 2,
-		kFunctionButtonA    = 3,
-		kFunctionButtonX    = 4,
-		kFunctionShoulderL  = 5, // L1 shoulder (top-left)
-		kFunctionShoulderR  = 6, // R1 shoulder (top-right)
-		kFunctionStart      = 7, // Start/menu button (top centre)
-		kFunctionScummVM    = 8, // ScummVM "S" button (opens the Global Main Menu)
-		kFunctionRightStick = 9,
-		kFunctionCount      = 10
+		kFunctionNone      = -1,
+		kFunctionDpad      = 0, // visible D-pad (DPAD_UP/DOWN/LEFT/RIGHT buttons)
+		kFunctionButtonY   = 1, // A/B/X/Y diamond (independent hotspots)
+		kFunctionButtonB   = 2,
+		kFunctionButtonA   = 3,
+		kFunctionButtonX   = 4,
+		kFunctionShoulderL = 5, // L1 shoulder (top-left)
+		kFunctionShoulderR = 6, // R1 shoulder (top-right)
+		kFunctionStart     = 7, // Start/menu button (top centre)
+		kFunctionScummVM   = 8, // ScummVM "S" button (opens the Global Main Menu)
+		kFunctionLook      = 9, // drag-to-look (right half, invisible)
+		kFunctionCount     = 10
 	};
 	FunctionId getFunctionId(int x, int y);
 
@@ -165,6 +166,10 @@ private:
 	static void keyDown(Common::KeyCode kc);
 	static void keyUp(Common::KeyCode kc);
 	static void axisMotion(Common::JoystickAxis axis, int16 value);
+	// Relative-mouse motion for drag-to-look (relX/relY in window pixels).
+	static void mouseRelative(int relX, int relY);
+	// Synthetic left click at the current cursor position (tap-to-click).
+	static void mouseClick();
 	// Opens the ScummVM Global Main Menu (pushes EVENT_MAINMENU).
 	static void mainMenu();
 
@@ -281,19 +286,22 @@ private:
 		bool pressed;
 	};
 
-	// Floating right stick, anchored at finger-down. Axis values remain held
-	// until the finger moves, lifts or is cancelled, like a hardware stick.
-	struct FunctionRightStick : Function {
-		FunctionRightStick(const TouchControls *parent) :
-			Function(parent), axisX(0), axisY(0) {}
-		void resetState() override { axisX = axisY = 0; }
+	// Drag-to-look: the right half of the screen, excluding the button/shoulder
+	// hotspots. Invisible (no widget). A drag becomes relative-mouse motion (the
+	// camera); a short tap becomes a left click.
+	struct FunctionLook : Function {
+		FunctionLook(const TouchControls *parent) :
+			Function(parent), prevX(0), prevY(0), hiresX(0), hiresY(0), maxTravel(0) {}
+		void resetState() override { prevX = prevY = 0; hiresX = hiresY = 0; maxTravel = 0; }
 
 		bool isInside(int, int) override { return false; } // no widget, no zombie reuse
 		void touch(int, int, Action) override;
-		// Draws the ring and clamped stick position while touched.
+		// Draws the ring/dot drag indicator while actively dragging.
 		void draw(uint8 baseAlpha, uint8 hlAlpha) override;
 
-		int16 axisX, axisY;
+		int prevX, prevY;     // previous finger position (fixed-point px)
+		float hiresX, hiresY; // sub-pixel relmouse accumulator
+		int maxTravel;        // max travel from start (window px), for tap detection
 	};
 };
 

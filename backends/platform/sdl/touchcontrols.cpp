@@ -44,13 +44,13 @@
 //   col 2 row 1 (256,128) : system pressed highlights (packed in quadrants)
 //
 // A spare row is appended below the 384x256 sheet (SVG y 256..384) into which
-// the right-stick ring/knob are drawn from primitives at load time (see
+// the drag-to-look ring/knob are drawn from primitives at load time (see
 // renderPrimitives()).
 // ---------------------------------------------------------------------------
 #define SVG_WIDTH          384
 #define SVG_HEIGHT         256
 // Total height of the backing surface: the sheet plus the spare primitives row
-// (the right-stick ring/knob are drawn into it from primitives).
+// (the drag-to-look ring/knob are drawn into it from primitives).
 #define SVG_FULL_HEIGHT    384
 
 // ---------------------------------------------------------------------------
@@ -91,22 +91,34 @@
 #define DPAD_DEAD           27   // direction dead-zone (SVG px); larger = less twitchy walking
 #define DPAD_HIT            62   // hit radius for zombie re-touch / inside test
 
-// Right-stick indicator (drawn from primitives into the spare row): a ring
+// Drag-to-look indicator (drawn from primitives into the spare row): a ring
 // ("base", anchored at the finger-down position) and a filled dot ("knob", at
 // the current finger position). Sizes in SVG px.
-#define STICK_RADIUS    34
-#define STICK_KNOB_RADIUS     13
-#define STICK_RING_CLIP       60, 256, 60 + 2 * STICK_RADIUS, 256 + 2 * STICK_RADIUS
-#define STICK_KNOB_CLIP       150, 256, 150 + 2 * STICK_KNOB_RADIUS, 256 + 2 * STICK_KNOB_RADIUS
+#define LOOK_RING_RADIUS    34
+#define LOOK_DOT_RADIUS     13
+#define LOOK_RING_CLIP       60, 256, 60 + 2 * LOOK_RING_RADIUS, 256 + 2 * LOOK_RING_RADIUS
+#define LOOK_DOT_CLIP       150, 256, 150 + 2 * LOOK_DOT_RADIUS, 256 + 2 * LOOK_DOT_RADIUS
 
 #define ALPHA_OPAQUE       255
 #define ZOMBIE_TIMEOUT     500 // ms
+
+// Drag-to-look: a finger that lifts having travelled less than this (window px)
+// synthesizes a left click instead.
+#define TAP_MAX_TRAVEL       8
+
+// Drag-to-look feel (tunable). The per-frame finger delta is turned into
+// relative-mouse motion as:  relMouse = delta * BASE * (1 + ACCEL * speed),
+// where speed is the per-frame finger travel magnitude in window pixels. BASE
+// is ~2x the previous sensitivity; ACCEL makes fast flicks move the camera
+// disproportionately more than slow drags.
+#define LOOK_BASE_SENS       2.5f
+#define LOOK_ACCEL           0.04f
 
 // ---------------------------------------------------------------------------
 // Home (resting) positions of the controls, in percent of the window. AAA
 // touch-FPS layout in landscape: D-pad bottom-left, A/B/X/Y diamond
 // bottom-right, and the gamepad.svg "system" cluster top-centre (a diamond of
-// GMM/R1/Start/L1 on its grouping circle). A floating right-stick region
+// GMM/R1/Start/L1 on its grouping circle). An invisible drag-to-look region
 // fills the rest of the right half. (The mode-toggle icon lives in the top-right
 // corner and is drawn elsewhere.)
 // ---------------------------------------------------------------------------
@@ -145,7 +157,7 @@
 #define SYS_HIT             (26 * SYS_SIZE_PCT / 100)
 
 // Fingers left of this (percent of width) and not on a hotspot drive the
-// D-pad; everything else drives the right stick.
+// D-pad; everything else drives drag-to-look.
 #define LEFT_REGION_MAX_PCT  40
 
 // The scale factor is stored as a fixed point 30.2 bits
@@ -176,24 +188,24 @@ TouchControls::TouchControls() :
 	_zombieCount(0),
 	_baseAlpha(ALPHA_OPAQUE * 6 / 10) {
 	_gesturesInsets[0] = _gesturesInsets[1] = _gesturesInsets[2] = _gesturesInsets[3] = 0;
-	_functions[kFunctionDpad]         = new FunctionDpad(this);
+	_functions[kFunctionDpad]      = new FunctionDpad(this);
 	// The first face button owns the shared resting-cluster glyph (drawn once);
 	// all four still have independent hotspots and pressed highlights. The last
 	// two args are the highlight crop offset (in half-widths/heights) from the
 	// cluster centre, matching the colour circles of the highlight row.
-	_functions[kFunctionButtonY]      = new FunctionButton(this, Common::JOYSTICK_BUTTON_Y,
+	_functions[kFunctionButtonY]   = new FunctionButton(this, Common::JOYSTICK_BUTTON_Y,
 			0, -ABXY_GLYPH_OFFSET, Common::Rect(ABXY_HL_Y), -1, -2, true);
-	_functions[kFunctionButtonB]      = new FunctionButton(this, Common::JOYSTICK_BUTTON_B,
+	_functions[kFunctionButtonB]   = new FunctionButton(this, Common::JOYSTICK_BUTTON_B,
 			ABXY_GLYPH_OFFSET, 0, Common::Rect(ABXY_HL_B), 0, -1, false);
-	_functions[kFunctionButtonA]      = new FunctionButton(this, Common::JOYSTICK_BUTTON_A,
+	_functions[kFunctionButtonA]   = new FunctionButton(this, Common::JOYSTICK_BUTTON_A,
 			0, ABXY_GLYPH_OFFSET, Common::Rect(ABXY_HL_A), -1, 0, false);
-	_functions[kFunctionButtonX]      = new FunctionButton(this, Common::JOYSTICK_BUTTON_X,
+	_functions[kFunctionButtonX]   = new FunctionButton(this, Common::JOYSTICK_BUTTON_X,
 			-ABXY_GLYPH_OFFSET, 0, Common::Rect(ABXY_HL_X), -2, -1, false);
-	_functions[kFunctionShoulderL]    = new FunctionShoulder(this, Common::JOYSTICK_BUTTON_LEFT_SHOULDER, false);
-	_functions[kFunctionShoulderR]    = new FunctionShoulder(this, Common::JOYSTICK_BUTTON_RIGHT_SHOULDER, true);
-	_functions[kFunctionStart]        = new FunctionStart(this);
-	_functions[kFunctionScummVM]      = new FunctionScummVM(this);
-	_functions[kFunctionRightStick]   = new FunctionRightStick(this);
+	_functions[kFunctionShoulderL] = new FunctionShoulder(this, Common::JOYSTICK_BUTTON_LEFT_SHOULDER, false);
+	_functions[kFunctionShoulderR] = new FunctionShoulder(this, Common::JOYSTICK_BUTTON_RIGHT_SHOULDER, true);
+	_functions[kFunctionStart]     = new FunctionStart(this);
+	_functions[kFunctionScummVM]   = new FunctionScummVM(this);
+	_functions[kFunctionLook]      = new FunctionLook(this);
 }
 
 void TouchControls::init(float scale) {
@@ -241,11 +253,11 @@ void TouchControls::renderPrimitives() {
 	_svg->fillRect(Common::Rect(0, SVG_PIXELS(SVG_HEIGHT), SVG_PIXELS(SVG_WIDTH), SVG_PIXELS(SVG_FULL_HEIGHT)),
 			fmt.ARGBToColor(0, 0, 0, 0));
 
-	// --- Right-stick indicator: a ring ("base") and a filled dot ("knob") ---
+	// --- Drag-to-look indicator: a ring ("base") and a filled dot ("knob") ---
 	const uint32 ringCol = fmt.ARGBToColor(210, 240, 240, 240);
 	const uint32 dotCol  = fmt.ARGBToColor(255, 255, 255, 255); // brighter knob
 	{
-		Common::Rect c(STICK_RING_CLIP);
+		Common::Rect c(LOOK_RING_CLIP);
 		Common::Rect r(SVG_PIXELS(c.left), SVG_PIXELS(c.top),
 				SVG_PIXELS(c.right), SVG_PIXELS(c.bottom));
 		int cx = (r.left + r.right) / 2;
@@ -259,7 +271,7 @@ void TouchControls::renderPrimitives() {
 		}
 	}
 	{
-		Common::Rect c(STICK_KNOB_CLIP);
+		Common::Rect c(LOOK_DOT_CLIP);
 		Common::Rect r(SVG_PIXELS(c.left), SVG_PIXELS(c.top),
 				SVG_PIXELS(c.right), SVG_PIXELS(c.bottom));
 		int cx = (r.left + r.right) / 2;
@@ -322,7 +334,7 @@ TouchControls::FunctionId TouchControls::getFunctionId(int x, int y) {
 	}
 
 	// Hit-test priority: Start > ScummVM > shoulders > A/B/X/Y hotspots > left
-	// region (D-pad) > right region (analog stick).
+	// region (D-pad) > right region (drag-to-look).
 	if (_functions[kFunctionStart]->isInside(x, y)) {
 		return kFunctionStart;
 	}
@@ -348,7 +360,7 @@ TouchControls::FunctionId TouchControls::getFunctionId(int x, int y) {
 	if (xRatio < LEFT_REGION_MAX_PCT) {
 		return kFunctionDpad;
 	}
-	return kFunctionRightStick;
+	return kFunctionLook;
 }
 
 void TouchControls::setDrawer(TouchControlsDrawer *drawer, int width, int height) {
@@ -578,6 +590,30 @@ void TouchControls::axisMotion(Common::JoystickAxis axis, int16 value) {
 	ev.joystick.axis = axis;
 	ev.joystick.position = value;
 	dynamic_cast<OSystem_SDL *>(g_system)->pushEvent(ev);
+}
+
+void TouchControls::mouseRelative(int relX, int relY) {
+	Common::Event ev;
+	ev.type = Common::EVENT_MOUSEMOVE;
+	// Absolute position is kept at the current cursor; the engine (HPL1) reads
+	// the relative delta for the camera.
+	ev.mouse = g_system->getEventManager()->getMousePos();
+	ev.relMouse = Common::Point(relX, relY);
+	dynamic_cast<OSystem_SDL *>(g_system)->pushEvent(ev);
+}
+
+void TouchControls::mouseClick() {
+	Common::Point p = g_system->getEventManager()->getMousePos();
+
+	Common::Event down;
+	down.type = Common::EVENT_LBUTTONDOWN;
+	down.mouse = p;
+	dynamic_cast<OSystem_SDL *>(g_system)->pushEvent(down);
+
+	Common::Event up;
+	up.type = Common::EVENT_LBUTTONUP;
+	up.mouse = p;
+	dynamic_cast<OSystem_SDL *>(g_system)->pushEvent(up);
 }
 
 void TouchControls::mainMenu() {
@@ -904,37 +940,71 @@ void TouchControls::FunctionStart::draw(uint8 /*baseAlpha*/, uint8 hlAlpha) {
 }
 
 // ===========================================================================
-// Floating analog right stick
+// Drag-to-look (right half, invisible: relative-mouse camera + tap-to-click)
 // ===========================================================================
 
-void TouchControls::FunctionRightStick::touch(int dX, int dY, Action action) {
-	int16 newX = 0;
-	int16 newY = 0;
-	const float radius = SVG_UNSCALED(STICK_RADIUS) * parent->_scale;
-	if (action == kActionMove && radius > 0) {
-		float x = dX / radius;
-		float y = dY / radius;
-		const float magnitude = sqrtf(x * x + y * y);
-		if (magnitude > 1.0f) {
-			x /= magnitude;
-			y /= magnitude;
-		}
-		newX = x * Common::JOYAXIS_MAX;
-		newY = y * Common::JOYAXIS_MAX;
+void TouchControls::FunctionLook::touch(int dX, int dY, Action action) {
+	if (action == kActionDown) {
+		prevX = currentX;
+		prevY = currentY;
+		hiresX = hiresY = 0.0f;
+		maxTravel = 0;
+		return;
 	}
 
-	if (newX != axisX) {
-		axisX = newX;
-		axisMotion(Common::JOYSTICK_AXIS_RIGHT_STICK_X, axisX);
+	if (action == kActionCancel) {
+		return;
 	}
-	if (newY != axisY) {
-		axisY = newY;
-		axisMotion(Common::JOYSTICK_AXIS_RIGHT_STICK_Y, axisY);
+
+	// Track the largest travel from the press origin (window px) for the
+	// tap-to-click decision (Manhattan distance is plenty here).
+	int travel = (abs(dX) + abs(dY)) / SCALE_FACTOR_FXP;
+	if (travel > maxTravel) {
+		maxTravel = travel;
+	}
+
+	if (action == kActionUp) {
+		if (maxTravel <= TAP_MAX_TRAVEL) {
+			mouseClick();
+		}
+		return;
+	}
+
+	// kActionMove: convert per-frame finger delta into relative-mouse motion,
+	// mirroring the touchpad relmouse scaling in sdl2-events.cpp, but with a
+	// higher base sensitivity and speed-based acceleration so fast flicks turn
+	// the camera disproportionately more than slow drags.
+	int ddX = (int)currentX - prevX;
+	int ddY = (int)currentY - prevY;
+	prevX = currentX;
+	prevY = currentY;
+
+	int kbdMouseSpeed = CLIP<int>(ConfMan.getInt("kbdmouse_speed"), 0, 7);
+	float speedFactor = (kbdMouseSpeed + 1) * 0.25f;
+
+	// Per-frame finger delta and travel magnitude, in window pixels.
+	float dxPx = ddX / (float)SCALE_FACTOR_FXP;
+	float dyPx = ddY / (float)SCALE_FACTOR_FXP;
+	float fingerSpeed = sqrtf(dxPx * dxPx + dyPx * dyPx);
+	float gain = LOOK_BASE_SENS * speedFactor * (1.0f + LOOK_ACCEL * fingerSpeed);
+
+	hiresX += dxPx * gain;
+	hiresY += dyPx * gain;
+
+	int relX = (int)hiresX;
+	int relY = (int)hiresY;
+	hiresX -= relX;
+	hiresY -= relY;
+
+	if (relX || relY) {
+		mouseRelative(relX, relY);
 	}
 }
 
-void TouchControls::FunctionRightStick::draw(uint8 baseAlpha, uint8 /*hlAlpha*/) {
-	// The ring stays at finger-down; the knob follows the normalized axes.
+void TouchControls::FunctionLook::draw(uint8 baseAlpha, uint8 /*hlAlpha*/) {
+	// Only while a finger is actively dragging the look region: a ring anchored
+	// at the finger-down position plus a filled dot at the current finger
+	// position, so the offset shows look direction/speed. Gone on release.
 	if (status != kFunctionActive) {
 		return;
 	}
@@ -942,12 +1012,9 @@ void TouchControls::FunctionRightStick::draw(uint8 baseAlpha, uint8 /*hlAlpha*/)
 	// The knob is drawn a little brighter than the configured pad opacity.
 	uint8 dotAlpha = (uint8)MIN<int>(ALPHA_OPAQUE, baseAlpha + (ALPHA_OPAQUE - baseAlpha) / 2);
 
-	Common::Rect ring(STICK_RING_CLIP);
+	Common::Rect ring(LOOK_RING_CLIP);
 	parent->drawSurface(baseAlpha, startX, startY, -ring.width() / 2, -ring.height() / 2, ring);
 
-	Common::Rect dot(STICK_KNOB_CLIP);
-	const int radius = SVG_UNSCALED(STICK_RADIUS) * parent->_scale;
-	const int x = startX + (int32)axisX * radius / Common::JOYAXIS_MAX;
-	const int y = startY + (int32)axisY * radius / Common::JOYAXIS_MAX;
-	parent->drawSurface(dotAlpha, x, y, -dot.width() / 2, -dot.height() / 2, dot);
+	Common::Rect dot(LOOK_DOT_CLIP);
+	parent->drawSurface(dotAlpha, currentX, currentY, -dot.width() / 2, -dot.height() / 2, dot);
 }
