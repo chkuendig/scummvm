@@ -126,6 +126,7 @@ MODULE_OBJS := \
 	engine/input/Action.o \
 	engine/input/ActionKeyboard.o \
 	engine/input/ActionMouseButton.o \
+	engine/input/Gamepad.o \
 	engine/input/Input.o \
 	engine/input/InputDevice.o \
 	engine/input/Keyboard.o \
