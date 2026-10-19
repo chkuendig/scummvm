@@ -29,7 +29,7 @@
 #include "graphics/managed_surface.h"
 #include "graphics/scaler.h"
 
-#define RECORD_VERSION 2
+#define RECORD_VERSION 3
 
 namespace Common {
 
@@ -137,6 +137,7 @@ bool PlaybackFile::checkPlaybackFileVersion() {
 	switch (_version) {
 	case 1:
 	case 2:
+	case 3:
 		break;
 	default:
 		warning("Unknown playback file version %d. Maximum supported version is %d.", _version, RECORD_VERSION);
@@ -448,6 +449,12 @@ void PlaybackFile::readEvent(RecorderEvent& event) {
 			event.joystick.axis = _tmpPlaybackFile.readByte();
 			event.joystick.button = _tmpPlaybackFile.readByte();
 			event.joystick.position = _tmpPlaybackFile.readSint16BE();
+			event.joystick.hasMouseMotion = false;
+			if (_version >= 3 && event.type == EVENT_JOYAXIS_MOTION) {
+				event.joystick.hasMouseMotion = _tmpPlaybackFile.readByte();
+				event.joystick.mouseMotion = _tmpPlaybackFile.readSint16BE();
+				event.joystick.mouseMotionEnd = _tmpPlaybackFile.readByte();
+			}
 			break;
 		default:
 			event.time = _tmpPlaybackFile.readUint32BE();
@@ -642,6 +649,11 @@ void PlaybackFile::writeEvent(const RecorderEvent &event) {
 			_tmpRecordFile.writeByte(event.joystick.axis);
 			_tmpRecordFile.writeByte(event.joystick.button);
 			_tmpRecordFile.writeSint16BE(event.joystick.position);
+			if (event.type == EVENT_JOYAXIS_MOTION) {
+				_tmpRecordFile.writeByte(event.joystick.hasMouseMotion);
+				_tmpRecordFile.writeSint16BE(event.joystick.mouseMotion);
+				_tmpRecordFile.writeByte(event.joystick.mouseMotionEnd);
+			}
 			break;
 		default:
 			_tmpRecordFile.writeUint32BE(event.time);

@@ -165,9 +165,7 @@ private:
 	// launcher and the GMM) keyboard-style from the on-screen pad.
 	static void keyDown(Common::KeyCode kc);
 	static void keyUp(Common::KeyCode kc);
-	static void axisMotion(Common::JoystickAxis axis, int16 value);
-	// Relative-mouse motion for drag-to-look (relX/relY in window pixels).
-	static void mouseRelative(int relX, int relY);
+	static void axisMotion(Common::JoystickAxis axis, int16 value, int16 mouseMotion, bool mouseMotionEnd);
 	// Synthetic left click at the current cursor position (tap-to-click).
 	static void mouseClick();
 	// Opens the ScummVM Global Main Menu (pushes EVENT_MAINMENU).
@@ -287,8 +285,8 @@ private:
 	};
 
 	// Drag-to-look: the right half of the screen, excluding the button/shoulder
-	// hotspots. Invisible (no widget). A drag becomes relative-mouse motion (the
-	// camera); a short tap becomes a left click.
+	// hotspots. Emits right-stick axes with the original mouse-emulation response
+	// for virtual-mouse mappings; a short tap becomes a left click.
 	struct FunctionLook : Function {
 		FunctionLook(const TouchControls *parent) :
 			Function(parent), prevX(0), prevY(0), hiresX(0), hiresY(0), maxTravel(0) {}
@@ -296,6 +294,7 @@ private:
 
 		bool isInside(int, int) override { return false; } // no widget, no zombie reuse
 		void touch(int, int, Action) override;
+		void emitAxes(int dX, int dY, int relX, int relY);
 		// Draws the ring/dot drag indicator while actively dragging.
 		void draw(uint8 baseAlpha, uint8 hlAlpha) override;
 
