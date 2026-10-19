@@ -24,6 +24,7 @@
 #include "backends/keymapper/action.h"
 #include "backends/keymapper/hardware-input.h"
 #include "backends/keymapper/keymapper-defaults.h"
+#include "backends/keymapper/virtual-mouse.h"
 
 #include "common/system.h"
 
@@ -177,26 +178,23 @@ void Keymapper::setEnabledKeymapType(Keymap::KeymapType type) {
 
 bool Keymapper::mapEvent(const Event &ev, List<Event> &mappedEvents) {
 	if (!_enabled) {
+		_pendingMouseMotion = Point();
 		return false;
 	}
 
 	hardcodedEventMapping(ev);
 
 	Keymap::ActionArray actions;
-	Keymap::KeymapMatch match = getMappedActions(ev, actions, _enabledKeymapType);
-	if (match != Keymap::kKeymapMatchExact) {
-		// If we found exact matching actions this input in the game / gui keymaps,
-		// no need to look at the global keymaps. An input resulting in actions
-		// from system and game keymaps would lead to unexpected user experience.
-		Keymap::ActionArray globalActions;
-		match = getMappedActions(ev, globalActions, Keymap::kKeymapTypeGlobal);
-		if (match == Keymap::kKeymapMatchExact || actions.empty()) {
-			actions = globalActions;
-		}
-	}
+	getMappedActions(ev, actions);
 
 	bool matchedAction = !actions.empty();
 	for (const auto &action : actions) {
+		if (ev.type == EVENT_JOYAXIS_MOTION && ev.joystick.hasMouseMotion &&
+				action->event.type == EVENT_CUSTOM_BACKEND_ACTION_AXIS &&
+				action->event.customType >= VirtualMouse::kCustomActionVirtualAxisUp &&
+				action->event.customType <= VirtualMouse::kCustomActionVirtualAxisRight) {
+			continue;
+		}
 		Event mappedEvent = executeAction(action, ev);
 		if (mappedEvent.type == EVENT_INVALID) {
 			continue;
@@ -225,7 +223,75 @@ bool Keymapper::mapEvent(const Event &ev, List<Event> &mappedEvents) {
 		}
 	}
 
+	if (ev.type == EVENT_JOYAXIS_MOTION && ev.joystick.hasMouseMotion) {
+		mapMouseMotion(ev, mappedEvents);
+	}
+
+	if (!matchedAction && !mappedEvents.empty()) {
+		// An unmapped final axis can complete mouse motion from a mapped axis.
+		mappedEvents.push_front(ev);
+		matchedAction = true;
+	}
 	return matchedAction;
+}
+
+void Keymapper::getMappedActions(const Event &event, Keymap::ActionArray &actions) const {
+	Keymap::KeymapMatch match = getMappedActions(event, actions, _enabledKeymapType);
+	if (match != Keymap::kKeymapMatchExact) {
+		// If we found exact matching actions this input in the game / gui keymaps,
+		// no need to look at the global keymaps. An input resulting in actions
+		// from system and game keymaps would lead to unexpected user experience.
+		Keymap::ActionArray globalActions;
+		match = getMappedActions(event, globalActions, Keymap::kKeymapTypeGlobal);
+		if (match == Keymap::kKeymapMatchExact || actions.empty()) {
+			actions = globalActions;
+		}
+	}
+}
+
+void Keymapper::mapMouseMotion(const Event &event, List<Event> &mappedEvents) {
+	if (event.joystick.mouseMotion) {
+		Event lookupEvent(event);
+		// A centred axis resets both halves. A relative delta at the centre
+		// belongs to one half only, so it must not be applied twice.
+		if (!lookupEvent.joystick.position) {
+			lookupEvent.joystick.position = event.joystick.mouseMotion > 0 ? 1 : -1;
+		}
+		int delta = event.joystick.mouseMotion * (lookupEvent.joystick.position > 0 ? 1 : -1);
+		Keymap::ActionArray actions;
+		getMappedActions(lookupEvent, actions);
+		for (const auto &action : actions) {
+			if (action->event.type != EVENT_CUSTOM_BACKEND_ACTION_AXIS) {
+				continue;
+			}
+			switch (action->event.customType) {
+			case VirtualMouse::kCustomActionVirtualAxisUp:
+				_pendingMouseMotion.y -= delta;
+				break;
+			case VirtualMouse::kCustomActionVirtualAxisDown:
+				_pendingMouseMotion.y += delta;
+				break;
+			case VirtualMouse::kCustomActionVirtualAxisLeft:
+				_pendingMouseMotion.x -= delta;
+				break;
+			case VirtualMouse::kCustomActionVirtualAxisRight:
+				_pendingMouseMotion.x += delta;
+				break;
+			default:
+				break;
+			}
+		}
+	}
+	if (event.joystick.mouseMotionEnd) {
+		if (_pendingMouseMotion != Point()) {
+			Event mouseEvent;
+			mouseEvent.type = EVENT_MOUSEMOVE;
+			mouseEvent.mouse = _eventMan->getMousePos();
+			mouseEvent.relMouse = _pendingMouseMotion;
+			mappedEvents.push_back(mouseEvent);
+		}
+		_pendingMouseMotion = Point();
+	}
 }
 
 Keymap::KeymapMatch Keymapper::getMappedActions(const Event &event, Keymap::ActionArray &actions, Keymap::KeymapType keymapType) const {
@@ -415,6 +481,7 @@ void Keymapper::hardcodedEventMapping(Event ev) {
 }
 
 void Keymapper::resetInputState() {
+	_pendingMouseMotion = Point();
 	for (uint i = 0; i < ARRAYSIZE(_joystickAxisPreviouslyPressed); i++) {
 		_joystickAxisPreviouslyPressed[i] = false;
 	}
