@@ -22,6 +22,7 @@
 #include "hpl1/metaengine.h"
 #include "backends/keymapper/action.h"
 #include "backends/keymapper/keymap.h"
+#include "backends/keymapper/virtual-mouse.h"
 #include "common/savefile.h"
 #include "common/system.h"
 #include "common/translation.h"
@@ -68,19 +69,6 @@ Common::Action *createMouseAction(const char *id, const Common::U32String &desc,
 	return act;
 }
 
-// The right analog stick drives the backend virtual mouse so it can control the
-// (relative) mouse-look camera, while the left stick is reserved for movement.
-// These custom action ids must match the (private) values of the
-// Common::VirtualMouse::kCustomActionVirtual* enum in
-// backends/keymapper/virtual-mouse.h; the VirtualMouse event observer picks the
-// events up and turns them into mouse-move (relMouse) events.
-enum {
-	kVirtualMouseUp = 10000,
-	kVirtualMouseDown = 10001,
-	kVirtualMouseLeft = 10002,
-	kVirtualMouseRight = 10003
-};
-
 Common::Action *createVirtualMouseAxisAction(const char *id, const Common::U32String &desc, const char *defaultMap, const Common::CustomEventType type) {
 	Common::Action *act = new Common::Action(id, desc);
 	act->setCustomBackendActionAxisEvent(type);
@@ -125,10 +113,10 @@ Common::Array<Common::Keymap *> Hpl1MetaEngine::initKeymaps(const char *target) 
 	act->addDefaultInputMapping("JOY_Y");
 	movement->addAction(act);
 	// Right analog stick: mouse-look camera (via the backend virtual mouse).
-	movement->addAction(createVirtualMouseAxisAction("LOOK_UP", _("Look up"), "JOY_RIGHT_STICK_Y-", kVirtualMouseUp));
-	movement->addAction(createVirtualMouseAxisAction("LOOK_DOWN", _("Look down"), "JOY_RIGHT_STICK_Y+", kVirtualMouseDown));
-	movement->addAction(createVirtualMouseAxisAction("LOOK_LEFT", _("Look left"), "JOY_RIGHT_STICK_X-", kVirtualMouseLeft));
-	movement->addAction(createVirtualMouseAxisAction("LOOK_RIGHT", _("Look right"), "JOY_RIGHT_STICK_X+", kVirtualMouseRight));
+	movement->addAction(createVirtualMouseAxisAction("LOOK_UP", _("Look up"), "JOY_RIGHT_STICK_Y-", Common::VirtualMouse::kCustomActionVirtualAxisUp));
+	movement->addAction(createVirtualMouseAxisAction("LOOK_DOWN", _("Look down"), "JOY_RIGHT_STICK_Y+", Common::VirtualMouse::kCustomActionVirtualAxisDown));
+	movement->addAction(createVirtualMouseAxisAction("LOOK_LEFT", _("Look left"), "JOY_RIGHT_STICK_X-", Common::VirtualMouse::kCustomActionVirtualAxisLeft));
+	movement->addAction(createVirtualMouseAxisAction("LOOK_RIGHT", _("Look right"), "JOY_RIGHT_STICK_X+", Common::VirtualMouse::kCustomActionVirtualAxisRight));
 
 	Keymap *actions = new Keymap(Keymap::kKeymapTypeGame, "HPL1_ACTIONS", "Actions");
 	act = createKeyBoardAction("INTERACTMODE", _("Interact mode"), "r", Common::KEYCODE_r);
