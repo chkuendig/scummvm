@@ -21,26 +21,10 @@
 
 // On-screen touch gamepad controls for the SDL backend (used by Emscripten).
 //
-// This implements the standard AAA touch-FPS layout in landscape:
-//   - a visible D-PAD (move) in the bottom-left, recentred under the finger and
-//     rendered as the gamepad.svg D-pad cell glyph; it emits the digital
-//     JOYSTICK_BUTTON_DPAD_UP/DOWN/LEFT/RIGHT buttons (8-way, diagonals fire two);
-//   - DRAG-TO-LOOK on the right half of the screen (the camera): an invisible
-//     region whose finger drag is turned into relative-mouse motion (mirrors the
-//     existing touchpad relmouse scaling), and a short tap there is turned into a
-//     left click;
-//   - a MULTI-TOUCH A/B/X/Y diamond in the bottom-right (each button its own
-//     independent hotspot so several can be held at once);
-//   - a compact secondary top-centre cluster reusing the gamepad.svg "system"
-//     cluster art (a diamond on a grouping circle): the GMM button (opens the
-//     Global Main Menu) on top, R1 on the right, Start at the bottom, L1 on left.
-//
-// The whole pad is hidden unless the on-screen gamepad is the active touch mode.
-//
-// Synthetic joystick / mouse events are pushed through the generic event
-// manager; the gamepad.svg asset is reused for the face-button and Start glyphs
-// (a missing asset is non-fatal), while the thumbstick ring/knob and the L1/R1
-// pills are drawn from primitives into spare regions of the same surface.
+// A floating digital D-pad, analog right stick, independent A/B/X/Y buttons,
+// and a top cluster for the main menu, shoulders and Start. Controls emit
+// joystick events through the backend event queue; engines choose their actions
+// through the keymapper. The pad is hidden outside gamepad touch mode.
 
 #ifndef BACKENDS_PLATFORM_SDL_TOUCHCONTROLS_H_
 #define BACKENDS_PLATFORM_SDL_TOUCHCONTROLS_H_
@@ -100,8 +84,7 @@ private:
 	uint8 _baseAlpha;
 	void refreshConfig();
 
-	// Draws the thumbstick ring/knob and the L1/R1 pills from primitives into
-	// the spare bottom row of the gamepad surface (called once after load).
+	// Draws the right-stick ring and knob into the spare row of the surface.
 	void renderPrimitives();
 
 	// Home (resting) centre of a control, in fixed-point screen pixels.
@@ -158,18 +141,18 @@ private:
 	Function *getZombieFunctionFromPos(int x, int y);
 
 	enum FunctionId {
-		kFunctionNone      = -1,
-		kFunctionDpad      = 0, // visible D-pad (DPAD_UP/DOWN/LEFT/RIGHT buttons)
-		kFunctionButtonY   = 1, // A/B/X/Y diamond (independent hotspots)
-		kFunctionButtonB   = 2,
-		kFunctionButtonA   = 3,
-		kFunctionButtonX   = 4,
-		kFunctionShoulderL = 5, // L1 shoulder (top-left)
-		kFunctionShoulderR = 6, // R1 shoulder (top-right)
-		kFunctionStart     = 7, // Start/menu button (top centre)
-		kFunctionScummVM   = 8, // ScummVM "S" button (opens the Global Main Menu)
-		kFunctionLook      = 9, // drag-to-look (right half, invisible)
-		kFunctionCount     = 10
+		kFunctionNone       = -1,
+		kFunctionDpad       = 0, // visible D-pad (DPAD_UP/DOWN/LEFT/RIGHT buttons)
+		kFunctionButtonY    = 1, // A/B/X/Y diamond (independent hotspots)
+		kFunctionButtonB    = 2,
+		kFunctionButtonA    = 3,
+		kFunctionButtonX    = 4,
+		kFunctionShoulderL  = 5, // L1 shoulder (top-left)
+		kFunctionShoulderR  = 6, // R1 shoulder (top-right)
+		kFunctionStart      = 7, // Start/menu button (top centre)
+		kFunctionScummVM    = 8, // ScummVM "S" button (opens the Global Main Menu)
+		kFunctionRightStick = 9,
+		kFunctionCount      = 10
 	};
 	FunctionId getFunctionId(int x, int y);
 
@@ -182,10 +165,6 @@ private:
 	static void keyDown(Common::KeyCode kc);
 	static void keyUp(Common::KeyCode kc);
 	static void axisMotion(Common::JoystickAxis axis, int16 value);
-	// Relative-mouse motion for drag-to-look (relX/relY in window pixels).
-	static void mouseRelative(int relX, int relY);
-	// Synthetic left click at the current cursor position (tap-to-click).
-	static void mouseClick();
 	// Opens the ScummVM Global Main Menu (pushes EVENT_MAINMENU).
 	static void mainMenu();
 
@@ -302,22 +281,19 @@ private:
 		bool pressed;
 	};
 
-	// Drag-to-look: the right half of the screen, excluding the button/shoulder
-	// hotspots. Invisible (no widget). A drag becomes relative-mouse motion (the
-	// camera); a short tap becomes a left click.
-	struct FunctionLook : Function {
-		FunctionLook(const TouchControls *parent) :
-			Function(parent), prevX(0), prevY(0), hiresX(0), hiresY(0), maxTravel(0) {}
-		void resetState() override { prevX = prevY = 0; hiresX = hiresY = 0; maxTravel = 0; }
+	// Floating right stick, anchored at finger-down. Axis values remain held
+	// until the finger moves, lifts or is cancelled, like a hardware stick.
+	struct FunctionRightStick : Function {
+		FunctionRightStick(const TouchControls *parent) :
+			Function(parent), axisX(0), axisY(0) {}
+		void resetState() override { axisX = axisY = 0; }
 
 		bool isInside(int, int) override { return false; } // no widget, no zombie reuse
 		void touch(int, int, Action) override;
-		// Draws the ring/dot drag indicator while actively dragging.
+		// Draws the ring and clamped stick position while touched.
 		void draw(uint8 baseAlpha, uint8 hlAlpha) override;
 
-		int prevX, prevY;     // previous finger position (fixed-point px)
-		float hiresX, hiresY; // sub-pixel relmouse accumulator
-		int maxTravel;        // max travel from start (window px), for tap detection
+		int16 axisX, axisY;
 	};
 };
 
