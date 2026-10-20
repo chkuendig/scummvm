@@ -3388,6 +3388,9 @@ EOF
 		append_var LDFLAGS "-s EXPORTED_FUNCTIONS=[_main,_malloc,_free,_raise]"
 		append_var LDFLAGS "-s EXPORTED_RUNTIME_METHODS=[ccall,lengthBytesUTF8,setValue,writeArrayToMemory]"
 		append_var LDFLAGS "--js-library backends/networking/http/emscripten/networkreadstream-emscripten.js"
+		if test "$_tts" != "no" ; then
+			append_var LDFLAGS "--js-library backends/text-to-speech/emscripten/emscripten-text-to-speech.js"
+		fi
 		if test "$_midi" != "no" ; then
 			append_var LDFLAGS "--js-library backends/midi/webmidi.js"
 		fi
