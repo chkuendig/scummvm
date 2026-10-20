@@ -33,6 +33,28 @@ mergeInto(LibraryManager.library, {
         try {
             const settingsPath = UTF8ToString(pathPtr);
             const path = settingsPath.substring(0, settingsPath.lastIndexOf('/'));
+            const exists = (p) => {
+                try {
+                    FS.stat(p);
+                    return true;
+                } catch (err) {
+                    return false;
+                }
+            };
+
+            // Request persistent storage before relying on IDBFS, so the
+            // settings + saved games survive automatic eviction. Without this
+            // the origin uses best-effort storage, which browsers (notably iOS
+            // Safari, with its ~7-day script-storage cap) can clear under
+            // pressure. persist() is origin-level and idempotent; best-effort.
+            if (typeof navigator !== 'undefined' && navigator.storage && navigator.storage.persist) {
+                try {
+                    const persisted = await navigator.storage.persist();
+                    console.debug('navigator.storage.persist() ->', persisted);
+                } catch (err) {
+                    console.debug('navigator.storage.persist() failed:', err);
+                }
+            }
 
             // Mount the filesystem.
             FS.mount(IDBFS, { autoPersist: true }, path);
@@ -43,7 +65,7 @@ mergeInto(LibraryManager.library, {
             });
 
             // Check if the settings file exists and download a default copy if needed.
-            if (!FS.analyzePath(settingsPath).exists) {
+            if (!exists(settingsPath)) {
                 console.debug('EmscriptenFilesystemFactory_initDefaultConfigFile: Download default scummvm.ini');
                 const response = await fetch('scummvm.ini');
                 if (response.ok) {
@@ -53,7 +75,7 @@ mergeInto(LibraryManager.library, {
             }
 
             // Check if the extras folder exists and create it if needed.
-            if (!FS.analyzePath(path + "/extras").exists) {
+            if (!exists(path + "/extras")) {
                 console.debug("Create empty settings folder at " + path + "/extras");
                 FS.mkdir(path + "/extras");
             }
