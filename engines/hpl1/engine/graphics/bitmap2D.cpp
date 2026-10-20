@@ -114,7 +114,7 @@ void Bitmap2D::fillRect(const cRect2l &rect, const cColor &color) {
 		rect.x,
 		rect.y,
 		rect.w <= 0 ? rect.x + _surface.w : rect.x + rect.w,
-		rect.h <= 0 ? rect.y + _surface.w : rect.y + rect.h);
+		rect.h <= 0 ? rect.y + _surface.h : rect.y + rect.h);
 	_surface.fillRect(surfaceRect, qcol);
 }
 
