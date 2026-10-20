@@ -279,6 +279,13 @@ Common::KeyCode SdlEventSource::SDLToOSystemKeycode(const SDL_Keycode key) {
 }
 
 bool SdlEventSource::pollEvent(Common::Event &event) {
+	// Drain synthetic events (e.g. from the on-screen touch controls) first so
+	// they are routed through the keymapper like any other input event.
+	if (!_eventQueue.empty()) {
+		event = _eventQueue.pop();
+		return true;
+	}
+
 	// If the screen changed, send an Common::EVENT_SCREEN_CHANGED
 	int screenID = g_system->getScreenChangeID();
 	if (screenID != _lastScreenID) {
