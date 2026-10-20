@@ -95,7 +95,7 @@ jmethodID JNI::_MID_setWindowCaption = 0;
 jmethodID JNI::_MID_showVirtualKeyboard = 0;
 jmethodID JNI::_MID_showOnScreenControls = 0;
 jmethodID JNI::_MID_setTouchMode = 0;
-jmethodID JNI::_MID_getTouchMode = 0;
+jmethodID JNI::_MID_isControllerConnected = 0;
 jmethodID JNI::_MID_setOrientation = 0;
 jmethodID JNI::_MID_getScummVMBasePath;
 jmethodID JNI::_MID_getScummVMConfigPath;
@@ -134,8 +134,6 @@ const JNINativeMethod JNI::_natives[] = {
 		(void *)JNI::pushEvent },
 	{ "updateTouch", "(IIII)V",
 		(void *)JNI::updateTouch },
-	{ "setupTouchMode", "(II)V",
-		(void *)JNI::setupTouchMode },
 	{ "syncVirtkeyboardState", "(Z)V",
 		(void *)JNI::syncVirtkeyboardState },
 	{ "setPause", "(Z)V",
@@ -453,19 +451,15 @@ void JNI::setTouchMode(int touchMode) {
 	}
 }
 
-int JNI::getTouchMode() {
+bool JNI::isControllerConnected() {
 	JNIEnv *env = JNI::getEnv();
-
-	int mode = env->CallIntMethod(_jobj, _MID_getTouchMode);
-
+	const bool connected = env->CallBooleanMethod(_jobj, _MID_isControllerConnected);
 	if (env->ExceptionCheck()) {
-		LOGE("Error trying to get touch controls status");
-
 		env->ExceptionDescribe();
 		env->ExceptionClear();
+		return false;
 	}
-
-	return mode;
+	return connected;
 }
 
 void JNI::setOrientation(int orientation) {
@@ -808,7 +802,7 @@ void JNI::create(JNIEnv *env, jobject self, jobject asset_manager,
 	FIND_METHOD(, showVirtualKeyboard, "(Z)V");
 	FIND_METHOD(, showOnScreenControls, "(I)V");
 	FIND_METHOD(, setTouchMode, "(I)V");
-	FIND_METHOD(, getTouchMode, "()I");
+	FIND_METHOD(, isControllerConnected, "()Z");
 	FIND_METHOD(, setOrientation, "(I)V");
 	FIND_METHOD(, getScummVMBasePath, "()Ljava/lang/String;");
 	FIND_METHOD(, getScummVMConfigPath, "()Ljava/lang/String;");
@@ -982,14 +976,9 @@ void JNI::updateTouch(JNIEnv *env, jobject self, int action, int ptr, int x, int
 
 	assert(_system);
 
-	_system->getTouchControls().update((TouchControls::Action) action, ptr, x, y);
-}
-
-void JNI::setupTouchMode(JNIEnv *env, jobject self, jint oldValue, jint newValue) {
-	if (!_system)
-		return;
-
-	_system->setupTouchMode(oldValue, newValue);
+	// A mode change reaches the UI asynchronously; ignore touches from a stale pad.
+	if (action == TouchControls::JACTION_CANCEL || _system->getTouchMode() == Common::kTouchModeGamepad)
+		_system->getTouchControls().update((TouchControls::Action) action, ptr, x, y);
 }
 
 void JNI::syncVirtkeyboardState(JNIEnv *env, jobject self, jboolean newState) {

@@ -694,9 +694,6 @@
 
 	<dialog name = 'GlobalOptions_Control' overlays = 'Dialog.GlobalOptions.TabWidget'>
 		<layout type = 'vertical' padding = '16, 16, 16, 16' spacing = '8'>
-			<widget name = 'grTouchpadCheckbox'
-					type = 'Checkbox'
-			/>
 			<widget name = 'grOnScreenControl'
 					type = 'Checkbox'
 			/>
@@ -1719,6 +1716,62 @@
 				/>
 				<widget name = 'Ok'
 						type = 'Button'
+				/>
+			</layout>
+		</layout>
+	</dialog>
+
+	<dialog name = 'GameOptions_Control' overlays = 'Dialog.GameOptions.TabWidget'>
+		<layout type = 'vertical' padding = '16, 16, 16, 16' spacing = '8'>
+			<widget name = 'grOnScreenControl'
+					type = 'Checkbox'
+			/>
+			<layout type = 'horizontal' padding = '16, 16, 0, 0' spacing = '10'>
+				<widget name = 'grTMMenusDesc'
+						type = 'OptionsLabel'
+				/>
+				<widget name = 'grTMMenus'
+						type = 'PopUp'
+				/>
+			</layout>
+			<layout type = 'horizontal' padding = '16, 16, 0, 0' spacing = '10'>
+				<widget name = 'grTM2DGamesDesc'
+						type = 'OptionsLabel'
+				/>
+				<widget name = 'grTM2DGames'
+						type = 'PopUp'
+				/>
+			</layout>
+			<layout type = 'horizontal' padding = '16, 16, 0, 0' spacing = '10'>
+				<widget name = 'grTM3DGamesDesc'
+						type = 'OptionsLabel'
+				/>
+				<widget name = 'grTM3DGames'
+						type = 'PopUp'
+				/>
+			</layout>
+			<layout type = 'horizontal' padding = '0, 0, 0, 0' spacing = '10'>
+				<widget name = 'grKbdMouseSpeedDesc'
+						type = 'OptionsLabel'
+				/>
+				<widget name = 'grKbdMouseSpeedSlider'
+						type = 'Slider'
+						rtl = 'no'
+				/>
+				<widget name = 'grKbdMouseSpeedLabel'
+						type = 'SmallLabel'
+				/>
+			</layout>
+			<layout type = 'horizontal' padding = '0, 0, 0, 0' spacing = '10' align = 'center'>
+				<widget name = 'grJoystickDeadzoneDesc'
+						type = 'OptionsLabel'
+				/>
+				<widget name = 'grJoystickDeadzoneSlider'
+						type = 'Slider'
+						rtl = 'no'
+				/>
+				<widget name = 'grJoystickDeadzoneLabel'
+						type = 'SmallLabel'
 				/>
 			</layout>
 		</layout>

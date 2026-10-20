@@ -416,9 +416,7 @@ void TouchControls::draw() {
 	// nothing is drawn in touchpad/mouse mode, when on-screen controls are off,
 	// or when a physical controller forced the fallback mode.
 	OSystem_SDL *sdlSystem = dynamic_cast<OSystem_SDL *>(g_system);
-	if (!sdlSystem || !sdlSystem->hasTouchscreen() ||
-			!ConfMan.getBool(ONSCREEN_CONTROL_KEY) ||
-			sdlSystem->getTouchMode() != Common::kTouchModeGamepad) {
+	if (!sdlSystem || !sdlSystem->isOnScreenGamepadActive()) {
 		return;
 	}
 

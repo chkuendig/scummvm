@@ -91,7 +91,7 @@ public:
 	static void showVirtualKeyboard(bool enable);
 	static void showOnScreenControls(int enableMask);
 	static void setTouchMode(int touchMode);
-	static int getTouchMode();
+	static bool isControllerConnected();
 	static void setOrientation(int touchMode);
 	static void addSysArchivesToSearchSet(Common::SearchSet &s, int priority);
 	static Common::String getScummVMBasePath();
@@ -155,7 +155,7 @@ private:
 	static jmethodID _MID_showVirtualKeyboard;
 	static jmethodID _MID_showOnScreenControls;
 	static jmethodID _MID_setTouchMode;
-	static jmethodID _MID_getTouchMode;
+	static jmethodID _MID_isControllerConnected;
 	static jmethodID _MID_setOrientation;
 	static jmethodID _MID_getScummVMBasePath;
 	static jmethodID _MID_getScummVMConfigPath;
@@ -195,7 +195,6 @@ private:
 	static void pushEvent(JNIEnv *env, jobject self, int type, int arg1,
 							int arg2, int arg3, int arg4, int arg5, int arg6);
 	static void updateTouch(JNIEnv *env, jobject self, int action, int ptr, int x, int y);
-	static void setupTouchMode(JNIEnv *env, jobject self, jint oldValue, jint newValue);
 	static void syncVirtkeyboardState(JNIEnv *env, jobject self, jboolean newState);
 	static void setPause(JNIEnv *env, jobject self, jboolean value);
 

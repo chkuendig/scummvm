@@ -175,19 +175,29 @@ static const int guiBaseValues[] = { 200, 175, 150, 125, 100, 75, 50, 25, -1 };
 static const char *const kbdMouseSpeedLabels[] = { "3", "5", "8", "10", "13", "15", "18", "20", nullptr };
 
 // On-screen touch mode presets are defined in common/touch-mode.h and shared
-// with the SDL and iOS backends (Android keeps its own private copy).
+// with the SDL, Android and iOS backends.
 using Common::kTouchModeDefault;
 using Common::kTouchModeTouchpad;
 using Common::kTouchModeMouse;
 using Common::kTouchModeGamepad;
 
 static uint32 loadTouchModeSetting(const Common::String &setting, const Common::String &domain, bool acceptDefault, uint32 defaultValue) {
-	if (!acceptDefault || ConfMan.hasKey(setting, domain))
-		return Common::parseTouchMode(ConfMan.get(setting, domain), (Common::TouchMode)defaultValue);
-	return kTouchModeDefault;
+	// Domain-specific ConfMan.get()/hasKey() also consult session overrides.
+	// Read the saved preset directly so opening Options cannot persist a manual toggle.
+	const Common::ConfigManager::Domain *saved = ConfMan.getDomain(domain);
+	if (saved && saved->contains(setting))
+		return Common::parseTouchMode(saved->getVal(setting), (Common::TouchMode)defaultValue);
+	return acceptDefault ? (uint32)kTouchModeDefault : defaultValue;
 }
 
 static void saveTouchModeSetting(const Common::String &setting, const Common::String &domain, uint32 mode) {
+	const bool inAppDomain = domain.equalsIgnoreCase(Common::ConfigManager::kApplicationDomain);
+	const Common::TouchMode fallback = setting == TOUCH_MODE_MENUS_KEY ? kTouchModeMouse :
+		(setting == TOUCH_MODE_3D_GAMES_KEY ? kTouchModeGamepad : kTouchModeTouchpad);
+	const uint32 previous = loadTouchModeSetting(setting, domain, !inAppDomain, fallback);
+	// Writing an unchanged preset would clear its session override in ConfMan.
+	if (previous == mode)
+		return;
 	const char *value = Common::touchModeToString((Common::TouchMode)mode);
 	if (value)
 		ConfMan.set(setting, value, domain);
@@ -211,7 +221,6 @@ OptionsDialog::~OptionsDialog() {
 
 void OptionsDialog::init() {
 	_enableControlSettings = false;
-	_touchpadCheckbox = nullptr;
 	_onscreenControlCheckbox = nullptr;
 	_touchModeMenusDesc = nullptr;
 	_touchModeMenusPopUp = nullptr;
@@ -309,22 +318,20 @@ void OptionsDialog::build() {
 	}
 
 	// Control options
-	if (g_system->hasFeature(OSystem::kFeatureTouchpadMode)) {
-		// Legacy single-mode touchpad toggle (non-OpenGL backends only)
-		if (_touchpadCheckbox != nullptr && ConfMan.hasKey("touchpad_mouse_mode", _domain)) {
-			_touchpadCheckbox->setState(g_system->getFeatureState(OSystem::kFeatureTouchpadMode));
-		}
+	if (_onscreenControlCheckbox) {
 		// On-screen touch controls (per-context touch mode presets)
-		if (_onscreenControlCheckbox != nullptr) {
-			const bool inAppDomain = _domain.equalsIgnoreCase(Common::ConfigManager::kApplicationDomain);
-			_onscreenControlCheckbox->setState(ConfMan.getBool(ONSCREEN_CONTROL_KEY, _domain));
-			// The on-screen gamepad is not offered in menus; guard hand-edited/legacy configs.
-			uint32 menusMode = loadTouchModeSetting(TOUCH_MODE_MENUS_KEY, _domain, !inAppDomain, kTouchModeMouse);
-			if (menusMode == (uint32)kTouchModeGamepad)
-				menusMode = kTouchModeMouse;
-			_touchModeMenusPopUp->setSelectedTag(menusMode);
-			_touchMode2DGamesPopUp->setSelectedTag(loadTouchModeSetting(TOUCH_MODE_2D_GAMES_KEY, _domain, !inAppDomain, kTouchModeTouchpad));
-			_touchMode3DGamesPopUp->setSelectedTag(loadTouchModeSetting(TOUCH_MODE_3D_GAMES_KEY, _domain, !inAppDomain, kTouchModeGamepad));
+		const bool inAppDomain = _domain.equalsIgnoreCase(Common::ConfigManager::kApplicationDomain);
+		_initialOnscreenControlState = ConfMan.getBool(ONSCREEN_CONTROL_KEY, _domain);
+		_onscreenControlCheckbox->setState(_initialOnscreenControlState);
+		PopUpWidget *popups[] = { _touchModeMenusPopUp, _touchMode2DGamesPopUp, _touchMode3DGamesPopUp };
+		const char *keys[] = { TOUCH_MODE_MENUS_KEY, TOUCH_MODE_2D_GAMES_KEY, TOUCH_MODE_3D_GAMES_KEY };
+		for (uint i = 0; i < ARRAYSIZE(popups); ++i) {
+			const Common::TouchContext context = (Common::TouchContext)i;
+			uint32 mode = loadTouchModeSetting(keys[i], _domain, !inAppDomain, Common::defaultTouchMode(context));
+			if (mode == (uint32)kTouchModeGamepad && (i == 0 || !g_system->hasFeature(OSystem::kFeatureOnScreenGamepad)))
+				mode = i == 0 ? kTouchModeMouse : kTouchModeTouchpad;
+			popups[i]->setSelectedTag(mode);
+			_initialTouchModeTags[i] = popups[i]->getSelectedTag();
 		}
 	}
 	if (g_system->hasFeature(OSystem::kFeatureKbdMouseSpeed)) {
@@ -994,31 +1001,24 @@ void OptionsDialog::apply() {
 		}
 	}
 
-	if (_backendOptions) {
-		bool changes = _backendOptions->save();
-		if (changes && _domain == Common::ConfigManager::kApplicationDomain)
-			g_system->applyBackendSettings();
-	}
+	const bool backendSettingsChanged = _backendOptions && _backendOptions->save();
 
 	// Control options
 	if (_enableControlSettings) {
-		if (g_system->hasFeature(OSystem::kFeatureTouchpadMode)) {
-			// Legacy single-mode touchpad toggle (non-OpenGL backends only)
-			if (_touchpadCheckbox != nullptr && ConfMan.getBool("touchpad_mouse_mode", _domain) != _touchpadCheckbox->getState()) {
-				g_system->setFeatureState(OSystem::kFeatureTouchpadMode, _touchpadCheckbox->getState());
-			}
+		if (_onscreenControlCheckbox) {
 			// On-screen touch controls (per-context touch mode presets)
-			if (_onscreenControlCheckbox != nullptr) {
-				ConfMan.setBool(ONSCREEN_CONTROL_KEY, _onscreenControlCheckbox->getState(), _domain);
-				saveTouchModeSetting(TOUCH_MODE_MENUS_KEY, _domain, _touchModeMenusPopUp->getSelectedTag());
-				saveTouchModeSetting(TOUCH_MODE_2D_GAMES_KEY, _domain, _touchMode2DGamesPopUp->getSelectedTag());
-				saveTouchModeSetting(TOUCH_MODE_3D_GAMES_KEY, _domain, _touchMode3DGamesPopUp->getSelectedTag());
-				// The in-game toggle stores a session-domain override for these
-				// keys; drop it so an explicit preset change here takes effect
-				// immediately instead of being masked until relaunch.
-				ConfMan.removeKey(TOUCH_MODE_MENUS_KEY, Common::ConfigManager::kSessionDomain);
-				ConfMan.removeKey(TOUCH_MODE_2D_GAMES_KEY, Common::ConfigManager::kSessionDomain);
-				ConfMan.removeKey(TOUCH_MODE_3D_GAMES_KEY, Common::ConfigManager::kSessionDomain);
+			if (_onscreenControlCheckbox->getState() != _initialOnscreenControlState) {
+				_initialOnscreenControlState = _onscreenControlCheckbox->getState();
+				ConfMan.setBool(ONSCREEN_CONTROL_KEY, _initialOnscreenControlState, _domain);
+			}
+			PopUpWidget *popups[] = { _touchModeMenusPopUp, _touchMode2DGamesPopUp, _touchMode3DGamesPopUp };
+			const char *keys[] = { TOUCH_MODE_MENUS_KEY, TOUCH_MODE_2D_GAMES_KEY, TOUCH_MODE_3D_GAMES_KEY };
+			for (uint i = 0; i < ARRAYSIZE(popups); ++i) {
+				const uint32 mode = popups[i]->getSelectedTag();
+				if (mode != _initialTouchModeTags[i]) {
+					saveTouchModeSetting(keys[i], _domain, mode);
+					_initialTouchModeTags[i] = mode;
+				}
 			}
 		}
 		if (g_system->hasFeature(OSystem::kFeatureKbdMouseSpeed)) {
@@ -1032,6 +1032,10 @@ void OptionsDialog::apply() {
 			}
 		}
 	}
+
+	// Apply after saving the shared touch settings as well as the backend options.
+	if (_domain == Common::ConfigManager::kApplicationDomain && (backendSettingsChanged || _onscreenControlCheckbox))
+		g_system->applyBackendSettings();
 
 	// Volume options
 	if (_musicVolumeSlider) {
@@ -1492,17 +1496,9 @@ void OptionsDialog::setSubtitleSettingsState(bool enabled) {
 }
 
 void OptionsDialog::addControlControls(GuiObject *boss, const Common::String &prefix) {
-#if !defined(USE_OPENGL)
-	// Legacy single-mode touchpad toggle. OpenGL backends (incl. Emscripten) use
-	// the per-context touch modes below instead, so it is only created here for
-	// non-OpenGL SDL backends (e.g. Switch, PSP2).
-	if (g_system->hasFeature(OSystem::kFeatureTouchpadMode))
-		_touchpadCheckbox = new CheckboxWidget(boss, prefix + "grTouchpadCheckbox", _("Touchpad mouse mode"));
-#endif
-
 	// On-screen touch controls: per-context touch mode presets (merged here from
 	// the former separate backend options tab).
-	if (g_system->hasFeature(OSystem::kFeatureTouchpadMode)) {
+	if (g_system->hasFeature(OSystem::kFeatureTouchMode)) {
 		const bool inAppDomain = _domain.equalsIgnoreCase(Common::ConfigManager::kApplicationDomain);
 		_onscreenControlCheckbox = new CheckboxWidget(boss, prefix + "grOnScreenControl", _("Show on-screen control"));
 
@@ -1520,7 +1516,7 @@ void OptionsDialog::addControlControls(GuiObject *boss, const Common::String &pr
 			touchModePopUps[i]->appendEntry(_("Touchpad emulation"), kTouchModeTouchpad);
 			touchModePopUps[i]->appendEntry(_("Direct mouse"), kTouchModeMouse);
 			// The on-screen gamepad is only available in games, not in menus.
-			if (touchModePopUps[i] != _touchModeMenusPopUp)
+			if (touchModePopUps[i] != _touchModeMenusPopUp && g_system->hasFeature(OSystem::kFeatureOnScreenGamepad))
 				touchModePopUps[i]->appendEntry(_("On-screen gamepad"), kTouchModeGamepad);
 		}
 	}
@@ -2345,9 +2341,9 @@ void GlobalOptionsDialog::build() {
 	addGraphicControls(graphicsContainer, "GlobalOptions_Graphics_Container.");
 
 	//
-	// The control tab (currently visible only for SDL and Vita platform, visibility checking by features
+	// The shared Control tab is shown when the backend advertises control options.
 	//
-	if (g_system->hasFeature(OSystem::kFeatureTouchpadMode) ||
+	if (g_system->hasFeature(OSystem::kFeatureTouchMode) ||
 		g_system->hasFeature(OSystem::kFeatureKbdMouseSpeed) ||
 		g_system->hasFeature(OSystem::kFeatureJoystickDeadzone)) {
 		tab->addTab(_("Control"), "GlobalOptions_Control");

@@ -3,3 +3,4 @@ DIST_FILES_LIST += dists/engine-data/classicmacfonts.dat
 DIST_FILES_LIST += dists/engine-data/encoding.dat
 DIST_FILES_LIST += dists/engine-data/helpdialog.zip
 DIST_FILES_LIST += dists/engine-data/macgui.dat
+DIST_FILES_LIST += dists/engine-data/gamepad.svg

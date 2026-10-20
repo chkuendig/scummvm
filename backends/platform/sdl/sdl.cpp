@@ -60,8 +60,6 @@
 #include "graphics/cursorman.h"
 #include "graphics/renderer.h"
 
-#include "engines/engine.h"	// for g_engine (read-only) in currentTouchContext()
-
 #include <time.h>	// for getTimeAndDate()
 
 #ifdef USE_DETECTLANG
@@ -240,6 +238,15 @@ bool OSystem_SDL::hasFeature(Feature f) {
 	// Both features gate the in-GUI touch options on hasTouchscreen() so the
 	// Emscripten override (navigator.maxTouchPoints) keeps them hidden on a
 	// mouse-only desktop browser.
+	if (f == kFeatureTouchMode)
+		return hasTouchscreen();
+	if (f == kFeatureOnScreenGamepad) {
+#ifdef USE_OPENGL
+		return hasTouchscreen() && dynamic_cast<OpenGLSdlGraphicsManager *>(_graphicsManager) != nullptr;
+#else
+		return false;
+#endif
+	}
 	if (f == kFeatureTouchscreen || f == kFeatureTouchpadMode) {
 		return hasTouchscreen();
 	}
@@ -251,7 +258,9 @@ bool OSystem_SDL::hasFeature(Feature f) {
 void OSystem_SDL::setFeatureState(Feature f, bool enable) {
 	switch (f) {
 	case kFeatureTouchpadMode:
-		ConfMan.setBool("touchpad_mouse_mode", enable);
+		ConfMan.set(Common::touchModeKeyForContext(currentTouchContext()), enable ? "touchpad" : "mouse",
+		            Common::ConfigManager::kSessionDomain);
+		applyTouchSettings();
 		break;
 	case kFeatureStaleMousePositionWorkaround:
 		_eventSource->setStaleMousePositionWorkaround(enable);
@@ -265,7 +274,7 @@ void OSystem_SDL::setFeatureState(Feature f, bool enable) {
 bool OSystem_SDL::getFeatureState(Feature f) {
 	switch (f) {
 	case kFeatureTouchpadMode:
-		return ConfMan.getBool("touchpad_mouse_mode");
+		return _touchMode == Common::kTouchModeTouchpad;
 		break;
 	case kFeatureStaleMousePositionWorkaround:
 		return _eventSource->getStaleMousePositionWorkaround();
@@ -288,77 +297,69 @@ bool OSystem_SDL::hasTouchscreen() const {
 #endif
 }
 
-OSystem_SDL::TouchContext OSystem_SDL::currentTouchContext() {
-	// The overlay is shown both by the launcher and by the in-game GMM/dialogs.
-	// Only treat it as the "menus" context when no game engine is running (i.e.
-	// the launcher). While a game is running, keep reporting the game's 2d/3d
-	// render context so opening the GMM over the game doesn't flip the touch
-	// preset (and make the on-screen gamepad disappear).
-	if (isOverlayVisible() && g_engine == nullptr) {
-		return kTouchContextMenus;
-	}
+Common::TouchContext OSystem_SDL::currentTouchContext() {
 	bool is3d = false;
 #ifdef USE_OPENGL
-	// Only the OpenGL graphics manager can render 3D games; SurfaceSDL is
-	// always 2D, so this stays guarded behind the OpenGL-specific API.
 	OpenGLSdlGraphicsManager *glManager = dynamic_cast<OpenGLSdlGraphicsManager *>(_graphicsManager);
-	if (glManager) {
+	if (glManager)
 		is3d = glManager->isRendering3D();
-	}
 #endif
-	return is3d ? kTouchContext3d : kTouchContext2d;
+	SdlGraphicsManager *gfx = dynamic_cast<SdlGraphicsManager *>(_graphicsManager);
+	return Common::touchContext(is3d, gfx && gfx->isOverlayInGUI());
 }
 
-const char *OSystem_SDL::touchModeKeyForContext(TouchContext context) {
-	switch (context) {
-	case kTouchContextMenus:
-		return TOUCH_MODE_MENUS_KEY;
-	case kTouchContext3d:
-		return TOUCH_MODE_3D_GAMES_KEY;
-	default:
-		return TOUCH_MODE_2D_GAMES_KEY;
+bool OSystem_SDL::isOnScreenGamepadAvailable() const {
+#ifdef USE_OPENGL
+	return hasTouchscreen() && dynamic_cast<OpenGLSdlGraphicsManager *>(_graphicsManager) &&
+	       _touchControls.isInitialized() && ConfMan.getBool(ONSCREEN_CONTROL_KEY) &&
+	       !(_eventSource && _eventSource->isJoystickConnected());
+#else
+	return false;
+#endif
+}
+
+bool OSystem_SDL::isOnScreenGamepadActive() const {
+	return _touchMode == Common::kTouchModeGamepad && isOnScreenGamepadAvailable();
+}
+
+void OSystem_SDL::registerDefaultSettings(const Common::String &target) const {
+	// Import the old single-mode setting without overwriting explicit presets.
+#ifdef PSP2
+	const char *legacyKey = "frontpanel_touchpad_mode";
+#else
+	const char *legacyKey = "touchpad_mouse_mode";
+#endif
+	const Common::ConfigManager::Domain *domain = ConfMan.getDomain(target);
+	if (domain && domain->contains(legacyKey)) {
+		const Common::String &legacy = domain->getVal(legacyKey);
+		const char *mode = (legacy == "true" || legacy == "yes" || legacy == "1") ? "touchpad" : "mouse";
+		const char *keys[] = { TOUCH_MODE_MENUS_KEY, TOUCH_MODE_2D_GAMES_KEY, TOUCH_MODE_3D_GAMES_KEY };
+		for (uint i = 0; i < ARRAYSIZE(keys); ++i) {
+			if (!domain->contains(keys[i]))
+				ConfMan.set(keys[i], mode, target);
+		}
 	}
+}
+
+void OSystem_SDL::applyBackendSettings() {
+	applyTouchSettings();
 }
 
 void OSystem_SDL::applyTouchSettings() {
 	const TouchMode oldMode = _touchMode;
-	const TouchContext context = currentTouchContext();
-
-	_touchMode = Common::parseTouchMode(ConfMan.get(touchModeKeyForContext(context)), Common::kTouchModeMouse);
-
-	// The on-screen gamepad is only available in games, never in menus. Guard
-	// against legacy or hand-edited configs that request it for the menus context.
-	if (context == kTouchContextMenus && _touchMode == Common::kTouchModeGamepad) {
-		_touchMode = Common::kTouchModeMouse;
-	}
-
-	// The manual toggle (cycleTouchMode) stores its choice in the session domain,
-	// so the re-derivation above returns the toggled mode for the rest of the
-	// session (until relaunch); it is never written to the config file.
-
-	// The on-screen gamepad is only useful as a fallback: if a physical
-	// controller is connected (incl. one exposed via the Web Gamepad API),
-	// fall back to the touchpad so we don't show a redundant overlay.
-	if (_touchMode == Common::kTouchModeGamepad && _eventSource && _eventSource->isJoystickConnected()) {
-		_touchMode = Common::kTouchModeTouchpad;
-	}
-
-	// If we just left the on-screen gamepad while a finger might still be held,
-	// release any virtual buttons so they don't get stuck down.
-	if (oldMode == Common::kTouchModeGamepad && _touchMode != Common::kTouchModeGamepad) {
+	const Common::TouchContext context = currentTouchContext();
+	const TouchMode requested = Common::parseTouchMode(ConfMan.get(Common::touchModeKeyForContext(context)));
+	_touchMode = Common::resolveTouchMode(requested, context, isOnScreenGamepadAvailable());
+	if (oldMode == Common::kTouchModeGamepad && _touchMode != Common::kTouchModeGamepad)
 		_touchControls.update(kActionCancel, 0, 0, 0);
-	}
+	if (oldMode != _touchMode && _graphicsManager)
+		dynamic_cast<SdlGraphicsManager *>(_graphicsManager)->notifyVideoExpose();
 }
 
 void OSystem_SDL::cycleTouchMode() {
 	const TouchMode oldMode = _touchMode;
-	// The on-screen gamepad is not offered by the toggle in the menus context, nor
-	// when a physical controller is connected - cycle straight past it in that case.
-	const bool gamepadAvailable = (currentTouchContext() != kTouchContextMenus) &&
-			!(_eventSource && _eventSource->isJoystickConnected());
-	_touchMode = (TouchMode)((_touchMode + 1) % Common::kTouchModeCount);
-	if (_touchMode == Common::kTouchModeGamepad && !gamepadAvailable)
-		_touchMode = (TouchMode)((_touchMode + 1) % Common::kTouchModeCount);
+	const Common::TouchContext context = currentTouchContext();
+	_touchMode = Common::nextTouchMode(_touchMode, context, isOnScreenGamepadAvailable());
 
 	// Leaving the on-screen gamepad: release any held virtual buttons.
 	if (oldMode == Common::kTouchModeGamepad && _touchMode != Common::kTouchModeGamepad) {
@@ -372,9 +373,11 @@ void OSystem_SDL::cycleTouchMode() {
 	// toggle almost immediately. The session domain is never saved to disk,
 	// so a fresh launch still starts from the configured presets.
 	if (const char *modeName = Common::touchModeToString(_touchMode)) {
-		ConfMan.set(touchModeKeyForContext(currentTouchContext()), modeName,
+		ConfMan.set(Common::touchModeKeyForContext(context), modeName,
 		            Common::ConfigManager::kSessionDomain);
 	}
+	if (_graphicsManager)
+		dynamic_cast<SdlGraphicsManager *>(_graphicsManager)->notifyVideoExpose();
 #ifdef USE_OSD
 	Common::U32String name;
 	switch (_touchMode) {
@@ -393,12 +396,12 @@ void OSystem_SDL::cycleTouchMode() {
 }
 
 bool OSystem_SDL::isTouchToggleVisible() const {
-	// The on-screen toggle is only rendered (and hit-tested) by overlay-capable
-	// renderers, which are exactly the ones that initialize the touch controls
-	// (OpenGL). SurfaceSDL is settings-only and never initializes them, so this
-	// keeps it from exposing a phantom invisible toggle in the top-right corner.
+#ifdef USE_OPENGL
 	return _touchUiReady && hasTouchscreen() && ConfMan.getBool(ONSCREEN_CONTROL_KEY) &&
-	       _touchControls.isInitialized();
+	       dynamic_cast<OpenGLSdlGraphicsManager *>(_graphicsManager) != nullptr;
+#else
+	return false;
+#endif
 }
 
 Common::Rect OSystem_SDL::getTouchToggleRect(int screenW, int screenH) const {
@@ -514,7 +517,15 @@ void OSystem_SDL::initBackend() {
 #ifdef ENABLE_EVENTRECORDER
 	g_eventRec.registerMixerManager(_mixerManager);
 
-	g_eventRec.registerTimerManager(new SdlTimerManager());
+	// Platforms like Emscripten pre-create a specialized DefaultTimerManager
+	// subclass (SDL timers don't work there); hand that one to the recorder
+	// instead of unconditionally creating an SdlTimerManager.
+	if (_timerManager != nullptr) {
+		g_eventRec.registerTimerManager(dynamic_cast<DefaultTimerManager *>(_timerManager));
+		_timerManager = nullptr;
+	} else {
+		g_eventRec.registerTimerManager(new SdlTimerManager());
+	}
 #else
 	if (_timerManager == nullptr)
 		_timerManager = new SdlTimerManager();
@@ -538,6 +549,9 @@ void OSystem_SDL::initBackend() {
 	ConfMan.registerDefault(TOUCH_MODE_2D_GAMES_KEY, "touchpad");
 	ConfMan.registerDefault(TOUCH_MODE_3D_GAMES_KEY, "gamepad");
 	ConfMan.registerDefault(ONSCREEN_CONTROL_KEY, true);
+	registerDefaultSettings(Common::ConfigManager::kApplicationDomain);
+	if (!ConfMan.getActiveDomainName().empty())
+		registerDefaultSettings(ConfMan.getActiveDomainName());
 
 #ifdef USE_OPENGL
 	// Hand our touch controls to the OpenGL graphics manager so it can render
@@ -721,6 +735,8 @@ void OSystem_SDL::detectAntiAliasingSupport() {
 #endif // defined(USE_OPENGL_GAME) || defined(USE_OPENGL_SHADERS)
 
 void OSystem_SDL::engineInit() {
+	registerDefaultSettings(ConfMan.getActiveDomainName());
+	applyTouchSettings();
 #if SDL_VERSION_ATLEAST(2, 0, 0)
 	if (_graphicsManager) {
 		dynamic_cast<SdlGraphicsManager *>(_graphicsManager)->unlockWindowSize();
@@ -1088,7 +1104,13 @@ MixerManager *OSystem_SDL::getMixerManager() {
 
 Common::TimerManager *OSystem_SDL::getTimerManager() {
 #ifdef ENABLE_EVENTRECORDER
-	return g_eventRec.getTimerManager();
+	// The recorder only receives its timer manager in initBackend(). Platforms
+	// that need timers earlier (Emscripten pumps its network filesystem via
+	// timers during init()) fall back to the backend's own manager until then.
+	Common::TimerManager *timerManager = g_eventRec.getTimerManager();
+	if (timerManager)
+		return timerManager;
+	return _timerManager;
 #else
 	return _timerManager;
 #endif
@@ -1149,7 +1171,9 @@ SdlGraphicsManager *OSystem_SDL::createGraphicsManager(SdlEventSource *sdlEventS
 	case GraphicsManagerOpenGL:
 		if (_oglType > OpenGL::kContextNone) {
 			debug(1, "creating OpenGL graphics manager");
-			return new OpenGLSdlGraphicsManager(sdlEventSource, window);
+			OpenGLSdlGraphicsManager *manager = new OpenGLSdlGraphicsManager(sdlEventSource, window);
+			manager->setTouchControls(&_touchControls);
+			return manager;
 		} else {
 			warning("OpenGL graphics manager requested, but OpenGL is not supported!");
 			return nullptr;
@@ -1271,6 +1295,7 @@ bool OSystem_SDL::setGraphicsMode(int mode, uint flags) {
 			CursorMan.popCursorPalette();
 		}
 
+		applyTouchSettings();
 		_graphicsManager->beginGFXTransaction();
 		return true;
 	} else {
