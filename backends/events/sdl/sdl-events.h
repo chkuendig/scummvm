@@ -171,7 +171,7 @@ protected:
 	 * A short tap cycles the touch mode; a long press (>= kTouchToggleLongPressMs)
 	 * opens the virtual keyboard, mirroring the iOS backend.
 	 */
-	bool handleTouchToggle(int action, float normX, float normY);
+	bool handleTouchToggle(int action, SDL_TouchID touchId, SDL_FingerID fingerId, float normX, float normY);
 
 	/** Long-press threshold (ms) on the touch toggle to open the vkeybd. */
 	static const uint32 kTouchToggleLongPressMs = 500;
@@ -181,6 +181,8 @@ protected:
 
 	/** Whether a finger-down landed on the touch toggle and is still held. */
 	bool _touchTogglePressed = false;
+	SDL_TouchID _touchToggleTouchId = 0;
+	SDL_FingerID _touchToggleFingerId = 0;
 #endif
 
 	//@}
