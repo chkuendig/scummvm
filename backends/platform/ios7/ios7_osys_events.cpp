@@ -148,6 +148,11 @@ bool OSystem_iOS7::pollEvent(Common::Event &event) {
 
 		case kInputTouchModeChanged:
 			handleEvent_touchModeChanged();
+			return false;
+
+		case kInputControllerChanged:
+			dynamic_cast<iOSGraphicsManager *>(_graphicsManager)->applyTouchSettings();
+			event.type = Common::EVENT_INPUT_CHANGED;
 			break;
 
 		default:
@@ -243,27 +248,7 @@ void  OSystem_iOS7::handleEvent_orientationChanged(int orientation) {
 }
 
 void OSystem_iOS7::handleEvent_touchModeChanged() {
-	// The on-screen gamepad is only offered by the toggle in-game (not in the
-	// menus/overlay) and only when no physical controller is connected. In those
-	// cases the cycle is direct <-> touchpad only (mirrors the SDL backend).
-	const bool overlayShown = _graphicsManager && _graphicsManager->isOverlayVisible();
-	const bool gamepadAvailable = !overlayShown && !iOS7_isControllerConnected();
-
-	switch (_currentTouchMode) {
-	case Common::kTouchModeMouse:
-		_currentTouchMode = Common::kTouchModeTouchpad;
-		break;
-	case Common::kTouchModeTouchpad:
-		_currentTouchMode = gamepadAvailable ? Common::kTouchModeGamepad : Common::kTouchModeMouse;
-		break;
-	case Common::kTouchModeGamepad:
-	default:
-		_currentTouchMode = Common::kTouchModeMouse;
-		break;
-	}
-
-	// updateTouchMode() (dis)connects the native virtual controller to match.
-	updateTouchMode();
+	rememberTouchMode(Common::nextTouchMode(_currentTouchMode, _touchContext, isOnScreenGamepadAvailable()));
 }
 
 void OSystem_iOS7::rebuildSurface() {
@@ -347,7 +332,7 @@ bool OSystem_iOS7::handleEvent_swipe(Common::Event &event, int direction, int to
 			} else {
 				_currentTouchMode = Common::kTouchModeMouse;
 			}
-			updateTouchMode();
+			rememberTouchMode(_currentTouchMode);
 
 			Common::U32String dialogMsg;
 			if (_currentTouchMode == Common::kTouchModeTouchpad)
@@ -361,10 +346,10 @@ bool OSystem_iOS7::handleEvent_swipe(Common::Event &event, int direction, int to
 
 		case kUIViewSwipeLeft: {
 			// Swipe left
-			bool connect = !ConfMan.getBool("gamepad_controller");
-			ConfMan.setBool("gamepad_controller", connect);
-			ConfMan.flushToDisk();
-			virtualController(connect);
+			if (_currentTouchMode == Common::kTouchModeGamepad)
+				rememberTouchMode(Common::kTouchModeTouchpad);
+			else if (_touchContext != Common::kTouchContextMenus && isOnScreenGamepadAvailable())
+				rememberTouchMode(Common::kTouchModeGamepad);
 			return false;
 		}
 

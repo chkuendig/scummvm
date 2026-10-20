@@ -87,6 +87,10 @@ public:
 	void cycleTouchMode();
 	/** Recompute the active touch mode from the per-context presets. */
 	void applyTouchSettings();
+	void applyBackendSettings() override;
+	void registerDefaultSettings(const Common::String &target) const override;
+	bool isOnScreenGamepadAvailable() const;
+	bool isOnScreenGamepadActive() const;
 	/** True if the on-screen mode-toggle button should be shown/hit-tested. */
 	bool isTouchToggleVisible() const;
 	/** Rectangle of the on-screen mode-toggle button, in the given screen size. */
@@ -193,13 +197,7 @@ protected:
 	// screen change; the on-screen toggle (cycleTouchMode) stores its choice in
 	// the ConfMan session domain so it survives those re-applications until the
 	// application is relaunched.
-	enum TouchContext {
-		kTouchContextMenus = 0,
-		kTouchContext2d = 1,
-		kTouchContext3d = 2
-	};
-	TouchContext currentTouchContext();
-	static const char *touchModeKeyForContext(TouchContext context);
+	Common::TouchContext currentTouchContext();
 
 #if defined(USE_OPENGL_GAME) || defined(USE_OPENGL_SHADERS)
 	// Graphics capabilities

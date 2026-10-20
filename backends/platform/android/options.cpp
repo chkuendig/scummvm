@@ -74,15 +74,7 @@ private:
 	void defineLayout(GUI::ThemeEval &layouts, const Common::String &layoutName, const Common::String &overlayedLayout) const override;
 	void handleCommand(GUI::CommandSender *sender, uint32 cmd, uint32 data) override;
 
-	GUI::CheckboxWidget *_onscreenCheckbox;
 	GUI::CheckboxWidget *_ignoreGameSafeAreaCheckbox;
-	GUI::StaticTextWidget *_preferredTouchModeDesc;
-	GUI::StaticTextWidget *_preferredTMMenusDesc;
-	GUI::PopUpWidget *_preferredTMMenusPopUp;
-	GUI::StaticTextWidget *_preferredTM2DGamesDesc;
-	GUI::PopUpWidget *_preferredTM2DGamesPopUp;
-	GUI::StaticTextWidget *_preferredTM3DGamesDesc;
-	GUI::PopUpWidget *_preferredTM3DGamesPopUp;
 	GUI::StaticTextWidget *_orientationDesc;
 	GUI::StaticTextWidget *_orientationMenusDesc;
 	GUI::PopUpWidget *_orientationMenusPopUp;
@@ -91,8 +83,6 @@ private:
 
 	bool _enabled;
 
-	uint32 loadTouchMode(const Common::String &setting, bool acceptDefault, uint32 defaultValue);
-	void saveTouchMode(const Common::String &setting, uint32 touchMode);
 	uint32 loadOrientation(const Common::String &setting, bool acceptDefault, uint32 defaultValue);
 	void saveOrientation(const Common::String &setting, uint32 orientation);
 };
@@ -116,13 +106,6 @@ protected:
 };
 
 enum {
-	kTouchModeDefault = -1,
-	kTouchModeTouchpad = 0,
-	kTouchModeMouse,
-	kTouchModeGamepad,
-};
-
-enum {
 	kOrientationDefault = -1,
 	kOrientationAuto = 0,
 	kOrientationPortrait,
@@ -134,39 +117,7 @@ AndroidOptionsWidget::AndroidOptionsWidget(GuiObject *boss, const Common::String
 
 	const bool inAppDomain = domain.equalsIgnoreCase(Common::ConfigManager::kApplicationDomain);
 
-	_onscreenCheckbox = new GUI::CheckboxWidget(widgetsBoss(), "AndroidOptionsDialog.OnScreenControl", _("Show On-screen control"));
 	_ignoreGameSafeAreaCheckbox = new GUI::CheckboxWidget(widgetsBoss(), "AndroidOptionsDialog.IgnoreGameSafeArea", _("Ignore safe areas in-game"));
-	_preferredTouchModeDesc = new GUI::StaticTextWidget(widgetsBoss(), "AndroidOptionsDialog.PreferredTouchModeText", _("Choose the preferred touch mode:"));
-	if (inAppDomain) {
-		_preferredTMMenusDesc = new GUI::StaticTextWidget(widgetsBoss(), "AndroidOptionsDialog.TMMenusText", _("In menus"));
-		_preferredTMMenusPopUp = new GUI::PopUpWidget(widgetsBoss(), "AndroidOptionsDialog.TMMenus");
-		_preferredTMMenusPopUp->appendEntry(_("Touchpad emulation"), kTouchModeTouchpad);
-		_preferredTMMenusPopUp->appendEntry(_("Direct mouse"), kTouchModeMouse); // TODO: Find a better name
-		_preferredTMMenusPopUp->appendEntry(_("Gamepad emulation"), kTouchModeGamepad);
-	} else {
-		_preferredTMMenusDesc = nullptr;
-		_preferredTMMenusPopUp = nullptr;
-	}
-
-	_preferredTM2DGamesDesc = new GUI::StaticTextWidget(widgetsBoss(), "AndroidOptionsDialog.TM2DGamesText", _("In 2D games"));
-	_preferredTM2DGamesPopUp = new GUI::PopUpWidget(widgetsBoss(), "AndroidOptionsDialog.TM2DGames");
-	_preferredTM3DGamesDesc = new GUI::StaticTextWidget(widgetsBoss(), "AndroidOptionsDialog.TM3DGamesText", _("In 3D games"));
-	_preferredTM3DGamesPopUp = new GUI::PopUpWidget(widgetsBoss(), "AndroidOptionsDialog.TM3DGames");
-
-	if (!inAppDomain) {
-		_preferredTM2DGamesPopUp->appendEntry(_("<default>"), kTouchModeDefault);
-		_preferredTM3DGamesPopUp->appendEntry(_("<default>"), kTouchModeDefault);
-	}
-
-	_preferredTM2DGamesPopUp->appendEntry(_("Touchpad emulation"), kTouchModeTouchpad);
-	_preferredTM3DGamesPopUp->appendEntry(_("Touchpad emulation"), kTouchModeTouchpad);
-
-	_preferredTM2DGamesPopUp->appendEntry(_("Direct mouse"), kTouchModeMouse); // TODO: Find a better name
-	_preferredTM3DGamesPopUp->appendEntry(_("Direct mouse"), kTouchModeMouse);
-
-	_preferredTM2DGamesPopUp->appendEntry(_("Gamepad emulation"), kTouchModeGamepad);
-	_preferredTM3DGamesPopUp->appendEntry(_("Gamepad emulation"), kTouchModeGamepad);
-
 	_orientationDesc = new GUI::StaticTextWidget(widgetsBoss(), "AndroidOptionsDialog.OrientationText", _("Select the orientation:"));
 	if (inAppDomain) {
 		_orientationMenusDesc = new GUI::StaticTextWidget(widgetsBoss(), "AndroidOptionsDialog.OMenusText", _("In menus"));
@@ -210,27 +161,7 @@ void AndroidOptionsWidget::defineLayout(GUI::ThemeEval &layouts, const Common::S
 	layouts.addDialog(layoutName, overlayedLayout)
 	        .addLayout(GUI::ThemeLayout::kLayoutVertical)
 	            .addPadding(0, 0, 0, 0)
-	            .addWidget("OnScreenControl", "Checkbox")
-	            .addWidget("IgnoreGameSafeArea", "Checkbox")
-	            .addWidget("PreferredTouchModeText", "", -1, layouts.getVar("Globals.Line.Height"));
-
-	if (inAppDomain) {
-		layouts.addLayout(GUI::ThemeLayout::kLayoutHorizontal)
-			.addPadding(16, 16, 0, 0)
-			.addWidget("TMMenusText", "OptionsLabel")
-			.addWidget("TMMenus", "PopUp")
-		.closeLayout();
-	}
-	layouts.addLayout(GUI::ThemeLayout::kLayoutHorizontal)
-			.addPadding(16, 16, 0, 0)
-			.addWidget("TM2DGamesText", "OptionsLabel")
-			.addWidget("TM2DGames", "PopUp")
-		.closeLayout()
-		.addLayout(GUI::ThemeLayout::kLayoutHorizontal)
-			.addPadding(16, 16, 0, 0)
-			.addWidget("TM3DGamesText", "OptionsLabel")
-			.addWidget("TM3DGames", "PopUp")
-		.closeLayout();
+	            .addWidget("IgnoreGameSafeArea", "Checkbox");
 
 	layouts.addWidget("OrientationText", "", -1, layouts.getVar("Globals.Line.Height"));
 	if (inAppDomain) {
@@ -326,23 +257,6 @@ void AndroidOptionsWidget::handleCommand(GUI::CommandSender *sender, uint32 cmd,
 	}
 }
 
-uint32 AndroidOptionsWidget::loadTouchMode(const Common::String &setting, bool acceptDefault, uint32 defaultValue) {
-	if (!acceptDefault || ConfMan.hasKey(setting, _domain)) {
-		Common::String preferredTouchMode = ConfMan.get(setting, _domain);
-		if (preferredTouchMode == "mouse") {
-			return kTouchModeMouse;
-		} else if (preferredTouchMode == "gamepad") {
-			return kTouchModeGamepad;
-		} else if (preferredTouchMode == "touchpad") {
-			return kTouchModeTouchpad;
-		} else {
-			return defaultValue;
-		}
-	} else {
-		return kTouchModeDefault;
-	}
-}
-
 uint32 AndroidOptionsWidget::loadOrientation(const Common::String &setting, bool acceptDefault, uint32 defaultValue) {
 	if (!acceptDefault || ConfMan.hasKey(setting, _domain)) {
 		Common::String orientation = ConfMan.get(setting, _domain);
@@ -363,38 +277,12 @@ uint32 AndroidOptionsWidget::loadOrientation(const Common::String &setting, bool
 void AndroidOptionsWidget::load() {
 	const bool inAppDomain = _domain.equalsIgnoreCase(Common::ConfigManager::kApplicationDomain);
 
-	_onscreenCheckbox->setState(ConfMan.getBool("onscreen_control", _domain));
 	_ignoreGameSafeAreaCheckbox->setState(ConfMan.getBool("ignore_game_safe_area", _domain));
-
-	// When in application domain, we don't have default entry so we must have a value
-	if (inAppDomain) {
-		_preferredTMMenusPopUp->setSelectedTag(loadTouchMode("touch_mode_menus", !inAppDomain, kTouchModeMouse));
-	}
-	_preferredTM2DGamesPopUp->setSelectedTag(loadTouchMode("touch_mode_2d_games", !inAppDomain, kTouchModeTouchpad));
-	_preferredTM3DGamesPopUp->setSelectedTag(loadTouchMode("touch_mode_3d_games", !inAppDomain, kTouchModeGamepad));
 
 	if (inAppDomain) {
 		_orientationMenusPopUp->setSelectedTag(loadOrientation("orientation_menus", !inAppDomain, kOrientationAuto));
 	}
 	_orientationGamesPopUp->setSelectedTag(loadOrientation("orientation_games", !inAppDomain, kOrientationAuto));
-}
-
-void AndroidOptionsWidget::saveTouchMode(const Common::String &setting, uint32 touchMode) {
-	switch (touchMode) {
-	case kTouchModeTouchpad:
-		ConfMan.set(setting, "touchpad", _domain);
-		break;
-	case kTouchModeMouse:
-		ConfMan.set(setting, "mouse", _domain);
-		break;
-	case kTouchModeGamepad:
-		ConfMan.set(setting, "gamepad", _domain);
-		break;
-	default:
-		// default
-		ConfMan.removeKey(setting, _domain);
-		break;
-	}
 }
 
 void AndroidOptionsWidget::saveOrientation(const Common::String &setting, uint32 orientation) {
@@ -419,28 +307,14 @@ bool AndroidOptionsWidget::save() {
 	const bool inAppDomain = _domain.equalsIgnoreCase(Common::ConfigManager::kApplicationDomain);
 
 	if (_enabled) {
-		ConfMan.setBool("onscreen_control", _onscreenCheckbox->getState(), _domain);
 		ConfMan.setBool("ignore_game_safe_area", _ignoreGameSafeAreaCheckbox->getState(), _domain);
-
-		if (inAppDomain) {
-			saveTouchMode("touch_mode_menus", _preferredTMMenusPopUp->getSelectedTag());
-		}
-		saveTouchMode("touch_mode_2d_games", _preferredTM2DGamesPopUp->getSelectedTag());
-		saveTouchMode("touch_mode_3d_games", _preferredTM3DGamesPopUp->getSelectedTag());
 
 		if (inAppDomain) {
 			saveOrientation("orientation_menus", _orientationMenusPopUp->getSelectedTag());
 		}
 		saveOrientation("orientation_games", _orientationGamesPopUp->getSelectedTag());
 	} else {
-		ConfMan.removeKey("onscreen_control", _domain);
 		ConfMan.removeKey("ignore_game_safe_area", _domain);
-
-		if (inAppDomain) {
-			ConfMan.removeKey("touch_mode_menus", _domain);
-		}
-		ConfMan.removeKey("touch_mode_2d_games", _domain);
-		ConfMan.removeKey("touch_mode_3d_games", _domain);
 
 		if (inAppDomain) {
 			ConfMan.removeKey("orientation_menus", _domain);
@@ -452,11 +326,7 @@ bool AndroidOptionsWidget::save() {
 }
 
 bool AndroidOptionsWidget::hasKeys() {
-	return ConfMan.hasKey("onscreen_control", _domain) ||
-	       ConfMan.hasKey("ignore_game_safe_area", _domain) ||
-	       (_domain.equalsIgnoreCase(Common::ConfigManager::kApplicationDomain) && ConfMan.hasKey("touch_mode_menus", _domain)) ||
-	       ConfMan.hasKey("touch_mode_2d_games", _domain) ||
-	       ConfMan.hasKey("touch_mode_3d_games", _domain) ||
+	return ConfMan.hasKey("ignore_game_safe_area", _domain) ||
 	       (_domain.equalsIgnoreCase(Common::ConfigManager::kApplicationDomain) && ConfMan.hasKey("orientation_menus", _domain)) ||
 	       ConfMan.hasKey("orientation_games", _domain);
 }
@@ -466,17 +336,8 @@ void AndroidOptionsWidget::setEnabled(bool e) {
 
 	_enabled = e;
 
-	_onscreenCheckbox->setEnabled(e);
 	_ignoreGameSafeAreaCheckbox->setEnabled(e);
 
-	if (inAppDomain) {
-		_preferredTMMenusDesc->setEnabled(e);
-		_preferredTMMenusPopUp->setEnabled(e);
-	}
-	_preferredTM2DGamesDesc->setEnabled(e);
-	_preferredTM2DGamesPopUp->setEnabled(e);
-	_preferredTM3DGamesDesc->setEnabled(e);
-	_preferredTM3DGamesPopUp->setEnabled(e);
 	if (inAppDomain) {
 		_orientationMenusDesc->setEnabled(e);
 		_orientationMenusPopUp->setEnabled(e);
@@ -484,7 +345,6 @@ void AndroidOptionsWidget::setEnabled(bool e) {
 	_orientationGamesDesc->setEnabled(e);
 	_orientationGamesPopUp->setEnabled(e);
 }
-
 
 GUI::OptionsContainerWidget *OSystem_Android::buildBackendOptionsWidget(GUI::GuiObject *boss, const Common::String &name, const Common::String &target) const {
 	return new AndroidOptionsWidget(boss, name, target);
@@ -500,31 +360,24 @@ void OSystem_Android::registerDefaultSettings(const Common::String &target) cons
 	ConfMan.registerDefault("orientation_games", "auto");
 }
 
-void OSystem_Android::applyTouchSettings(bool _3dMode, bool overlayShown) {
-	Common::String setting;
-	int defaultMode;
-
-	if (overlayShown) {
-		setting = "touch_mode_menus";
-		defaultMode = TOUCH_MODE_MOUSE;
-	} else if (_3dMode) {
-		setting = "touch_mode_3d_games";
-		defaultMode = TOUCH_MODE_GAMEPAD;
-	} else {
-		setting = "touch_mode_2d_games";
-		defaultMode = TOUCH_MODE_TOUCHPAD;
+void OSystem_Android::applyTouchSettings(bool rendering3d, bool overlayShown) {
+	_touchContext = Common::touchContext(rendering3d, overlayShown);
+	const Common::TouchMode requested = Common::parseTouchMode(ConfMan.get(Common::touchModeKeyForContext(_touchContext)));
+	const Common::TouchMode mode = Common::resolveTouchMode(requested, _touchContext, isOnScreenGamepadAvailable());
+	if (mode != getTouchMode()) {
+		setupTouchMode(mode);
+		JNI::setTouchMode(mode);
 	}
+}
 
-	Common::String preferredTouchMode = ConfMan.get(setting);
-	if (preferredTouchMode == "mouse") {
-		JNI::setTouchMode(TOUCH_MODE_MOUSE);
-	} else if (preferredTouchMode == "gamepad") {
-		JNI::setTouchMode(TOUCH_MODE_GAMEPAD);
-	} else if (preferredTouchMode == "touchpad") {
-		JNI::setTouchMode(TOUCH_MODE_TOUCHPAD);
-	} else {
-		JNI::setTouchMode(defaultMode);
-	}
+bool OSystem_Android::isOnScreenGamepadAvailable() const {
+	return _touchControls.isInitialized() && ConfMan.getBool(ONSCREEN_CONTROL_KEY) && !JNI::isControllerConnected();
+}
+
+void OSystem_Android::cycleTouchMode() {
+	const Common::TouchMode mode = Common::nextTouchMode(getTouchMode(), _touchContext, isOnScreenGamepadAvailable());
+	ConfMan.set(Common::touchModeKeyForContext(_touchContext), Common::touchModeToString(mode), Common::ConfigManager::kSessionDomain);
+	dynamic_cast<AndroidGraphicsManager *>(_graphicsManager)->applyTouchSettings();
 }
 
 void OSystem_Android::applyOrientationSettings() {
