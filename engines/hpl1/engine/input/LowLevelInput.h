@@ -33,6 +33,7 @@
 
 namespace hpl {
 
+class Gamepad;
 class Mouse;
 class Keyboard;
 class iLowLevelGraphics;
@@ -40,6 +41,7 @@ class iLowLevelGraphics;
 class LowLevelInput {
 	friend class Keyboard;
 	friend class Mouse;
+	friend class Gamepad;
 
 public:
 	LowLevelInput(iLowLevelGraphics *graphics);
@@ -58,6 +60,7 @@ public:
 	 */
 	void EndInputUpdate();
 
+	Gamepad *CreateGamepad();
 	Mouse *CreateMouse();
 	Keyboard *CreateKeyboard();
 
