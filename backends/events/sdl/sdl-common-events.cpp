@@ -91,8 +91,16 @@ bool SdlEventSource::isTouchPortTouchpadMode(SDL_TouchID port) {
 	return g_system->getFeatureState(OSystem::kFeatureTouchpadMode);
 }
 
-bool SdlEventSource::handleTouchToggle(int action, float normX, float normY) {
+bool SdlEventSource::handleTouchToggle(int action, SDL_TouchID touchId, SDL_FingerID fingerId, float normX, float normY) {
 	OSystem_SDL *sdlSystem = dynamic_cast<OSystem_SDL *>(g_system);
+	if (_touchTogglePressed && (touchId != _touchToggleTouchId || fingerId != _touchToggleFingerId))
+		return false;
+	if (action == kActionCancel) {
+		if (!_touchTogglePressed)
+			return false;
+		_touchTogglePressed = false;
+		return true;
+	}
 
 	// A finger-up completes a press that started on the toggle. Process it
 	// regardless of the current finger position (the press started on the
@@ -103,6 +111,8 @@ bool SdlEventSource::handleTouchToggle(int action, float normX, float normY) {
 			return false;
 		}
 		_touchTogglePressed = false;
+		if (!sdlSystem || !sdlSystem->isTouchToggleVisible())
+			return true;
 		uint32 held = g_system->getMillis() - _touchToggleDownTime;
 		if (held >= kTouchToggleLongPressMs) {
 			Common::Event ev;
@@ -114,10 +124,9 @@ bool SdlEventSource::handleTouchToggle(int action, float normX, float normY) {
 		return true;
 	}
 
-	// Only act on finger-down for the remaining hit-test; intermediate motion is
-	// a harmless no-op while the press is tracked.
+	// Consume motion from the captured finger so it cannot reach the pointer or pad.
 	if (action != kActionDown) {
-		return false;
+		return _touchTogglePressed;
 	}
 	if (!sdlSystem || !sdlSystem->isTouchToggleVisible()) {
 		return false;
@@ -131,6 +140,8 @@ bool SdlEventSource::handleTouchToggle(int action, float normX, float normY) {
 	// Start tracking the press; the action (cycle vs. vkeybd) is decided on up.
 	_touchToggleDownTime = g_system->getMillis();
 	_touchTogglePressed = true;
+	_touchToggleTouchId = touchId;
+	_touchToggleFingerId = fingerId;
 	return true;
 }
 
