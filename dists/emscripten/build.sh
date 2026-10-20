@@ -272,8 +272,6 @@ if [ "$_libmad" = true ]; then
     wget -nc "https://downloads.sourceforge.net/mad/libmad-0.15.1b.tar.gz"
     tar -xf libmad-0.15.1b.tar.gz
     cd "$LIBS_FOLDER/libmad-0.15.1b/"
-    # libmad needs patching as -fforce-mem has been removed in GCC 4.3 and later
-    sed -i -e 's/-fforce-mem//g' configure
     CFLAGS="-Oz" emconfigure ./configure --host=wasm32-unknown-none --build=wasm32-unknown-none --prefix="$LIBS_FOLDER/build/" --with-pic --enable-fpm=no
     emmake make -j 5
     emmake make install
@@ -387,40 +385,6 @@ if [[ "make" =~ $(echo ^\(${TASKS}\)$) || "build" =~ $(echo ^\(${TASKS}\)$) ]]; 
   num_cpus=$(nproc || grep -c ^processor /proc/cpuinfo || echo 1)
   emmake make -j ${num_cpus}
 
-  # SDL3's emscripten audio backend arms a setInterval("silence_callback")
-  # while the AudioContext is autoplay-blocked (always the case on mobile
-  # before the first user gesture) that dynCall()s into wasm on every tick.
-  # If such a tick fires while ASYNCIFY has the main stack unwound (e.g. the
-  # HTTP virtual-fs busy-wait during a chunk download), the raw re-entry
-  # corrupts the asyncify state and traps ("call_indirect to a signature that
-  # does not match" / "Unreachable code should not be executed" in doRewind -
-  # observed on iOS Safari). Guard the callback to skip ticks while asyncify
-  # is not in its normal state. The SDL port source ships inside the emsdk
-  # cache, so patch the generated JS post-link instead (idempotent; anchors
-  # on the SDL EM_ASM text carried verbatim into scummvm.js).
-  if [[ -f "${ROOT_FOLDER}/scummvm.js" ]] && ! grep -q 'silence_callback = function() { if (typeof Asyncify' "${ROOT_FOLDER}/scummvm.js"; then
-    sed -i 's/var silence_callback = function() {/var silence_callback = function() { if (typeof Asyncify !== "undefined" \&\& Asyncify.state !== Asyncify.State.Normal) return;/g' "${ROOT_FOLDER}/scummvm.js"
-    echo "Patched asyncify guard into silence_callback ($(grep -c 'Asyncify.State.Normal) return;' "${ROOT_FOLDER}/scummvm.js") site(s))"
-  fi
-
-  # The silence_callback guard above only covers the autoplay-blocked
-  # fallback timer. SDL3's *real* ScriptProcessorNode.onaudioprocess handlers
-  # (playback and recording) share the identical raw dynCall('ip', ...)
-  # shape and were called out as an open gap in that fix ("could in theory
-  # hit the same race mid-game"). They fire continuously once an audio
-  # graph is running, independent of autoplay-block state, so any Asyncify
-  # busy-wait during active playback - e.g. VirtualFileSystemNode::
-  # waitForDirectoryCache() while the GUI file browser lists an HTTP-backed
-  # folder (the "Add Game" dialog's bundled data entry) - can re-enter and
-  # corrupt the asyncify state the same way. Guard both real handlers too.
-  if [[ -f "${ROOT_FOLDER}/scummvm.js" ]] && ! grep -q 'function(audioProcessingEvent) { if (typeof Asyncify' "${ROOT_FOLDER}/scummvm.js"; then
-    sed -i 's/function(audioProcessingEvent) { if ((SDL3 === undefined) || (SDL3.audio_recording === undefined)) { return; }/function(audioProcessingEvent) { if (typeof Asyncify !== "undefined" \&\& Asyncify.state !== Asyncify.State.Normal) return; if ((SDL3 === undefined) || (SDL3.audio_recording === undefined)) { return; }/' "${ROOT_FOLDER}/scummvm.js"
-    echo "Patched asyncify guard into audio_recording onaudioprocess"
-  fi
-  if [[ -f "${ROOT_FOLDER}/scummvm.js" ]] && ! grep -q 'function (e) { if (typeof Asyncify' "${ROOT_FOLDER}/scummvm.js"; then
-    sed -i 's/function (e) { if ((SDL3 === undefined) || (SDL3.audio_playback === undefined)) { return; }/function (e) { if (typeof Asyncify !== "undefined" \&\& Asyncify.state !== Asyncify.State.Normal) return; if ((SDL3 === undefined) || (SDL3.audio_playback === undefined)) { return; }/' "${ROOT_FOLDER}/scummvm.js"
-    echo "Patched asyncify guard into audio_playback onaudioprocess"
-  fi
 fi
 
 #################################
