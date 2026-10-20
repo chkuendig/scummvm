@@ -46,11 +46,9 @@ void iOSGraphicsManager::initSurface() {
 	OpenGL::Texture::getRGBAPixelFormat());
 	handleResize(sys->getScreenWidth(), sys->getScreenHeight());
 
-	_old_touch_mode = Common::kTouchModeTouchpad;
-
 	_rendering3d = (_renderer3d != nullptr);
 	// maybe in 3D, not in GUI
-	sys->applyTouchSettings(_rendering3d, false);
+	sys->applyTouchSettings(_rendering3d, isOverlayInGUI());
 }
 
 void iOSGraphicsManager::deinitSurface() {
@@ -84,31 +82,15 @@ bool iOSGraphicsManager::loadVideoMode(uint requestedWidth, uint requestedHeight
 void iOSGraphicsManager::showOverlay(bool inGUI) {
 	if (_overlayVisible && inGUI == _overlayInGUI)
 		return;
-
-	// Don't change touch mode when not changing mouse coordinates
-	if (inGUI) {
-		_old_touch_mode = dynamic_cast<OSystem_iOS7 *>(g_system)->getCurrentTouchMode();
-		// maybe in 3D, in overlay
-		dynamic_cast<OSystem_iOS7 *>(g_system)->applyTouchSettings(_renderer3d != nullptr, true);
-	} else if (_overlayInGUI) {
-		// Restore touch mode active before overlay was shown
-		dynamic_cast<OSystem_iOS7 *>(g_system)->setCurrentTouchMode(static_cast<TouchMode>(_old_touch_mode));
-		// Resync the toggle icon and native virtual controller to the restored mode.
-		dynamic_cast<OSystem_iOS7 *>(g_system)->updateTouchMode();
-	}
-
 	OpenGL::OpenGLGraphicsManager::showOverlay(inGUI);
+	applyTouchSettings();
 }
 
 void iOSGraphicsManager::hideOverlay() {
-	if (_overlayInGUI) {
-		// Restore touch mode active before overlay was shown
-		dynamic_cast<OSystem_iOS7 *>(g_system)->setCurrentTouchMode(static_cast<TouchMode>(_old_touch_mode));
-		// Resync the toggle icon and native virtual controller to the restored mode.
-		dynamic_cast<OSystem_iOS7 *>(g_system)->updateTouchMode();
-	}
-
+	if (!_overlayVisible)
+		return;
 	OpenGL::OpenGLGraphicsManager::hideOverlay();
+	applyTouchSettings();
 }
 
 void iOSGraphicsManager::applyTouchSettings() const {
