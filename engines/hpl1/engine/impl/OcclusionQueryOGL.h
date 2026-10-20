@@ -32,7 +32,7 @@
 #include "hpl1/engine/graphics/OcclusionQuery.h"
 #include "hpl1/opengl.h"
 
-#ifdef HPL1_USE_OPENGL
+#if defined(HPL1_USE_OPENGL) && !USE_FORCED_GLES2
 
 namespace hpl {
 
@@ -53,5 +53,5 @@ public:
 
 } // namespace hpl
 
-#endif // HPL1_USE_OPENGL
+#endif // defined(HPL1_USE_OPENGL) && !USE_FORCED_GLES2
 #endif // HPL_OCCLUSION_QUERY_H
