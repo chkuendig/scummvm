@@ -28,9 +28,8 @@
 #         <the CI-parity flags used in .github/workflows>
 #
 #   The recorder dialog then offers a Download button to export a recorded
-#   session out of the browser's virtual filesystem. Note: --enable-release
-#   also switches plugin ASYNCIFY_IMPORTS from ["*"] to the narrowed list, so
-#   omit --enable-release for iterating unless you have regenerated the list.
+#   session out of the browser's virtual filesystem. Plugin Asyncify imports
+#   use ["*"] in both release and debug builds.
 #
 
 
@@ -45,7 +44,7 @@ TASKS=()
 CONFIGURE_ARGS=()
 _bundle_games=()
 _verbose=false
-EMSDK_VERSION="${EMSDK_VERSION:-6.0.11}"
+EMSDK_VERSION="${EMSDK_VERSION:-6.0.13}"
 EMSCRIPTEN_VERSION="$EMSDK_VERSION"
 
 usage="\
