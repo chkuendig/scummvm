@@ -644,6 +644,13 @@ public:
 		* EventTests::staleMousePosition()).
 		*/
 		kFeatureStaleMousePositionWorkaround,
+
+		/** Per-context touch presets and a session-local mode toggle. No state. */
+		kFeatureTouchMode,
+
+		/** The backend can provide an on-screen gamepad. No state. */
+		kFeatureOnScreenGamepad,
+
 	};
 
 	/**

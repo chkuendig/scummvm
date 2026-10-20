@@ -56,7 +56,6 @@ protected:
 
 	void refreshScreen() override;
 
-	int _old_touch_mode;
 	bool _rendering3d;
 	WindowedGraphicsManager::Insets _insets;
 };
