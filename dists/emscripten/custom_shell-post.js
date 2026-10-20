@@ -5,6 +5,9 @@
 JSEvents.removeAllHandlersOnTarget = function(){};
 
 // Make sure to release any resources (e.g. RetroWave or Midi Devices) when leaving the page
+// TODO: For this to reliably work, we need to ensure to run everything synchronous
 window.addEventListener("beforeunload", function (e) {
-	Module["_raise"](2); // SIGINT
+	if (Module["_raise"]) {
+		Module["_raise"](2); // SIGINT
+	}
 });
