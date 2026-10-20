@@ -6,12 +6,16 @@
 ######################################################################
 
 TESTS        := $(srcdir)/test/common/*.h \
+	$(srcdir)/test/backends/*.h \
 	$(srcdir)/test/common/compression/*.h \
 	$(srcdir)/test/common/formats/*.h \
 	$(srcdir)/test/audio/*.h \
 	$(srcdir)/test/math/*.h \
 	$(srcdir)/test/image/*.h
-TEST_LIBS    :=
+TEST_LIBS    := backends/keymapper/action.o \
+	backends/keymapper/hardware-input.o \
+	backends/keymapper/keymap.o \
+	backends/keymapper/keymapper.o
 
 ifdef POSIX
 TEST_LIBS += test/system/null_osystem.o \
