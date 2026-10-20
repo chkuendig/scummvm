@@ -418,6 +418,9 @@ TMPC=${TMPO}.cpp
 TMPLOG=config.log
 
 cc_check_no_clean() {
+	if test "$_backend" = emscripten ; then
+		for _cc_arg do shift; case " $emscripten_builtin_libs " in *" $_cc_arg "*) test -z "$_cc_arg" || continue ;; esac; set -- "$@" "$_cc_arg"; done
+	fi
 	echo >> "$TMPLOG"
 	cat "$TMPC" >> "$TMPLOG"
 	echo >> "$TMPLOG"
@@ -3378,6 +3381,7 @@ EOF
 		append_var LIBS "-lcalico_ds9"
 		;;
 	emscripten)
+		emscripten_builtin_libs=""
 		append_var DEFINES "-DEMSCRIPTEN"
 		add_line_to_config_mk 'EMSCRIPTEN = 1'
 		_port_mk="backends/platform/sdl/emscripten/emscripten.mk"
@@ -3426,6 +3430,7 @@ EOF
 		if test "$_freetype2" = yes; then
 			# neither pkg-config nor freetype-config work, so we setup freetype manually
 			append_var LDFLAGS "-s USE_FREETYPE=1"
+			append_var emscripten_builtin_libs "-lfreetype -lz"
 			_freetype_found="true"
 			_freetypepath="$EMSDK/upstream/emscripten/cache/sysroot/include/freetype2/"
 			FREETYPE2_CFLAGS="-I$_freetypepath"
@@ -3434,31 +3439,37 @@ EOF
 		fi
 		if test "$_gif" = yes; then
 		 	append_var LDFLAGS "-s USE_GIFLIB=1"
+			append_var emscripten_builtin_libs "-lgif"
 		else
 			_gif=no
 		fi
 		if test "$_jpeg" = yes; then
 			append_var LDFLAGS "-s USE_LIBJPEG=1"
+			append_var emscripten_builtin_libs "-ljpeg"
 		else
 			_jpeg=no
 		fi
 		if test "$_ogg" = yes; then
 			append_var LDFLAGS "-s USE_OGG=1"
+			append_var emscripten_builtin_libs "-logg"
 		else
 			_ogg=no
 		fi
 		if test "$_png" = yes; then
 			append_var LDFLAGS "-s USE_LIBPNG=1"
+			append_var emscripten_builtin_libs "-lpng -lpng16 -lz"
 		else
 			_png=no
 		fi
 		if test "$_vorbis" = yes; then
 			append_var LDFLAGS "-s USE_VORBIS=1"
+			append_var emscripten_builtin_libs "-lvorbisfile -lvorbis -logg"
 		else
 			_vorbis=no
 		fi
 		if test "$_zlib" = yes; then
 			append_var LDFLAGS "-s USE_ZLIB=1"
+			append_var emscripten_builtin_libs "-lz"
 		else
 			_zlib=no
 		fi
@@ -7902,26 +7913,14 @@ case $_host_os in
 		;;
 	emscripten)
 		append_var LDFLAGS '--pre-js $(srcdir)/dists/emscripten/custom_shell-pre.js --post-js $(srcdir)/dists/emscripten/custom_shell-post.js --shell-file $(srcdir)/dists/emscripten/custom_shell.html'
-		# we remove some linker flags for libs which will be added by emscripten from emscripten-ports to avoid duplicate symbols
-		if test "${LDFLAGS#*-s USE_GIFLIB=1}" != "$LDFLAGS"; then
-			LIBS=`echo ${LIBS} | sed 's/-lgif//g'`
-		fi
-		if test "${LDFLAGS#*-s USE_LIBJPEG=1}" != "$LDFLAGS"; then
-    		LIBS=`echo ${LIBS} | sed 's/-ljpeg//g'`
-		fi
-		if test "${LDFLAGS#*-s USE_OGG=1}" != "$LDFLAGS"; then
-			LIBS=`echo ${LIBS} | sed 's/-logg//g'`
-		fi
-		if test "${LDFLAGS#*-s USE_LIBPNG=1}" != "$LDFLAGS"; then
-			LIBS=`echo ${LIBS} | sed 's/-lpng -lz//g'`
-		fi
-		if test "${LDFLAGS#*-s USE_VORBIS=1}" != "$LDFLAGS"; then
-			LIBS=`echo ${LIBS} | sed 's/-lvorbisfile//g;'`
-			LIBS=`echo ${LIBS} | sed 's/-lvorbis//g'`
-		fi
-		if test "${LDFLAGS#*-s USE_ZLIB=1}" != "$LDFLAGS"; then
-			LIBS=`echo ${LIBS} | sed 's/-lz//g'`
-		fi
+		_emscripten_libs="$LIBS"
+		LIBS=
+		for _lib in $_emscripten_libs; do
+			case " $emscripten_builtin_libs " in
+				*" $_lib "*) ;;
+				*) append_var LIBS "$_lib" ;;
+			esac
+		done
 		;;
 	kolibrios)
 		# In reality we will build a DLL
