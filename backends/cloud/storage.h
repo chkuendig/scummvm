@@ -148,11 +148,11 @@ public:
 
 	/** Returns pointer to Networking::NetworkReadStream. */
 	virtual Networking::Request *streamFile(const Common::String &path, Networking::NetworkReadStreamCallback callback, Networking::ErrorCallback errorCallback);
-	virtual Networking::Request *streamFileById(const Common::String &id, Networking::NetworkReadStreamCallback callback, Networking::ErrorCallback errorCallback) = 0;
+	virtual Networking::Request *streamFileById(const Common::String &id, Networking::NetworkReadStreamCallback callback, Networking::ErrorCallback errorCallback, uint64 startPos = 0, uint64 length = 0) = 0;
 
 	/** Calls the callback when finished. */
 	virtual Networking::Request *download(const Common::String &remotePath, const Common::Path &localPath, BoolCallback callback, Networking::ErrorCallback errorCallback);
-	virtual Networking::Request *downloadById(const Common::String &remoteId, const Common::Path &localPath, BoolCallback callback, Networking::ErrorCallback errorCallback);
+	virtual Networking::Request *downloadById(const Common::String &remoteId, const Common::Path &localPath, BoolCallback callback, Networking::ErrorCallback errorCallback, uint64 startPos = 0, uint64 length = 0);
 
 	/** Returns Common::Array<StorageFile> with list of files, which were not downloaded. */
 	virtual Networking::Request *downloadFolder(const Common::String &remotePath, const Common::Path &localPath, FileArrayCallback callback, Networking::ErrorCallback errorCallback, bool recursive = false);
