@@ -29,7 +29,6 @@
 #include "backends/fs/emscripten/emscripten-fs-factory.h"
 #include "backends/mixer/emscriptensdl/emscriptensdl-mixer.h"
 #include "backends/mutex/null/null-mutex.h"
-#include "backends/fs/emscripten/emscripten-fs-factory.h"
 #include "backends/platform/sdl/emscripten/emscripten.h"
 #include "backends/timer/emscripten/emscripten-timer.h"
 #include "common/file.h"
@@ -37,65 +36,15 @@
 #include "backends/text-to-speech/emscripten/emscripten-text-to-speech.h"
 #endif
 
-// Inline JavaScript, see https://emscripten.org/docs/api_reference/emscripten.h.html#inline-assembly-javascript for details
-EM_JS(bool, isFullscreen, (), {
-	return !!document.fullscreenElement;
-});
-
-EM_JS(void, toggleFullscreen, (bool enable), {
-	let canvas = document.getElementById('canvas');
-	if (enable && !document.fullscreenElement) {
-		canvas.requestFullscreen();
-	}
-	if (!enable && document.fullscreenElement) {
-		document.exitFullscreen();
-	}
-});
-
-EM_JS(void, downloadFile, (const char *filenamePtr, char *dataPtr, int dataSize), {
-	const view = new Uint8Array(HEAPU8.buffer, dataPtr, dataSize);
-	const blob = new Blob([view], {
-			type:
-				'octet/stream'
-		});
-	const filename = UTF8ToString(filenamePtr);
-	setTimeout(() => {
-		const a = document.createElement('a');
-		a.style = 'display:none';
-		document.body.appendChild(a);
-		const url = window.URL.createObjectURL(blob);
-		a.href = url;
-		a.download = filename;
-		a.click();
-		window.URL.revokeObjectURL(url);
-		document.body.removeChild(a);
-	}, 0);
-});
-
-#ifdef USE_CLOUD
-/* Listener to feed the activation JSON from the wizard at cloud.scummvm.org back 
- * Usage: Run the following on the final page of the activation flow:
- * 		  window.opener.postMessage(document.getElementById("json").value,"*")
- */
-EM_JS(bool, cloud_connection_open_oauth_window, (char const *url), {
-	oauth_window = window.open(UTF8ToString(url));
-	window.addEventListener("message", (event) => {
-		Module._cloud_connection_json_callback(stringToNewUTF8( JSON.stringify(event.data)));
-		oauth_window.close()
-	}, {once : true});
-	return true;
-});
-#endif
-
 extern "C" {
 #ifdef USE_CLOUD
-void EMSCRIPTEN_KEEPALIVE cloud_connection_json_callback(char *str) {
-	warning("cloud_connection_callback: %s", str);
+void EMSCRIPTEN_KEEPALIVE OSystem_Emscripten_cloudConnectionWizardCallback(char *str) {
+	debug(5, "OSystem_Emscripten_cloudConnectionWizardCallback: %s", str);
 	OSystem_Emscripten *emscripten_g_system = dynamic_cast<OSystem_Emscripten *>(g_system);
 	if (emscripten_g_system->_cloudConnectionCallback) {
 		(*emscripten_g_system->_cloudConnectionCallback)(new Common::String(str));
 	} else {
-		warning("No Storage Connection Callback Registered!");
+		warning("OSystem_Emscripten_cloudConnectionWizardCallback: No Storage Connection Callback Registered!");
 	}
 }
 #endif
@@ -118,6 +67,7 @@ void OSystem_Emscripten::initBackend() {
 
 	// Invoke parent implementation of this method
 	OSystem_POSIX::initBackend();
+
 }
 
 void OSystem_Emscripten::init() {
@@ -146,7 +96,7 @@ bool OSystem_Emscripten::hasFeature(Feature f) {
 
 bool OSystem_Emscripten::getFeatureState(Feature f) {
 	if (f == kFeatureFullscreenMode) {
-		return isFullscreen();
+		return OSystem_Emscripten_isFullscreen();
 	} else {
 		return OSystem_POSIX::getFeatureState(f);
 	}
@@ -154,7 +104,7 @@ bool OSystem_Emscripten::getFeatureState(Feature f) {
 
 void OSystem_Emscripten::setFeatureState(Feature f, bool enable) {
 	if (f == kFeatureFullscreenMode) {
-		toggleFullscreen(enable);
+		OSystem_Emscripten_setFullscreen(enable);
 	} else {
 		OSystem_POSIX::setFeatureState(f, enable);
 	}
@@ -203,7 +153,7 @@ void OSystem_Emscripten::exportFile(const Common::Path &filename) {
 	char *bytes = new char[size + 1];
 	file.read(bytes, size);
 	file.close();
-	downloadFile(exportName.c_str(), bytes, size);
+	OSystem_Emscripten_downloadFile(exportName.c_str(), bytes, size);
 	delete[] bytes;
 }
 
@@ -236,10 +186,10 @@ void OSystem_Emscripten::delayMillis(uint msecs) {
 
 #ifdef USE_CLOUD
 bool OSystem_Emscripten::openUrl(const Common::String &url) {
-	if(url.hasPrefix("https://cloud.scummvm.org/")){
-		return cloud_connection_open_oauth_window(url.c_str());
+	if (url.hasPrefix("https://cloud.scummvm.org")) {
+		return OSystem_Emscripten_openCloudOAuthWindow(url.c_str());
 	}
-	return	OSystem_SDL::openUrl(url);
+	return OSystem_SDL::openUrl(url);
 }
 #endif
 
