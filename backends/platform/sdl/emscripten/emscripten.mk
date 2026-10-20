@@ -39,7 +39,6 @@ endif
 ifdef DIST_FILES_VKEYBD
 	cp $(DIST_FILES_VKEYBD) ./build-emscripten/data
 endif
-	cp "$(srcdir)/dists/android/gamepad.svg" ./build-emscripten/data
 ifdef DIST_FILES_SOUNDFONTS
 	cp $(DIST_FILES_SOUNDFONTS) ./build-emscripten/data
 endif
