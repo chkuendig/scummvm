@@ -363,6 +363,33 @@
 			<widget name = 'grTouchpadCheckbox'
 					type = 'Checkbox'
 			/>
+			<widget name = 'grOnScreenControl'
+					type = 'Checkbox'
+			/>
+			<layout type = 'horizontal' padding = '16, 16, 0, 0' spacing = '10'>
+				<widget name = 'grTMMenusDesc'
+						type = 'OptionsLabel'
+				/>
+				<widget name = 'grTMMenus'
+						type = 'PopUp'
+				/>
+			</layout>
+			<layout type = 'horizontal' padding = '16, 16, 0, 0' spacing = '10'>
+				<widget name = 'grTM2DGamesDesc'
+						type = 'OptionsLabel'
+				/>
+				<widget name = 'grTM2DGames'
+						type = 'PopUp'
+				/>
+			</layout>
+			<layout type = 'horizontal' padding = '16, 16, 0, 0' spacing = '10'>
+				<widget name = 'grTM3DGamesDesc'
+						type = 'OptionsLabel'
+				/>
+				<widget name = 'grTM3DGames'
+						type = 'PopUp'
+				/>
+			</layout>
 			<layout type = 'horizontal' padding = '0, 0, 0, 0' spacing = '10'>
 				<widget name = 'grKbdMouseSpeedDesc'
 						type = 'OptionsLabel'
