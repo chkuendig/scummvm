@@ -39,6 +39,13 @@ enum eInputDeviceType {
 	eInputDeviceType_LastEnum
 };
 
+enum eGamepadAction {
+	eGamepadAction_LookUp = 1,
+	eGamepadAction_LookDown,
+	eGamepadAction_LookLeft,
+	eGamepadAction_LookRight
+};
+
 //-------------------------------------------------
 
 enum eMButton {
