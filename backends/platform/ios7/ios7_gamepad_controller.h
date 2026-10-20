@@ -29,6 +29,9 @@ API_AVAILABLE(ios(7.0))
 
 - (id)initWithView:(iPhoneView *)view;
 - (void)virtualController:(bool)connect;
+// True when a physical controller (excluding the on-screen virtual one) is
+// currently connected.
+- (BOOL)isPhysicalControllerConnected;
 
 @end
 
