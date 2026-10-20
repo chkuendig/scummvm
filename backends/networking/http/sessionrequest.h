@@ -96,6 +96,9 @@ public:
 	byte *getData() { return _contentsStream.getData(); }
 	uint32 getSize() { return _contentsStream.size(); }
 
+	/** Returns a number in range [0, 1], where 1 is "complete". */
+	double getProgress() const;
+
 };
 
 } // End of namespace Networking
