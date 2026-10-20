@@ -55,6 +55,7 @@ public:
 	/** Add the virtual mouse keymapper actions to a keymap */
 	void addActionsToKeymap(Keymap *keymap);
 
+	/** Backend axis actions for engine-specific virtual mouse mappings. */
 	enum {
 		kCustomActionVirtualAxisUp    = 10000,
 		kCustomActionVirtualAxisDown  = 10001,
