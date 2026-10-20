@@ -1,4 +1,9 @@
 /*global Module*/
+// Reload page when fragment identifier (and launch parameters) changes
+window.addEventListener("hashchange", function () {
+	location.reload();
+});
+
 Module["arguments"] = [];
 
 // Add all parameters passed via the fragment identifier
@@ -7,19 +12,4 @@ if (window.location.hash.length > 0) {
     params.forEach((param) => {
         Module["arguments"].push(param);
     })
-}
-
-// MIDI support
-var midiOutputMap;
-if (!("requestMIDIAccess" in navigator)) {
-	console.error("No MIDI support in your browser.");
-} else {
-	navigator
-		.requestMIDIAccess({ sysex: true, software: true })
-		.then((midiAccess) => {
-			midiOutputMap = midiAccess.outputs;
-			midiAccess.onstatechange = (e) => {
-				midiOutputMap = e.target.outputs;
-			};
-		});
 }

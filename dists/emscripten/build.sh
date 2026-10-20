@@ -256,8 +256,6 @@ if [ "$_libmad" = true ]; then
     wget -nc "https://downloads.sourceforge.net/mad/libmad-0.15.1b.tar.gz"
     tar -xf libmad-0.15.1b.tar.gz
     cd "$LIBS_FOLDER/libmad-0.15.1b/"
-    # libmad needs patching as -fforce-mem has been removed in GCC 4.3 and later
-    sed -i -e 's/-fforce-mem//g' configure
     CFLAGS="-Oz" emconfigure ./configure --host=wasm32-unknown-none --build=wasm32-unknown-none --prefix="$LIBS_FOLDER/build/" --with-pic --enable-fpm=no
     emmake make -j 5
     emmake make install
