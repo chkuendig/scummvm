@@ -111,8 +111,6 @@ public:
 	 */
 	static void removeFromConfig(const Common::String &keyPrefix);
 
-	Common::String accessToken() const { return _token; }
-
 private:
 	// Temporary storage for range parameters used in streamFileById
 	uint64 _pendingRangeStartPos;
