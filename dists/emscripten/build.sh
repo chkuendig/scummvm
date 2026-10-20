@@ -312,12 +312,12 @@ fi
 
 if [ "$_retrowave" = true ]; then
   if [[ ! -f "$LIBS_FOLDER/build/lib/libRetroWave.a" ]]; then
-    echo "build libRetroWave-e6bf60e"
+    echo "build libRetroWave-ddb5b34"
     cd "$LIBS_FOLDER"
-    wget -nc --content-disposition "https://github.com/SudoMaker/RetroWave/archive/e6bf60eed2d2bd1deff688d645be71a32bbf05bb.tar.gz"
-    tar -xf RetroWave-e6bf60eed2d2bd1deff688d645be71a32bbf05bb.tar.gz
-    cd "$LIBS_FOLDER/RetroWave-e6bf60eed2d2bd1deff688d645be71a32bbf05bb/"
-    CFLAGS="-fPIC -s USE_ZLIB=1 -Oz"  emcmake cmake -B "build/" -DRETROWAVE_BUILD_PLAYER=0  -DCMAKE_INSTALL_PREFIX="$LIBS_FOLDER/build/" -DCMAKE_INSTALL_LIBDIR="lib"
+    wget -nc --content-disposition "https://github.com/SudoMaker/RetroWave/archive/ddb5b34f25d23b075dec8fffe65dedb629a78e86.tar.gz"
+    tar -xf RetroWave-ddb5b34f25d23b075dec8fffe65dedb629a78e86.tar.gz
+    cd "$LIBS_FOLDER/RetroWave-ddb5b34f25d23b075dec8fffe65dedb629a78e86/"
+    CFLAGS="-fPIC -s USE_ZLIB=1 -Oz -DEMSCRIPTEN"  emcmake cmake -B "build/" -DRETROWAVE_BUILD_PLAYER=0  -DCMAKE_INSTALL_PREFIX="$LIBS_FOLDER/build/" -DCMAKE_INSTALL_LIBDIR="lib"
     cmake --build "build/"  
     cmake --install "build/"  
   fi
@@ -326,12 +326,12 @@ fi
 
 if [ "$_libtheoradec" = true ]; then
   if [[ ! -f "$LIBS_FOLDER/build/lib/libtheora.a" ]]; then
-    echo "build libtheora-1.1.1"
+    echo "build libtheora-1.2.0"
     cd "$LIBS_FOLDER"
-    wget -nc "https://downloads.xiph.org/releases/theora/libtheora-1.1.1.tar.xz"
-    tar -xf libtheora-1.1.1.tar.xz
-    cd "$LIBS_FOLDER/libtheora-1.1.1/"
-    CFLAGS="-fPIC -s USE_OGG=1 -Oz" emconfigure ./configure --host=wasm32-unknown-none --build=wasm32-unknown-none --prefix="$LIBS_FOLDER/build/" --disable-asm
+    wget -nc "https://downloads.xiph.org/releases/theora/libtheora-1.2.0.tar.xz"
+    tar -xf libtheora-1.2.0.tar.xz
+    cd "$LIBS_FOLDER/libtheora-1.2.0/"
+    CFLAGS="-fPIC -s USE_OGG=1 -Oz" emconfigure ./configure --host=wasm32-unknown-none --build=wasm32-unknown-none --prefix="$LIBS_FOLDER/build/" --disable-asm --disable-examples
     emmake make -j 5
     emmake make install
   fi
