@@ -49,8 +49,7 @@
 // AndroidGraphicsManager
 //
 AndroidGraphicsManager::AndroidGraphicsManager() :
-	_touchcontrols(nullptr),
-	_old_touch_mode(OSystem_Android::TOUCH_MODE_TOUCHPAD) {
+	_touchcontrols(nullptr) {
 	ENTER();
 
 	// Initialize our OpenGL ES context.
@@ -182,32 +181,17 @@ void AndroidGraphicsManager::recalculateDisplayAreas() {
 void AndroidGraphicsManager::showOverlay(bool inGUI) {
 	if (_overlayVisible && inGUI == _overlayInGUI)
 		return;
-
-	// Don't change touch mode when not changing mouse coordinates
-	if (inGUI) {
-		_old_touch_mode = JNI::getTouchMode();
-		// maybe in 3D, in overlay
-		dynamic_cast<OSystem_Android *>(g_system)->applyTouchSettings(_renderer3d != nullptr, true);
-		dynamic_cast<OSystem_Android *>(g_system)->applyOrientationSettings();
-	} else if (_overlayInGUI) {
-		// Restore touch mode active before overlay was shown
-		JNI::setTouchMode(_old_touch_mode);
-	}
-
 	OpenGL::OpenGLGraphicsManager::showOverlay(inGUI);
+	applyTouchSettings();
+	dynamic_cast<OSystem_Android *>(g_system)->applyOrientationSettings();
 }
 
 void AndroidGraphicsManager::hideOverlay() {
 	if (!_overlayVisible)
 		return;
-
-	if (_overlayInGUI) {
-		// Restore touch mode active before overlay was shown
-		JNI::setTouchMode(_old_touch_mode);
-		dynamic_cast<OSystem_Android *>(g_system)->applyOrientationSettings();
-	}
-
 	OpenGL::OpenGLGraphicsManager::hideOverlay();
+	applyTouchSettings();
+	dynamic_cast<OSystem_Android *>(g_system)->applyOrientationSettings();
 }
 
 float AndroidGraphicsManager::getHiDPIScreenFactor() const {

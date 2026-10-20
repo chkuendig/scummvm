@@ -22,7 +22,9 @@
 #ifndef _ANDROID_H_
 #define _ANDROID_H_
 
+#include "common/touch-mode.h"
 #include <android/log.h>
+#include <atomic>
 
 #include "common/fs.h"
 #include "common/archive.h"
@@ -148,7 +150,8 @@ private:
 	Common::Point _touch_pt_down, _touch_pt_scroll, _touch_pt_dt, _touch_pt_multi;
 	int _eventScaleX;
 	int _eventScaleY;
-	int _touch_mode;
+	std::atomic<int> _touch_mode;
+	Common::TouchContext _touchContext = Common::kTouchContextMenus;
 	int _touchpad_scale;  // Used in events.cpp
 	int _trackball_scale; // Used in events.cpp
 	int _dpad_scale;      // Used in events.cpp
@@ -182,10 +185,10 @@ private:
 
 public:
 	enum {
-		TOUCH_MODE_TOUCHPAD = 0,
-		TOUCH_MODE_MOUSE = 1,
-		TOUCH_MODE_GAMEPAD = 2,
-		TOUCH_MODE_MAX = 3
+		TOUCH_MODE_TOUCHPAD = Common::kTouchModeTouchpad,
+		TOUCH_MODE_MOUSE = Common::kTouchModeMouse,
+		TOUCH_MODE_GAMEPAD = Common::kTouchModeGamepad,
+		TOUCH_MODE_MAX = Common::kTouchModeCount
 	};
 
 	enum {
@@ -222,8 +225,11 @@ public:
 	void pushDelayedTouchMouseBtnEvents();
 
 	TouchControls &getTouchControls() { return _touchControls; }
-	void applyTouchSettings(bool _3dMode, bool overlayShown);
-	void setupTouchMode(int oldValue, int newValue);
+	void applyTouchSettings(bool rendering3d, bool overlayShown);
+	void cycleTouchMode();
+	bool isOnScreenGamepadAvailable() const;
+	void setupTouchMode(int newValue);
+	Common::TouchMode getTouchMode() const { return (Common::TouchMode)_touch_mode.load(); }
 
 	void applyOrientationSettings();
 

@@ -61,6 +61,7 @@ import android.text.TextUtils;
 import android.util.DisplayMetrics;
 import android.util.Log;
 import android.util.TypedValue;
+import android.view.InputDevice;
 import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
@@ -707,8 +708,7 @@ public class ScummVMActivity extends Activity {
 					if (isScreenKeyboardShown()) {
 						hideScreenKeyboard();
 					} else {
-						int newTouchMode = _events.nextTouchMode();
-						setupTouchModeBtn(newTouchMode);
+						_events.nextTouchMode();
 					}
 				}
 			});
@@ -846,9 +846,7 @@ public class ScummVMActivity extends Activity {
 
 		@Override
 		protected void setTouchMode(final int touchMode) {
-			if (_events.getTouchMode() == touchMode) {
-				return;
-			}
+			// Check for duplicate modes on the UI thread so queued transitions keep their order.
 			runOnUiThread(new Runnable() {
 				public void run() {
 					_events.setTouchMode(touchMode);
@@ -858,8 +856,17 @@ public class ScummVMActivity extends Activity {
 		}
 
 		@Override
-		protected int getTouchMode() {
-			return _events.getTouchMode();
+		protected boolean isControllerConnected() {
+			for (int id : InputDevice.getDeviceIds()) {
+				InputDevice device = InputDevice.getDevice(id);
+				if (device == null || device.isVirtual())
+					continue;
+				final int sources = device.getSources();
+				if ((sources & InputDevice.SOURCE_GAMEPAD) == InputDevice.SOURCE_GAMEPAD ||
+				    (sources & InputDevice.SOURCE_JOYSTICK) == InputDevice.SOURCE_JOYSTICK)
+					return true;
+			}
+			return false;
 		}
 
 		@Override
@@ -1404,7 +1411,7 @@ public class ScummVMActivity extends Activity {
 		if (_events != null) {
 			_finishing = true;
 
-			_events.clearEventHandler();
+			_events.destroy();
 			_events.sendQuitEvent();
 
 			// Make sure the thread is actively polling for events

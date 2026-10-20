@@ -593,7 +593,8 @@ bool OSystem_Android::hasFeature(Feature f) {
 			f == kFeatureClipboardSupport ||
 			f == kFeatureKbdMouseSpeed ||
 			f == kFeatureJoystickDeadzone ||
-			f == kFeatureTouchscreen) {
+			f == kFeatureTouchscreen ||
+			f == kFeatureTouchMode || f == kFeatureOnScreenGamepad) {
 		return true;
 	}
 

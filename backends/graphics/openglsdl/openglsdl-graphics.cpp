@@ -428,6 +428,7 @@ void OpenGLSdlGraphicsManager::updateScreen() {
 			_touchControlsIniting = true;
 			_touchControls->init(getHiDPIScreenFactor());
 			_touchControlsIniting = false;
+			sdlSystem->applyTouchSettings();
 		}
 	}
 

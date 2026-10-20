@@ -30,6 +30,7 @@
 
 #include "common/translation.h"
 #include "backends/platform/ios7/ios7_osys_main.h"
+#include "backends/graphics/ios/ios-graphics.h"
 
 #include <TargetConditionals.h>
 
@@ -60,7 +61,6 @@ private:
 	void saveOrientation(const Common::String &setting, uint32 orientation);
 #endif
 
-	GUI::CheckboxWidget *_gamepadControllerCheckbox;
 	GUI::StaticTextWidget *_gamepadControllerOpacityDesc;
 	GUI::SliderWidget *_gamepadControllerOpacitySlider;
 	GUI::StaticTextWidget *_gamepadControllerOpacityLabel;
@@ -72,7 +72,7 @@ private:
 #if TARGET_OS_IOS
 	// The per-context touch-mode dropdowns and the on-screen-control checkbox are
 	// now provided by the shared Control tab (gui/options.cpp); iOS opts in via
-	// kFeatureTouchpadMode. Only the iOS-specific settings remain here.
+	// kFeatureTouchMode. Only the iOS-specific settings remain here.
 	GUI::StaticTextWidget *_orientationDesc;
 	GUI::StaticTextWidget *_orientationMenusDesc;
 	GUI::PopUpWidget *_orientationMenusPopUp;
@@ -85,7 +85,6 @@ private:
 IOS7OptionsWidget::IOS7OptionsWidget(GuiObject *boss, const Common::String &name, const Common::String &domain) :
 		OptionsContainerWidget(boss, name, "IOS7OptionsDialog", domain), _enabled(true) {
 
-	_gamepadControllerCheckbox = new GUI::CheckboxWidget(widgetsBoss(), "IOS7OptionsDialog.GamepadController", _("Show Gamepad Controller (iOS 15 and later)"));
 	_gamepadControllerOpacityDesc = new GUI::StaticTextWidget(widgetsBoss(), "IOS7OptionsDialog.GamepadControllerOpacity", _("Gamepad opacity"));
 	_gamepadControllerOpacitySlider = new GUI::SliderWidget(widgetsBoss(), "IOS7OptionsDialog.GamepadControllerOpacitySlider", _("Gamepad opacity"), kGamepadControllerOpacityChanged);
 	_gamepadControllerOpacityLabel = new GUI::StaticTextWidget(widgetsBoss(), "IOS7OptionsDialog.GamepadControllerOpacityLabel", Common::U32String(" "), Common::U32String(), GUI::ThemeEngine::kFontStyleBold, Common::UNK_LANG, false);
@@ -138,7 +137,6 @@ void IOS7OptionsWidget::defineLayout(GUI::ThemeEval &layouts, const Common::Stri
 
 	layouts.addDialog(layoutName, overlayedLayout)
 	        .addLayout(GUI::ThemeLayout::kLayoutVertical)
-	            .addWidget("GamepadController", "Checkbox")
 			.addLayout(GUI::ThemeLayout::kLayoutHorizontal)
 				.addPadding(0, 0, 0, 0)
 				.addWidget("GamepadControllerLeftButton", "OptionsLabel")
@@ -256,7 +254,6 @@ void IOS7OptionsWidget::saveOrientation(const Common::String &setting, uint32 or
 void IOS7OptionsWidget::load() {
 	const bool inAppDomain = _domain.equalsIgnoreCase(Common::ConfigManager::kApplicationDomain);
 
-	_gamepadControllerCheckbox->setState(ConfMan.getBool("gamepad_controller", _domain));
 	_gamepadControllerOpacitySlider->setValue(ConfMan.getInt("gamepad_controller_opacity", _domain));
 	_gamepadControllerOpacityLabel->setValue(_gamepadControllerOpacitySlider->getValue());
 	_gamepadControllerDirectionalInputPopUp->setSelectedTag(loadDirectionalInput("gamepad_controller_directional_input", !inAppDomain, kDirectionalInputThumbstick));
@@ -278,7 +275,6 @@ bool IOS7OptionsWidget::save() {
 #endif
 
 	if (_enabled) {
-		ConfMan.setBool("gamepad_controller", _gamepadControllerCheckbox->getState(), _domain);
 		ConfMan.setInt("gamepad_controller_opacity", _gamepadControllerOpacitySlider->getValue(), _domain);
 		ConfMan.setInt("gamepad_controller_directional_input", _gamepadControllerDirectionalInputPopUp->getSelectedTag(), _domain);
 		ConfMan.setBool("gamepad_controller_minimal_layout", _gamepadControllerMinimalLayoutCheckbox->getState(), _domain);
@@ -292,7 +288,6 @@ bool IOS7OptionsWidget::save() {
 		saveOrientation("orientation_games", _orientationGamesPopUp->getSelectedTag());
 #endif
 	} else {
-		ConfMan.removeKey("gamepad_controller", _domain);
 		ConfMan.removeKey("gamepad_controller_opacity", _domain);
 		ConfMan.removeKey("gamepad_controller_directional_input", _domain);
 		ConfMan.removeKey("gamepad_controller_minimal_layout", _domain);
@@ -311,8 +306,7 @@ bool IOS7OptionsWidget::save() {
 }
 
 bool IOS7OptionsWidget::hasKeys() {
-	bool hasKeys = ConfMan.hasKey("gamepad_controller", _domain) ||
-	ConfMan.hasKey("gamepad_controller_opacity", _domain) ||
+	bool hasKeys = ConfMan.hasKey("gamepad_controller_opacity", _domain) ||
 	ConfMan.hasKey("gamepad_controller_directional_input", _domain) ||
 	ConfMan.hasKey("gamepad_controller_minimal_layout", _domain);
 
@@ -331,14 +325,12 @@ void IOS7OptionsWidget::setEnabled(bool e) {
 #if __IPHONE_15_0
 	// On-screen controls (virtual controller is supported in iOS 15 and later)
 	if (@available(iOS 15.0, *)) {
-		_gamepadControllerCheckbox->setEnabled(e);
 		_gamepadControllerDirectionalInputPopUp->setEnabled(e);
 		_gamepadControllerOpacityDesc->setEnabled(e);
 		_gamepadControllerOpacitySlider->setEnabled(e);
 		_gamepadControllerOpacityLabel->setEnabled(e);
 		_gamepadControllerMinimalLayoutCheckbox->setEnabled(e);
 	} else {
-		_gamepadControllerCheckbox->setEnabled(false);
 		_gamepadControllerDirectionalInputPopUp->setEnabled(false);
 		_gamepadControllerOpacityDesc->setEnabled(false);
 		_gamepadControllerOpacitySlider->setEnabled(false);
@@ -347,7 +339,6 @@ void IOS7OptionsWidget::setEnabled(bool e) {
 	}
 #endif /* __IPHONE_15_0  */
 #else /* TARGET_OS_IOS */
-	_gamepadControllerCheckbox->setEnabled(false);
 	_gamepadControllerDirectionalInputDesc->setEnabled(false);
 	_gamepadControllerDirectionalInputPopUp->setEnabled(false);
 	_gamepadControllerOpacityDesc->setEnabled(false);
@@ -375,10 +366,17 @@ GUI::OptionsContainerWidget *OSystem_iOS7::buildBackendOptionsWidget(GUI::GuiObj
 }
 
 void OSystem_iOS7::registerDefaultSettings(const Common::String &target) const {
-	ConfMan.registerDefault("gamepad_controller", false);
 	ConfMan.registerDefault("gamepad_controller_opacity", 6);
 	ConfMan.registerDefault("gamepad_controller_directional_input", kDirectionalInputThumbstick);
 	ConfMan.registerDefault("gamepad_controller_minimal_layout", false);
+
+	const Common::ConfigManager::Domain *domain = ConfMan.getDomain(target);
+	if (domain && domain->contains("gamepad_controller")) {
+		const Common::String &legacy = domain->getVal("gamepad_controller");
+		if ((legacy == "true" || legacy == "yes" || legacy == "1") && !domain->contains(TOUCH_MODE_2D_GAMES_KEY))
+			ConfMan.set(TOUCH_MODE_2D_GAMES_KEY, "gamepad", target);
+		ConfMan.removeKey("gamepad_controller", target);
+	}
 
 	// Touch-mode presets are shared with the Control tab (gui/options.cpp).
 	ConfMan.registerDefault(TOUCH_MODE_MENUS_KEY, "direct");
@@ -396,12 +394,9 @@ void OSystem_iOS7::registerDefaultSettings(const Common::String &target) const {
 }
 
 void OSystem_iOS7::applyBackendSettings() {
-	virtualController(ConfMan.getBool("gamepad_controller"));
-	// _currentTouchMode is applied by the graphic manager
-
 #if TARGET_OS_IOS
 	applyOrientationSettings();
-	updateTouchMode();
+	dynamic_cast<iOSGraphicsManager *>(_graphicsManager)->applyTouchSettings();
 	if (isKeyboardShown()) {
 		setShowKeyboard(false);
 		setShowKeyboard(true);
@@ -434,30 +429,27 @@ void OSystem_iOS7::applyOrientationSettings() {
 }
 #endif
 
-void OSystem_iOS7::applyTouchSettings(bool _3dMode, bool overlayShown) {
+bool OSystem_iOS7::isOnScreenGamepadAvailable() const {
 #if TARGET_OS_IOS
-	Common::String setting;
+	return iOS7_isVirtualControllerAvailable() && ConfMan.getBool(ONSCREEN_CONTROL_KEY) && !iOS7_isControllerConnected();
+#else
+	return false;
+#endif
+}
 
-	if (overlayShown) {
-		setting = TOUCH_MODE_MENUS_KEY;
-	} else if (_3dMode) {
-		setting = TOUCH_MODE_3D_GAMES_KEY;
-	} else {
-		setting = TOUCH_MODE_2D_GAMES_KEY;
-	}
+void OSystem_iOS7::rememberTouchMode(TouchMode mode) {
+	ConfMan.set(Common::touchModeKeyForContext(_touchContext), Common::touchModeToString(mode), Common::ConfigManager::kSessionDomain);
+	dynamic_cast<iOSGraphicsManager *>(_graphicsManager)->applyTouchSettings();
+}
 
-	_currentTouchMode = Common::parseTouchMode(ConfMan.get(setting), Common::kTouchModeTouchpad);
-	if (_currentTouchMode == Common::kTouchModeGamepad) {
-		// The on-screen gamepad is only available in-game and while no physical
-		// controller is connected; otherwise fall back to touchpad.
-		if (overlayShown || iOS7_isControllerConnected())
-			_currentTouchMode = Common::kTouchModeTouchpad;
-	}
-
-	// updateTouchMode() (dis)connects the native virtual controller to match.
+void OSystem_iOS7::applyTouchSettings(bool rendering3d, bool overlayShown) {
+#if TARGET_OS_IOS
+	_touchContext = Common::touchContext(rendering3d, overlayShown);
+	const TouchMode requested = Common::parseTouchMode(ConfMan.get(Common::touchModeKeyForContext(_touchContext)));
+	_currentTouchMode = Common::resolveTouchMode(requested, _touchContext, isOnScreenGamepadAvailable());
 	updateTouchMode();
 #else
-	(void)_3dMode;
+	(void)rendering3d;
 	(void)overlayShown;
 #endif
 }

@@ -31,6 +31,8 @@
 
 @implementation GamepadController {
 	GCController *_controller;
+	GCController *_virtualBacking;
+	BOOL _virtualControllerRequested;
 #if TARGET_OS_IOS
 #ifdef __IPHONE_15_0
 	API_AVAILABLE(ios(15.0))
@@ -67,6 +69,11 @@
 											 selector:@selector(controllerDidConnect:)
 												 name:@"GCControllerDidConnectNotification"
 											   object:nil];
+
+	[[NSNotificationCenter defaultCenter] addObserver:self
+	                                         selector:@selector(controllerDidDisconnect:)
+	                                             name:GCControllerDidDisconnectNotification
+	                                           object:nil];
 
 #if TARGET_OS_IOS
 #ifdef __IPHONE_15_0
@@ -168,50 +175,82 @@
 			break;
 		}
 
-		if (_currentController != controller) {
-			[_currentController disconnect];
+		if (_currentController == controller && _virtualControllerRequested == connect &&
+		    (!connect || controller.controller != nil)) {
+			if (connect)
+				[self setGCControllerViewProperties:[[[UIApplication sharedApplication] keyWindow] subviews]];
+			return;
 		}
+		_virtualControllerRequested = connect;
+		if (_currentController != controller)
+			[_currentController disconnect];
 
-		if (connect) {
+		if (connect && controller.controller == nil) {
+			_currentController = controller;
 			[controller connectWithReplyHandler:^(NSError * _Nullable error) {
+				if (!_virtualControllerRequested || _currentController != controller) {
+					[controller disconnect];
+					return;
+				}
+				if (error) {
+					_virtualControllerRequested = NO;
+					return;
+				}
 				[self setGCControllerViewProperties:[[[UIApplication sharedApplication] keyWindow] subviews]];
 			}];
-			_currentController = controller;
-		}
-		else {
+		} else if (!connect) {
 			[_currentController disconnect];
-			[self setIsConnected:NO];
+			[self setIsConnected:[self isPhysicalControllerConnected]];
+		} else {
+			[self setGCControllerViewProperties:[[[UIApplication sharedApplication] keyWindow] subviews]];
 		}
 	}
 #endif
 #endif
 }
 
-- (BOOL)isPhysicalControllerConnected {
-#ifdef __IPHONE_14_0
-	if (@available(iOS 14.0, tvOS 14.0, *)) {
-		GCController *virtualBacking = nil;
-#if TARGET_OS_IOS
-#ifdef __IPHONE_15_0
-		if (@available(iOS 15.0, *)) {
-			// The on-screen virtual controller shows up in [GCController controllers]
-			// too; exclude its backing GCController so only real hardware counts.
-			virtualBacking = _currentController.controller;
-		}
-#endif
-#endif
-		for (GCController *c in [GCController controllers]) {
-			if (c != virtualBacking) {
-				return YES;
-			}
-		}
+- (BOOL)isVirtualController:(GCController *)controller {
+	if (controller == _virtualBacking)
+		return YES;
+#if TARGET_OS_IOS && defined(__IPHONE_15_0)
+	if (@available(iOS 15.0, *)) {
+		return controller == _virtualControllerThumbstick.controller ||
+		       controller == _virtualControllerMiniThumbstick.controller ||
+		       controller == _virtualControllerDpad.controller ||
+		       controller == _virtualControllerMiniDpad.controller;
 	}
 #endif
 	return NO;
 }
 
+- (BOOL)isPhysicalControllerConnected {
+	for (GCController *controller in [GCController controllers]) {
+		if (![self isVirtualController:controller])
+			return YES;
+	}
+	return NO;
+}
+
+- (void)controllerDidDisconnect:(NSNotification *)notification {
+	GCController *controller = (GCController *)notification.object;
+	if ([self isVirtualController:controller]) {
+		_virtualBacking = nil;
+		if (_controller == controller)
+			_controller = nil;
+		return;
+	}
+	if (_controller == controller)
+		_controller = nil;
+	[self setIsConnected:[self isPhysicalControllerConnected]];
+	[self.view addEvent:InternalEvent(kInputControllerChanged, 0, 0)];
+}
+
 - (void)controllerDidConnect:(NSNotification *)notification {
 	_controller = (GCController*)notification.object;
+	if ([self isVirtualController:_controller])
+		_virtualBacking = _controller;
+	else
+		[self.view addEvent:InternalEvent(kInputControllerChanged, 0, 0)];
 
 #if TARGET_OS_TV
 	if (_controller.microGamepad != nil) {

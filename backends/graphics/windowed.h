@@ -104,6 +104,7 @@ public:
 	}
 
 	bool isOverlayVisible() const override { return _overlayVisible; }
+	bool isOverlayInGUI() const { return _overlayVisible && _overlayInGUI; }
 
 	Common::Rect getSafeOverlayArea(int16 *width, int16 *height) const override {
 		Insets insets = getSafeAreaInsets();
