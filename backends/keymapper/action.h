@@ -81,6 +81,12 @@ public:
 		event.customType = evtType;
 	}
 
+	void setCustomEngineActionAxisEvent(const CustomEventType evtType) {
+		event = Event();
+		event.type = EVENT_CUSTOM_ENGINE_ACTION_AXIS;
+		event.customType = evtType;
+	}
+
 	void setKeyEvent(const KeyState &ks) {
 		event = Event();
 		event.type = EVENT_KEYDOWN;
