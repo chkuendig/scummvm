@@ -275,7 +275,7 @@ const char *NetworkReadStreamEmscripten::getError() const {
 		return "No error";
 	}
 
-	return NetworkReadStreamEmscripten_getErr(_fetchId);
+	return NetworkReadStreamEmscripten_getError(_fetchId);
 }
 
 bool NetworkReadStreamEmscripten::eos() const {
