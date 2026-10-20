@@ -27,6 +27,8 @@
 
 #include "hpl1/penumbra-overture/ButtonHandler.h"
 
+#include "hpl1/engine/input/Gamepad.h"
+
 #include "hpl1/penumbra-overture/Credits.h"
 #include "hpl1/penumbra-overture/DeathMenu.h"
 #include "hpl1/penumbra-overture/DemoEndText.h"
@@ -347,7 +349,7 @@ void cButtonHandler::Update(float afTimeStep) {
 				mpInit->mpDeathMenu->OnMouseUp(eMButton_Left);
 			}
 			/// Mouse Movement
-			cVector2f vRel = mpInput->GetMouse()->GetRelPosition();
+			cVector2f vRel = mpInput->GetPointerMotion(afTimeStep);
 			mpInit->mpDeathMenu->AddMousePos(vRel * mfMouseSensitivity);
 		}
 		///////////////////////////////////////
@@ -375,7 +377,7 @@ void cButtonHandler::Update(float afTimeStep) {
 				mpInit->mpNumericalPanel->OnMouseUp(eMButton_Left);
 			}
 			/// Mouse Movement
-			cVector2f vRel = mpInput->GetMouse()->GetRelPosition();
+			cVector2f vRel = mpInput->GetPointerMotion(afTimeStep);
 			mpInit->mpNumericalPanel->AddMousePos(vRel * mfMouseSensitivity);
 		}
 		///////////////////////////////////////
@@ -404,7 +406,7 @@ void cButtonHandler::Update(float afTimeStep) {
 				}
 			}
 			/// Mouse Movement
-			cVector2f vRel = mpInput->GetMouse()->GetRelPosition();
+			cVector2f vRel = mpInput->GetPointerMotion(afTimeStep);
 			mpInit->mpNotebook->AddMousePos(vRel * mfMouseSensitivity);
 		}
 		///////////////////////////////////////
@@ -459,7 +461,7 @@ void cButtonHandler::Update(float afTimeStep) {
 			if (mpInput->BecameTriggerd("Nine"))
 				mpInit->mpInventory->OnShortcutDown(8);
 			/// Mouse Movement
-			cVector2f vRel = mpInput->GetMouse()->GetRelPosition();
+			cVector2f vRel = mpInput->GetPointerMotion(afTimeStep);
 			mpInit->mpInventory->AddMousePos(vRel * mfMouseSensitivity);
 		} else {
 			bPlayerStateIsActive = true;
@@ -560,8 +562,9 @@ void cButtonHandler::Update(float afTimeStep) {
 					if (mpInput->BecameTriggerd("InteractMode")) {
 						mpPlayer->StartInteractMode();
 					}
-					cVector2f vRel = mpInput->GetMouse()->GetRelPosition();
+					cVector2f vRel = mpInput->GetRelativePointerMotion();
 					vRel /= mpLowLevelGraphics->GetVirtualSize();
+					vRel += mpInput->GetGamepadLookMotion(afTimeStep);
 
 					mpPlayer->AddYaw(vRel.x * mfMouseSensitivity);
 					mpPlayer->AddPitch(vRel.y * mfMouseSensitivity);
@@ -617,6 +620,7 @@ void cButtonHandler::Update(float afTimeStep) {
 //-----------------------------------------------------------------------
 
 void cButtonHandler::Reset() {
+	mpInput->GetGamepad()->Reset();
 }
 
 //-----------------------------------------------------------------------

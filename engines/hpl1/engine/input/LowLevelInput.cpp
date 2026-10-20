@@ -27,6 +27,7 @@
 
 #include "common/events.h"
 #include "common/system.h"
+#include "hpl1/engine/input/Gamepad.h"
 #include "hpl1/engine/input/Keyboard.h"
 #include "hpl1/engine/input/LowLevelInput.h"
 #include "hpl1/engine/input/Mouse.h"
@@ -60,6 +61,12 @@ void LowLevelInput::BeginInputUpdate() {
 
 void LowLevelInput::EndInputUpdate() {
 	_events.clear();
+}
+
+//-----------------------------------------------------------------------
+
+Gamepad *LowLevelInput::CreateGamepad() {
+	return hplNew(Gamepad, (this));
 }
 
 //-----------------------------------------------------------------------
