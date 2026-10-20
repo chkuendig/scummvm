@@ -50,6 +50,7 @@ AbstractFSNode *EmscriptenFilesystemFactory::makeFileNodePath(const Common::Stri
 		return new HTTPFilesystemNode(path);
 #ifdef USE_CLOUD
 	} else if (path.hasPrefix(CLOUD_FS_PATH) && CloudMan.isStorageEnabled()) {
+		CloudFilesystemNode::invalidateFoldersCache();
 		return new CloudFilesystemNode(path);
 #endif
 	} else if (path.hasPrefix(DRAGDROP_FS_PATH)) {
