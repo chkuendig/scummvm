@@ -163,7 +163,7 @@ bool OSystem_iOS7::handleEvent_touchBegan(Common::Event &event, int x, int y) {
 	_lastPadX = x;
 	_lastPadY = y;
 
-	if (_currentTouchMode == kTouchModeDirect) {
+	if (_currentTouchMode == Common::kTouchModeMouse) {
 		Common::Point mouse(x, y);
 		dynamic_cast<iOSGraphicsManager *>(_graphicsManager)->notifyMousePosition(mouse);
 	}
@@ -177,7 +177,7 @@ bool OSystem_iOS7::handleEvent_touchMoved(Common::Event &event, int x, int y) {
 	_lastPadX = x;
 	_lastPadY = y;
 
-	if (_currentTouchMode == kTouchModeTouchpad) {
+	if (_currentTouchMode == Common::kTouchModeTouchpad) {
 		handleEvent_mouseDelta(event, deltaX, deltaY);
 	} else {
 		// Update mouse position
@@ -243,16 +243,26 @@ void  OSystem_iOS7::handleEvent_orientationChanged(int orientation) {
 }
 
 void OSystem_iOS7::handleEvent_touchModeChanged() {
+	// The on-screen gamepad is only offered by the toggle in-game (not in the
+	// menus/overlay) and only when no physical controller is connected. In those
+	// cases the cycle is direct <-> touchpad only (mirrors the SDL backend).
+	const bool overlayShown = _graphicsManager && _graphicsManager->isOverlayVisible();
+	const bool gamepadAvailable = !overlayShown && !iOS7_isControllerConnected();
+
 	switch (_currentTouchMode) {
-	case kTouchModeDirect:
-		_currentTouchMode = kTouchModeTouchpad;
+	case Common::kTouchModeMouse:
+		_currentTouchMode = Common::kTouchModeTouchpad;
 		break;
-	case kTouchModeTouchpad:
+	case Common::kTouchModeTouchpad:
+		_currentTouchMode = gamepadAvailable ? Common::kTouchModeGamepad : Common::kTouchModeMouse;
+		break;
+	case Common::kTouchModeGamepad:
 	default:
-		_currentTouchMode = kTouchModeDirect;
+		_currentTouchMode = Common::kTouchModeMouse;
 		break;
 	}
 
+	// updateTouchMode() (dis)connects the native virtual controller to match.
 	updateTouchMode();
 }
 
@@ -332,15 +342,15 @@ bool OSystem_iOS7::handleEvent_swipe(Common::Event &event, int direction, int to
 
 		case kUIViewSwipeRight: {
 			// Swipe right
-			if (_currentTouchMode == kTouchModeDirect) {
-				_currentTouchMode = kTouchModeTouchpad;
+			if (_currentTouchMode == Common::kTouchModeMouse) {
+				_currentTouchMode = Common::kTouchModeTouchpad;
 			} else {
-				_currentTouchMode = kTouchModeDirect;
+				_currentTouchMode = Common::kTouchModeMouse;
 			}
 			updateTouchMode();
 
 			Common::U32String dialogMsg;
-			if (_currentTouchMode == kTouchModeTouchpad)
+			if (_currentTouchMode == Common::kTouchModeTouchpad)
 				dialogMsg = _("Touchpad emulation");
 			else
 				dialogMsg = _("Direct mouse");
