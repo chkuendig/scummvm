@@ -103,6 +103,8 @@ MODULE_OBJS += \
 	fs/emscripten/emscripten-fs-factory.o \
 	fs/emscripten/emscripten-posix-fs.o \
 	fs/emscripten/http-fs.o \
+	fs/emscripten/virtual-fs.o \
+	fs/emscripten/virtual-readstream.o \
 	midi/webmidi.o \
 	mixer/emscriptensdl/emscriptensdl-mixer.o \
 	timer/emscripten/emscripten-timer.o
