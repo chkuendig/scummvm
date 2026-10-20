@@ -55,10 +55,6 @@ public:
 	/** Add the virtual mouse keymapper actions to a keymap */
 	void addActionsToKeymap(Keymap *keymap);
 
-private:
-	static const int32 kUpdateDelay = 12;
-	static const int32 kDefaultScreenWidth = 640;
-
 	enum {
 		kCustomActionVirtualAxisUp    = 10000,
 		kCustomActionVirtualAxisDown  = 10001,
@@ -66,6 +62,10 @@ private:
 		kCustomActionVirtualAxisRight = 10003,
 		kCustomActionVirtualMouseSlow = 10004
 	};
+
+private:
+	static const int32 kUpdateDelay = 12;
+	static const int32 kDefaultScreenWidth = 640;
 
 	void handleAxisMotion(int16 axisPositionX, int16 axisPositionY);
 	float computeJoystickMouseSpeedFactor() const;
