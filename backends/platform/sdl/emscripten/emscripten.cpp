@@ -26,12 +26,19 @@
 #include <emscripten.h>
 
 #include "backends/events/emscriptensdl/emscriptensdl-events.h"
+#include "backends/fs/emscripten/dragdrop-fs.h"
 #include "backends/fs/emscripten/emscripten-fs-factory.h"
 #include "backends/mixer/emscriptensdl/emscriptensdl-mixer.h"
 #include "backends/mutex/null/null-mutex.h"
 #include "backends/platform/sdl/emscripten/emscripten.h"
+#include "backends/printing/emscripten/emscripten-printman.h"
 #include "backends/timer/emscripten/emscripten-timer.h"
+#ifdef ENABLE_EVENTRECORDER
+#include "gui/EventRecorder.h"
+#endif
 #include "common/file.h"
+#include "common/fs.h"
+#include "common/translation.h"
 #ifdef USE_TTS
 #include "backends/text-to-speech/emscripten/emscripten-text-to-speech.h"
 #endif
@@ -54,19 +61,17 @@ void EMSCRIPTEN_KEEPALIVE OSystem_Emscripten_cloudConnectionWizardCallback(char 
 
 void OSystem_Emscripten::initBackend() {
 #ifdef USE_TTS
-	// Initialize Text to Speech manager
 	_textToSpeechManager = new EmscriptenTextToSpeechManager();
 #endif
 
-	// Event source
 	_eventSource = new EmscriptenSdlEventSource();
 
-	// Emscripten-specific mixer manager
 	_mixerManager = new EmscriptenSdlMixerManager();
 	_mixerManager->init();
 
-	// Invoke parent implementation of this method
 	OSystem_POSIX::initBackend();
+
+	ConfMan.setPath("extrapath", Common::Path(Common::String::format("%s/extras/", getenv("HOME"))));
 
 }
 
@@ -78,11 +83,11 @@ void OSystem_Emscripten::init() {
 	// being loaded over HTTP.
 	_timerManager = new EmscriptenTimerManager();
 
-	// Initialze File System Factory
 	EmscriptenFilesystemFactory *fsFactory = new EmscriptenFilesystemFactory();
 	_fsFactory = fsFactory;
 
-	// Invoke parent implementation of this method
+	_printingManager = createEmscriptenPrintingManager();
+
 	OSystem_SDL::init();
 }
 
@@ -140,6 +145,14 @@ OSystem_SDL::GraphicsManagerType OSystem_Emscripten::getDefaultGraphicsManager()
 }
 #endif
 
+bool OSystem_Emscripten::hasTouchscreen() const {
+	// SDL's touch/mouse detection is unreliable in the browser (touchpads look
+	// like touch devices, touchscreens synthesize mouse events). Use the
+	// browser's maxTouchPoints as the authoritative touch-capability signal.
+	// Needed by the SurfaceSDL backend too, so it is not guarded by USE_OPENGL.
+	return EM_ASM_INT({ return (navigator.maxTouchPoints || 0) > 0 ? 1 : 0; }) != 0;
+}
+
 void OSystem_Emscripten::exportFile(const Common::Path &filename) {
 	Common::File file;
 	Common::FSNode node(filename);
@@ -170,18 +183,120 @@ void OSystem_Emscripten::addSysArchivesToSearchSet(Common::SearchSet &s, int pri
 	}
 }
 
+bool OSystem_Emscripten::setGraphicsMode(int mode, uint flags) {
+	debug(3, "Removing drag & drop event listeners before setGraphicsMode");
+	DragDropFilesystemNode_removeDragEventListeners();
+	bool ok = OSystem_SDL::setGraphicsMode(mode, flags);
+	if (ok) {
+		debug(3, "Re-adding drag & drop event listeners after setGraphicsMode");
+		DragDropFilesystemNode_addDragEventListeners();
+	}
+	return ok;
+}
+
+void OSystem_Emscripten::applyBackendSettings() {
+	// Remove SDL3 drag-and-drop listeners and add our own.
+	// SDL3 default listeners don't support directories, are buggy (libsdl-org/SDL#13924) and
+	// load every file into memory after dropping
+	DragDropFilesystemNode_removeDragEventListeners();
+	DragDropFilesystemNode_addDragEventListeners();
+}
+
 void OSystem_Emscripten::delayMillis(uint msecs) {
 	static uint32 lastSleep = 0;
 	if (msecs == 0 && getMillis() - lastSleep < 20) {
 		return;
 	}
 #ifdef ENABLE_EVENTRECORDER
-	if (!g_eventRec.processDelayMillis())
-#endif
+	// The recorder suppresses real delays for deterministic timing, but on
+	// Emscripten SDL_Delay is the asyncify suspend point — never yielding
+	// would spin the wasm main loop synchronously and hang the tab. Yield
+	// with a zero-length delay instead; determinism comes from the
+	// recorder's fake timer, not the wall-clock delay.
+	if (g_eventRec.processDelayMillis())
+		SDL_Delay(0);
+	else
+		SDL_Delay(msecs);
+#else
 	SDL_Delay(msecs);
+#endif
 
+	// SDL timers don't work in this port, so timers are pumped cooperatively
+	// from here. With the event recorder enabled the active timer manager is
+	// owned by the recorder (and swapped on record/playback transitions) —
+	// but only after initBackend() has handed it over; the config/index
+	// downloads run before that, so fall back to the backend member until
+	// the recorder has one.
+#ifdef ENABLE_EVENTRECORDER
+	DefaultTimerManager *timerManager = g_eventRec.getTimerManager();
+	if (!timerManager)
+		timerManager = dynamic_cast<DefaultTimerManager *>(_timerManager);
+	if (timerManager)
+		timerManager->checkTimers();
+#else
 	((EmscriptenTimerManager *)_timerManager)->checkTimers();
+#endif
 	lastSleep = getMillis();
+}
+
+void OSystem_Emscripten::importExtrasFile(const Common::FSNode &node) {
+	assert(!node.isDirectory());
+	assert(ConfMan.hasKey("extrapath") || ConfMan.hasDefault("extrapath"));
+	Common::Path extrapath = ConfMan.getPath("extrapath");
+	Common::Path readPath = node.getPath();
+	Common::String filename = readPath.getLastComponent().toString();
+
+	// Import Roland MT-32 and CM-32L ROM files
+	if (filename == "MT32_PCM.ROM" || filename == "MT32_CONTROL.ROM" ||
+		filename == "CM32L_PCM.ROM" || filename == "CM32L_CONTROL.ROM") {
+
+		Common::File readFile;
+		if (!readFile.open(node)) {
+			warning("OSystem_Emscripten::importExtrasFile - Could not open file %s", readPath.toString().c_str());
+			readFile.close();
+			return;
+		}
+		const Common::Path writePath(extrapath.appendComponent(filename.c_str()));
+		Common::DumpFile writeFile;
+		if (!writeFile.open(writePath)) {
+			writeFile.close();
+			readFile.close();
+			warning("OSystem_Emscripten::importExtrasFile - Could not open file %s", writePath.toString().c_str());
+			return;
+		}
+		byte *_buffer = new byte[readFile.size()];
+		uint32 readBytes = readFile.read(_buffer, readFile.size());
+		if (readBytes == readFile.size()) {
+			if (writeFile.write(_buffer, readBytes) != readBytes) {
+				warning("OSystem_Emscripten::importExtrasFile - unable to write all received bytes into output file");
+				writeFile.close();
+				readFile.close();
+				return;
+			}
+		} else {
+			writeFile.close();
+			readFile.close();
+			warning("OSystem_Emscripten::importExtrasFile - unable to read all bytes from input file");
+			return;
+		}
+		writeFile.close();
+		readFile.close();
+		debug(5, "OSystem_Emscripten::importExtrasFile - File copied %s -> %s", filename.c_str(), writePath.toString().c_str());
+
+		Common::FSNode mt32PcmNode = Common::FSNode(extrapath.appendComponent("MT32_PCM.ROM"));
+		Common::FSNode mt32ControlNode = Common::FSNode(extrapath.appendComponent("MT32_CONTROL.ROM"));
+		Common::FSNode cm32lPcmNode = Common::FSNode(extrapath.appendComponent("CM32L_PCM.ROM"));
+		Common::FSNode cm32lControlNode = Common::FSNode(extrapath.appendComponent("CM32L_CONTROL.ROM"));
+		const bool mt32Complete = mt32PcmNode.exists() && mt32ControlNode.exists();
+		const bool cm32Complete = cm32lPcmNode.exists() && cm32lControlNode.exists();
+		if ((filename.equals("MT32_PCM.ROM") || filename.equals("MT32_CONTROL.ROM")) && mt32Complete) {
+			g_system->displayMessageOnOSD(_("Roland MT-32 ROMs imported successfully"));
+			debug(5, "OSystem_Emscripten::importExtrasFile - Roland MT-32 ROMs imported successfully");
+		} else if ((filename.equals("CM32L_PCM.ROM") || filename.equals("CM32L_CONTROL.ROM")) && cm32Complete) {
+			g_system->displayMessageOnOSD(_("Roland CM-32L ROMs imported successfully"));
+			debug(5, "OSystem_Emscripten::importExtrasFile - Roland CM-32L ROMs imported successfully");
+		}
+	}
 }
 
 #ifdef USE_CLOUD
