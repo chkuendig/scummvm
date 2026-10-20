@@ -154,6 +154,9 @@ int OSystem_iOS7::timerHandler(int t) {
 }
 
 void OSystem_iOS7::initBackend() {
+	registerDefaultSettings(Common::ConfigManager::kApplicationDomain);
+	if (!ConfMan.getActiveDomainName().empty())
+		registerDefaultSettings(ConfMan.getActiveDomainName());
 	_eventManager = new DefaultEventManager(this);
 
 	_savefileManager = new SandboxedSaveFileManager(Common::Path(_chrootBasePath, Common::Path::kNativeSeparator), "/Savegames");
@@ -191,15 +194,16 @@ bool OSystem_iOS7::hasFeature(Feature f) {
 	case kFeatureNoQuit:
 	case kFeatureKbdMouseSpeed:
 	case kFeatureTouchscreen:
-	// Opt in to the shared Control-tab touch section (on-screen control
-	// checkbox + per-context touch-mode dropdowns). iOS renders the toggle and
-	// the on-screen gamepad natively (see ios7_video / GCVirtualController).
-	case kFeatureTouchpadMode:
+#if TARGET_OS_IOS
+	case kFeatureTouchMode:
+#endif
 #ifdef SCUMMVM_NEON
 	case kFeatureCpuNEON:
 #endif
 		return true;
 
+	case kFeatureOnScreenGamepad:
+		return iOS7_isVirtualControllerSupported();
 	default:
 		return ModularGraphicsBackend::hasFeature(f);
 	}
@@ -221,11 +225,6 @@ bool OSystem_iOS7::getFeatureState(Feature f) {
 	switch (f) {
 	case kFeatureVirtualKeyboard:
 		return isKeyboardShown();
-
-	case kFeatureTouchpadMode:
-		// The per-context touch modes are driven by the shared Control tab and
-		// the native toggle, not by this legacy single-mode flag.
-		return false;
 
 	default:
 		return ModularGraphicsBackend::getFeatureState(f);

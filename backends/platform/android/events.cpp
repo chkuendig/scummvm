@@ -89,7 +89,9 @@ enum {
 	JE_MOUSE_WHEEL_DOWN = 23,
 	JE_TV_REMOTE = 24,
 	JE_QUIT = 0x1000,
-	JE_MENU = 0x1001
+	JE_MENU = 0x1001,
+	JE_TOUCH_MODE_CHANGED = 0x1002,
+	JE_INPUT_CHANGED = 0x1003
 };
 
 // meta modifier
@@ -1442,6 +1444,17 @@ void OSystem_Android::pushEvent(int type, int arg1, int arg2, int arg3,
 		pushEvent(ev0);
 		break;
 
+	case JE_TOUCH_MODE_CHANGED:
+		ev0.type = Common::EVENT_CUSTOM_BACKEND_ACTION_START;
+		ev0.customType = JE_TOUCH_MODE_CHANGED;
+		pushEvent(ev0);
+		break;
+
+	case JE_INPUT_CHANGED:
+		ev0.type = Common::EVENT_INPUT_CHANGED;
+		pushEvent(ev0);
+		break;
+
 	case JE_MENU:
 		ev0.type = Common::EVENT_MAINMENU;
 		pushEvent(ev0);
@@ -1538,6 +1551,13 @@ bool OSystem_Android::pollEvent(Common::Event &event) {
 	}
 	_event_queue_lock->unlock();
 
+	if (event.type == Common::EVENT_CUSTOM_BACKEND_ACTION_START && event.customType == JE_TOUCH_MODE_CHANGED) {
+		cycleTouchMode();
+		return false;
+	}
+	if (event.type == Common::EVENT_INPUT_CHANGED)
+		dynamic_cast<AndroidGraphicsManager *>(_graphicsManager)->applyTouchSettings();
+
 	if (Common::isMouseEvent(event)) {
 		if (_graphicsManager)
 			return dynamic_cast<AndroidGraphicsManager *>(_graphicsManager)->notifyMousePosition(event.mouse);
@@ -1578,7 +1598,7 @@ void OSystem_Android::pushDelayedTouchMouseBtnEvents() {
 	_event_queue_lock->unlock();
 }
 
-void OSystem_Android::setupTouchMode(int oldValue, int newValue) {
+void OSystem_Android::setupTouchMode(int newValue) {
 	_touch_mode = newValue;
 
 	if (newValue == TOUCH_MODE_TOUCHPAD) {

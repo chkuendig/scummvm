@@ -682,15 +682,14 @@ bool SdlEventSource::pollEvent(Common::Event &event) {
 				int action = (ev.type == SDL_FINGERDOWN) ? kActionDown :
 				             (ev.type == SDL_FINGERUP) ? kActionUp : kActionMove;
 				// On-screen mode-toggle button takes precedence over everything.
-				if (handleTouchToggle(action, ev.tfinger.x, ev.tfinger.y)) {
+				if (handleTouchToggle(action, ev.tfinger.touchId, ev.tfinger.fingerId, ev.tfinger.x, ev.tfinger.y)) {
 					continue;
 				}
 				// In gamepad mode (no physical controller — applyTouchSettings
 				// falls back otherwise), drive the on-screen gamepad and consume
 				// the finger, like the Android backend does from JNI.
 				OSystem_SDL *sdlSystem = dynamic_cast<OSystem_SDL *>(g_system);
-				if (sdlSystem && sdlSystem->getTouchMode() == Common::kTouchModeGamepad &&
-				    sdlSystem->getTouchControls().isInitialized()) {
+				if (sdlSystem && sdlSystem->isOnScreenGamepadActive()) {
 					Common::Point size = getTouchscreenSizePixels();
 					sdlSystem->getTouchControls().update((TouchAction)action,
 						(int)(ev.tfinger.fingerId & 0x7fffffff), (int)(ev.tfinger.x * size.x), (int)(ev.tfinger.y * size.y));
@@ -853,6 +852,9 @@ bool SdlEventSource::dispatchSDLEvent(SDL_Event &ev, Common::Event &event) {
 		}
 
 		case SDL_WINDOWEVENT_FOCUS_LOST: {
+			_touchTogglePressed = false;
+			if (OSystem_SDL *system = dynamic_cast<OSystem_SDL *>(g_system))
+				system->getTouchControls().update(kActionCancel, 0, 0, 0);
 			// Always allow the display to turn off if ScummVM is out of focus
 			event.type = Common::EVENT_FOCUS_LOST;
 			SDL_EnableScreenSaver();
