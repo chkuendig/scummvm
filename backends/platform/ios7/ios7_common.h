@@ -49,7 +49,8 @@ enum InputEvent {
 	kInputJoystickButtonDown,
 	kInputJoystickButtonUp,
 	kInputScreenChanged,
-	kInputTouchModeChanged
+	kInputTouchModeChanged,
+	kInputControllerChanged
 };
 
 enum ScreenOrientation {
@@ -111,6 +112,8 @@ TouchMode iOS7_getCurrentTouchMode();
 // True when a physical game controller (i.e. not the on-screen virtual one) is
 // currently connected. Used to demote the on-screen gamepad touch mode.
 bool iOS7_isControllerConnected();
+bool iOS7_isVirtualControllerSupported();
+bool iOS7_isVirtualControllerAvailable();
 void iOS7_setSafeAreaInsets(int l, int r, int t, int b);
 
 #endif
