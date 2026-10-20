@@ -1,4 +1,9 @@
 /*global Module*/
+// Reload page when fragment identifier (and launch parameters) changes
+window.addEventListener("hashchange", function () {
+	location.reload();
+});
+
 Module["arguments"] = [];
 
 // Add all parameters passed via the fragment identifier
