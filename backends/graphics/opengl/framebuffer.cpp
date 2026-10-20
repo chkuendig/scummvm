@@ -129,15 +129,20 @@ void Framebuffer::applyBlendState() {
 			break;
 		case kBlendModeTraditionalTransparency:
 			GL_CALL(glEnable(GL_BLEND));
-			// Use a separate alpha function (GL_ZERO, GL_ONE) so the blend leaves
-			// the destination (drawing-buffer) alpha untouched at the cleared 1.0.
-			// Otherwise semi-transparent draws drop the buffer alpha and a
-			// premultiplied-alpha WebGL canvas composites the HTML page through.
+#if defined(__EMSCRIPTEN__)
+			// Keep the WebGL canvas opaque when compositing it over the HTML page.
 			GL_CALL(glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ZERO, GL_ONE));
+#else
+			GL_CALL(glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
+#endif
 			break;
 		case kBlendModePremultipliedTransparency:
 			GL_CALL(glEnable(GL_BLEND));
+#if defined(__EMSCRIPTEN__)
 			GL_CALL(glBlendFuncSeparate(GL_ONE, GL_ONE_MINUS_SRC_ALPHA, GL_ZERO, GL_ONE));
+#else
+			GL_CALL(glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA));
+#endif
 			break;
 		case kBlendModeAdditive:
 			GL_CALL(glEnable(GL_BLEND));

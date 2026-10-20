@@ -1,4 +1,9 @@
 /*global Module*/
+// Reload page when fragment identifier (and launch parameters) changes
+window.addEventListener("hashchange", function () {
+	location.reload();
+});
+
 Module["arguments"] = [];
 
 
@@ -72,11 +77,6 @@ if (window.location.hash.length > 0) {
         Module["arguments"].push(param);
     })
 }
-
-// Reload page when fragment identifier (and launch parameters) changes
-window.addEventListener("hashchange", function () {
-	location.reload();
-});
 
 // Loading Indicator for WASM Initialization
 // To get the progress of WebAssembly.instantiateStreaming / WebAssembly.compileStreaming,

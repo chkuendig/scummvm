@@ -112,7 +112,6 @@ MODULE_OBJS += \
 	mixer/emscriptensdl/emscriptensdl-mixer.o \
 	networking/http/emscripten/connectionmanager-emscripten.o \
 	networking/http/emscripten/networkreadstream-emscripten.o \
-	printing/emscripten/emscripten-printman.o \
 	timer/emscripten/emscripten-timer.o
 ifdef USE_CLOUD
 MODULE_OBJS += \
@@ -123,6 +122,7 @@ ifdef USE_TTS
 MODULE_OBJS += \
 	text-to-speech/emscripten/emscripten-text-to-speech.o
 endif
+MODULE_OBJS += printing/emscripten/emscripten-printman.o
 endif
 
 ifdef USE_SDL_NET

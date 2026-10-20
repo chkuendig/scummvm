@@ -5216,21 +5216,12 @@ PLUGIN_LDFLAGS		+= -Wl,-T$(srcdir)/backends/plugins/ds/plugin.ld -mthumb -mthumb
 		append_var DEFINES "-DUNCACHED_PLUGINS"
 		append_var CXXFLAGS "-fPIC"
 		append_var LIBS ""
-		# ASYNCIFY_IMPORTS: treat every plugin import as a possible suspend
-		# point. The narrowed list in dists/emscripten/plugin-asyncify-imports.json
-		# only covers main-module functions, but plugins also call their own
-		# default-visibility functions through imports (the dynamic linker
-		# resolves them back to the plugin), e.g. SCI's Portrait::init() calling
-		# SpanImpl::allocateFromStream(). Calls missing from the list get no
-		# Asyncify handling, so a file read that suspends there corrupts the
-		# suspended stack. Keep ["*"] until the list covers those calls.
-		_emscripten_asyncify_imports='["*"]'
-_mak_plugins="
+_mak_plugins='
 PLUGIN_EXTRA_DEPS =
-PLUGIN_LDFLAGS  += -s SIDE_MODULE=1 -s ASYNCIFY=1 -s ASYNCIFY_IMPORTS=${_emscripten_asyncify_imports} -s EXPORT_ALL=1
+PLUGIN_LDFLAGS  += -s SIDE_MODULE=1 -s ASYNCIFY=1 -s ASYNCIFY_IMPORTS=["*"] -s EXPORT_ALL=1
 PRE_OBJS_FLAGS  := -s MAIN_MODULE=1 -s EXPORT_ALL=1
 POST_OBJS_FLAGS :=
-"
+'
 		;;
 	freebsd* | openbsd*)
 		_plugin_prefix="lib"
