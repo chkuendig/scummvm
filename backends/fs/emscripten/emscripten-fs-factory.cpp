@@ -23,6 +23,7 @@
 
 #include "backends/fs/emscripten/emscripten-fs-factory.h"
 #include "backends/fs/emscripten/emscripten-posix-fs.h"
+#include "backends/fs/emscripten/dragdrop-fs.h"
 #include "backends/fs/emscripten/http-fs.h"
 #include "common/debug.h"
 #include "common/system.h"
@@ -51,6 +52,8 @@ AbstractFSNode *EmscriptenFilesystemFactory::makeFileNodePath(const Common::Stri
 	} else if (path.hasPrefix(CLOUD_FS_PATH) && CloudMan.isStorageEnabled()) {
 		return new CloudFilesystemNode(path);
 #endif
+	} else if (path.hasPrefix(DRAGDROP_FS_PATH)) {
+		return new DragDropFilesystemNode(path);
 	} else {
 		return new EmscriptenPOSIXFilesystemNode(path);
 	}
