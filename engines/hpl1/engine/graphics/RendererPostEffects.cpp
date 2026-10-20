@@ -61,7 +61,6 @@ cRendererPostEffects::cRendererPostEffects(iLowLevelGraphics *apLowLevelGraphics
 	mpRenderList = apRenderList;
 
 	///////////////////////////////////////////
-	// Create screen buffers
 	Log(" Creating screen buffers size %s\n", mvScreenSize.ToString().c_str());
 	for (int i = 0; i < 2; i++) {
 		if (mpLowLevelGraphics->GetCaps(eGraphicCaps_TextureTargetRectangle)) {
@@ -86,20 +85,16 @@ cRendererPostEffects::cRendererPostEffects(iLowLevelGraphics *apLowLevelGraphics
 	}
 
 	///////////////////////////////////////////
-	// Create programs
 	Hpl1::logInfo(Hpl1::kDebugRenderer, "%s", "Creating RendererPostEffects programs");
 
 	/////////////////
-	// Blur programs
 	mbBlurFallback = false; // Set to true if the fallbacks are used.
 	_blur2DProgram = mpGpuManager->CreateProgram("hpl1_PostEffect_Blur", "hpl1_PostEffect_Blur_2D");
 	_blurRectProgram = mpGpuManager->CreateProgram("hpl1_PostEffect_Blur", "hpl1_PostEffect_Blur_Rect");
 
 	/////////////////
-	// Bloom programs
 	_bloomProgram = mpGpuManager->CreateProgram("hpl1_PostEffect_Bloom", "hpl1_PostEffect_Bloom");
 
-	// Bloom blur textures
 	mpBloomBlurTexture = mpLowLevelGraphics->CreateTexture(
 		cVector2l(256, 256),
 		32, cColor(0, 0, 0, 0), false,
@@ -113,14 +108,11 @@ cRendererPostEffects::cRendererPostEffects(iLowLevelGraphics *apLowLevelGraphics
 	}
 
 	/////////////////
-	// MotionBlur programs
 	_motionBlurProgram = mpGpuManager->CreateProgram("hpl1_PostEffect_Motion", "hpl1_PostEffect_Motion"); // CHECK APPLE
 
 	/////////////////
-	// Depth of Field programs
 	_depthOfFieldProgram = mpGpuManager->CreateProgram("hpl1_PostEffect_DoF", "hpl1_PostEffect_DoF");
 
-	// Depth of Field blur textures
 	mpDofBlurTexture = mpLowLevelGraphics->CreateTexture(cVector2l(256, 256),
 														 32, cColor(0, 0, 0, 0), false,
 														 eTextureType_Normal, eTextureTarget_2D);
@@ -256,9 +248,7 @@ void cRendererPostEffects::RenderBlurTexture(iTexture *apDestination, iTexture *
 	///////////////////////////////////////////
 	// Horizontal blur pass
 
-	// Shader setup
 	if (bProgramsLoaded) {
-		// Setup vertex program
 		_blurRectProgram->Bind();
 		_blurRectProgram->SetFloat("xOffset", 1);
 		_blurRectProgram->SetFloat("yOffset", 0);
@@ -266,7 +256,6 @@ void cRendererPostEffects::RenderBlurTexture(iTexture *apDestination, iTexture *
 		_blurRectProgram->SetMatrixf("worldViewProj", eGpuProgramMatrix_ViewProjection, eGpuProgramMatrixOp_Identity);
 	}
 
-	// Draw the screen texture with blur
 	pLowLevel->SetTexture(0, apSource);
 	if (mbBlurFallback) {
 		mpLowLevelGraphics->SetTexture(1, apSource);
@@ -287,8 +276,6 @@ void cRendererPostEffects::RenderBlurTexture(iTexture *apDestination, iTexture *
 	///////////////////////////////////////////
 	// Vertical blur pass
 
-	// Setup shaders
-	// Shader setup
 	if (bProgramsLoaded) {
 		_blur2DProgram->Bind();
 		_blur2DProgram->SetFloat("xOffset", 0);
@@ -296,7 +283,6 @@ void cRendererPostEffects::RenderBlurTexture(iTexture *apDestination, iTexture *
 		_blur2DProgram->SetFloat("amount", (1 / pLowLevel->GetScreenSize().x) * afBlurAmount);
 	}
 
-	// Set texture and draw
 	pLowLevel->SetTexture(0, apDestination);
 	if (mbBlurFallback) {
 		mpLowLevelGraphics->SetTexture(1, apDestination);
@@ -312,7 +298,6 @@ void cRendererPostEffects::RenderBlurTexture(iTexture *apDestination, iTexture *
 		mpLowLevelGraphics->DrawQuad(mvTexRectVtx);
 	}
 
-	// Shader setup
 	if (bProgramsLoaded) {
 		_blur2DProgram->UnBind();
 	}
@@ -341,29 +326,31 @@ void cRendererPostEffects::RenderDepthOfField() {
 		return;
 
 	//////////////////////////////
-	// Setup
 	cCamera3D *pCam = mpRenderList->GetCamera();
 
 	iTexture *pScreenTexture = mpScreenBuffer[mImageTrailData.mlCurrentBuffer == 0 ? 1 : 0];
 
-	// Size of the virtual screen
 	cVector2f vVirtSize = mpLowLevelGraphics->GetVirtualSize();
 
-	// Copy screen to texture
 	mpLowLevelGraphics->CopyContextToTexure(pScreenTexture, 0, cVector2l((int)mvScreenSize.x, (int)mvScreenSize.y));
 
-	// Set up things needed for blurring
 	mpLowLevelGraphics->SetDepthWriteActive(false);
 	mpLowLevelGraphics->SetDepthTestActive(false);
 	mpLowLevelGraphics->SetIdentityMatrix(eMatrix_ModelView);
 	mpLowLevelGraphics->SetOrthoProjection(mpLowLevelGraphics->GetVirtualSize(), -1000, 1000);
 
-	// Render blur texture
 	RenderBlurTexture(mpDofBlurTexture, pScreenTexture, 2.0f);
 
-	// Set texture
 	mpLowLevelGraphics->SetTexture(0, pScreenTexture);
 	mpLowLevelGraphics->SetTexture(1, mpDofBlurTexture);
+
+	// Bind _depthOfFieldProgram once for both passes; the `skyMode` uniform
+	// switches behaviour: 1.0 forces a uniform `maxBlur` over the whole quad,
+	// 0.0 uses the depth-driven per-pixel computation.
+	_depthOfFieldProgram->Bind();
+	_depthOfFieldProgram->SetVec3f("planes", cVector3f(mfDofNearPlane, mfDofFocalPlane, mfDofFarPlane));
+	_depthOfFieldProgram->SetFloat("maxBlur", mfDofMaxBlur);
+	_depthOfFieldProgram->SetVec2f("screenSize", mvScreenSize);
 
 	// Render entire screen textur to screen, this to cover up what has been done by the
 	// blur filter, should have support for frame_buffer_object so this can be skipped.
@@ -381,6 +368,9 @@ void cRendererPostEffects::RenderDepthOfField() {
 		mvTexRectVtx[2] = cVertex(cVector3f(vVirtSize.x, vVirtSize.y, 40), cVector2f(mvScreenSize.x, 0), cColor(1, 1.0f));
 		mvTexRectVtx[3] = cVertex(cVector3f(0, vVirtSize.y, 40), cVector2f(0, 0), cColor(1, 1.0f));
 
+		// Desktop fixed-function path: program a combiner that interpolates
+		// the screen rect texture and the blur texture by a constant DoF
+		// strength. The shader path achieves the same lerp via skyMode=1.
 		mpLowLevelGraphics->SetActiveTextureUnit(1);
 		mpLowLevelGraphics->SetTextureEnv(eTextureParam_ColorSource0, eTextureSource_Texture);
 		mpLowLevelGraphics->SetTextureEnv(eTextureParam_ColorSource1, eTextureSource_Previous);
@@ -388,12 +378,15 @@ void cRendererPostEffects::RenderDepthOfField() {
 		mpLowLevelGraphics->SetTextureEnv(eTextureParam_ColorFunc, eTextureFunc_Interpolate);
 		mpLowLevelGraphics->SetTextureConstantColor(cColor(mfDofMaxBlur, mfDofMaxBlur));
 
+		_depthOfFieldProgram->SetFloat("skyMode", 1.0f);
+		_depthOfFieldProgram->SetMatrixf("worldViewProj", eGpuProgramMatrix_ViewProjection,
+										 eGpuProgramMatrixOp_Identity);
+
 		mpLowLevelGraphics->DrawQuadMultiTex(mvTexRectVtx, vUvVec);
 
 		mpLowLevelGraphics->SetTextureEnv(eTextureParam_ColorFunc, eTextureFunc_Modulate);
 	}
 
-	// Set things back to normal
 	mpLowLevelGraphics->SetMatrix(eMatrix_Projection, pCam->GetProjectionMatrix());
 
 	///////////////////////////////////////////
@@ -402,14 +395,10 @@ void cRendererPostEffects::RenderDepthOfField() {
 	mpLowLevelGraphics->SetDepthTestActive(true);
 	mpLowLevelGraphics->SetBlendActive(false);
 
-	// Setup
-	_depthOfFieldProgram->Bind();
-	_depthOfFieldProgram->SetVec3f("planes", cVector3f(mfDofNearPlane, mfDofFocalPlane, mfDofFarPlane));
-	_depthOfFieldProgram->SetFloat("maxBlur", mfDofMaxBlur);
-	_depthOfFieldProgram->SetVec2f("screenSize", mvScreenSize);
+	// Per-mesh DoF: use the depth-driven blur factor.
+	_depthOfFieldProgram->SetFloat("skyMode", 0.0f);
 
 	//////////////////
-	// Render objects
 	cMotionBlurObjectIterator it = mpRenderList->GetMotionBlurIterator();
 	while (it.HasNext()) {
 		iRenderable *pObject = it.Next();
@@ -438,7 +427,6 @@ void cRendererPostEffects::RenderDepthOfField() {
 
 		pObject->GetVertexBuffer()->UnBind();
 
-		// Set the previous position to the current
 		if (pMtx)
 			pObject->SetPrevMatrix(*pMtx);
 	}
@@ -446,7 +434,6 @@ void cRendererPostEffects::RenderDepthOfField() {
 	mpLowLevelGraphics->SetDepthTestFunc(eDepthTestFunc_LessOrEqual);
 	mpLowLevelGraphics->SetDepthWriteActive(true);
 
-	// Reset stuff
 	_depthOfFieldProgram->UnBind();
 	mpLowLevelGraphics->SetTexture(0, NULL);
 	mpLowLevelGraphics->SetTexture(1, NULL);
@@ -462,10 +449,8 @@ void cRendererPostEffects::RenderMotionBlur() {
 		return;
 
 	//////////////////////////////
-	// Setup
 	iTexture *pScreenTexture = mpScreenBuffer[mImageTrailData.mlCurrentBuffer == 0 ? 1 : 0];
 
-	// Copy screen to texture
 	mpLowLevelGraphics->CopyContextToTexure(pScreenTexture, 0, cVector2l((int)mvScreenSize.x, (int)mvScreenSize.y));
 
 	///////////////////////////////////////////
@@ -482,7 +467,6 @@ void cRendererPostEffects::RenderMotionBlur() {
 
 	cMotionBlurObjectIterator it = mpRenderList->GetMotionBlurIterator();
 
-	// Setup
 	_motionBlurProgram->Bind();
 	_motionBlurProgram->SetFloat("blurScale", mfMotionBlurAmount);
 	_motionBlurProgram->SetVec2f("halfScreenSize",
@@ -492,7 +476,6 @@ void cRendererPostEffects::RenderMotionBlur() {
 	mpLowLevelGraphics->SetTexture(0, pScreenTexture);
 
 	//////////////////
-	// Render objects
 	while (it.HasNext()) {
 		iRenderable *pObject = it.Next();
 		cMatrixf *pMtx = pObject->GetModelMatrix(pCam);
@@ -540,17 +523,14 @@ void cRendererPostEffects::RenderMotionBlur() {
 
 		pObject->GetVertexBuffer()->UnBind();
 
-		// Set the previous position to the current
 		if (pMtx)
 			pObject->SetPrevMatrix(*pMtx);
 	}
 
-	// Reset stuff
 	_motionBlurProgram->UnBind();
 	mpLowLevelGraphics->SetTexture(0, NULL);
 	mpLowLevelGraphics->SetTexture(1, NULL);
 
-	// Set the new pervious values.
 	pCam->SetPrevView(pCam->GetViewMatrix());
 	pCam->SetPrevProjection(pCam->GetProjectionMatrix());
 }
@@ -565,34 +545,26 @@ void cRendererPostEffects::RenderBloom() {
 		return;
 
 	//////////////////////////////
-	// Setup
-
 	iTexture *pScreenTexture = mpScreenBuffer[mImageTrailData.mlCurrentBuffer == 0 ? 1 : 0];
 
-	// Copy screen to texture
 	mpLowLevelGraphics->CopyContextToTexure(pScreenTexture, 0,
 											cVector2l((int)mvScreenSize.x, (int)mvScreenSize.y));
 
-	// Get the blur texture
 	RenderBlurTexture(mpBloomBlurTexture, pScreenTexture, mfBloomSpread);
 
-	// Size of blur texture
 	/*cVector2f vBlurSize = */ cVector2f((float)mpBloomBlurTexture->getWidth(), (float)mpBloomBlurTexture->getHeight());
 
-	// Size of the virtual screen
 	cVector2f vVirtSize = mpLowLevelGraphics->GetVirtualSize();
 
 	///////////////////////////////////////////
 	// Draw Bloom
 
-	// Setup bloom program
 	_bloomProgram->Bind();
 	_bloomProgram->SetMatrixf("worldViewProj", eGpuProgramMatrix_ViewProjection, eGpuProgramMatrixOp_Identity);
 
 	mpLowLevelGraphics->SetTexture(0, mpBloomBlurTexture);
 	mpLowLevelGraphics->SetTexture(1, pScreenTexture);
 
-	// Draw
 	{
 		tVector3fVec vUvVec;
 		vUvVec.resize(4);
@@ -641,7 +613,6 @@ void cRendererPostEffects::RenderImageTrail() {
 				mpLowLevelGraphics->ClearScreen();
 				mpLowLevelGraphics->SetClearDepthActive(true);
 
-				// Draw the new image to screen transparently
 				mpLowLevelGraphics->SetBlendActive(true);
 				mpLowLevelGraphics->SetBlendFunc(eBlendFunc_SrcAlpha, eBlendFunc_Zero);
 
@@ -660,7 +631,6 @@ void cRendererPostEffects::RenderImageTrail() {
 
 		if (mImageTrailData.mbActive) {
 			if (!mImageTrailData.mbFirstPass) {
-				// Draw the old Blurred image to screen
 				mpLowLevelGraphics->SetBlendFunc(eBlendFunc_SrcAlpha, eBlendFunc_One);
 
 				mpLowLevelGraphics->SetTexture(0, mpScreenBuffer[mImageTrailData.mlCurrentBuffer]);
@@ -675,7 +645,6 @@ void cRendererPostEffects::RenderImageTrail() {
 			}
 			mImageTrailData.mlCurrentBuffer = mImageTrailData.mlCurrentBuffer == 0 ? 1 : 0;
 
-			// Copy screen to new blur buffer
 			mpLowLevelGraphics->CopyContextToTexure(mpScreenBuffer[mImageTrailData.mlCurrentBuffer], 0, cVector2l((int)mpLowLevelGraphics->GetScreenSize().x, (int)mpLowLevelGraphics->GetScreenSize().y));
 		}
 
