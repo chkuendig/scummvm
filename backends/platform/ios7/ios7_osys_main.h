@@ -66,6 +66,7 @@ protected:
 	long _queuedEventTime;
 	Common::Event _queuedInputEvent;
 	TouchMode _currentTouchMode;
+	Common::TouchContext _touchContext = Common::kTouchContextMenus;
 	int _lastPadX;
 	int _lastPadY;
 
@@ -97,13 +98,14 @@ public:
 	bool getFeatureState(Feature f) override;
 
 	TouchMode getCurrentTouchMode() const { return _currentTouchMode; };
-	void setCurrentTouchMode(TouchMode mode) { _currentTouchMode = mode; };
 
 #if TARGET_OS_IOS
 	void applyOrientationSettings();
 	void setSupportedScreenOrientation(ScreenOrientation screenOrientation);
 #endif
-	void applyTouchSettings(bool _3dMode, bool overlayShown);
+	void applyTouchSettings(bool rendering3d, bool overlayShown);
+	bool isOnScreenGamepadAvailable() const;
+	void rememberTouchMode(TouchMode mode);
 	// Refresh the on-screen toggle icon and (dis)connect the native virtual
 	// controller to match the current touch mode.
 	void updateTouchMode();
