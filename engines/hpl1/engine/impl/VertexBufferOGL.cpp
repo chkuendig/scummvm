@@ -30,7 +30,11 @@
 #include "hpl1/engine/math/Math.h"
 #include "hpl1/engine/system/low_level_system.h"
 
-#ifdef HPL1_USE_OPENGL
+// This file implements the legacy fixed-function (glVertexPointer / glBegin /
+// GL_QUADS) vertex buffer fallback for desktop OpenGL. None of that exists in
+// GLES2/WebGL2, so compile it out entirely on the GLES2 build — the SDL
+// renderer never instantiates this class in that configuration anyway.
+#if defined(HPL1_USE_OPENGL) && !USE_FORCED_GLES2
 
 namespace hpl {
 
@@ -143,7 +147,6 @@ void cVertexBufferOGL::UpdateData(tVertexFlag aTypes, bool abIndices) {
 void cVertexBufferOGL::CreateShadowDouble(bool abUpdateData) {
 	int lIdx = cMath::Log2ToInt(eVertexFlag_Position);
 
-	// Set to new size.
 	int lSize = (int)mvVertexArray[lIdx].size();
 	mvVertexArray[lIdx].reserve(lSize * 2);
 
@@ -152,7 +155,7 @@ void cVertexBufferOGL::CreateShadowDouble(bool abUpdateData) {
 		mvVertexArray[lIdx].push_back(mvVertexArray[lIdx][i * 4 + 0]);
 		mvVertexArray[lIdx].push_back(mvVertexArray[lIdx][i * 4 + 1]);
 		mvVertexArray[lIdx].push_back(mvVertexArray[lIdx][i * 4 + 2]);
-		mvVertexArray[lIdx].push_back(0); // 0);
+		mvVertexArray[lIdx].push_back(0);
 	}
 
 	mbHasShadowDouble = true;
@@ -274,7 +277,6 @@ iVertexBuffer *cVertexBufferOGL::CreateCopy(eVertexBufferUsageType aUsageType) {
 														   mVertexFlags, mDrawType, aUsageType,
 														   GetVertexNum(), GetIndexNum()));
 
-	// Copy the vertices to the new buffer.
 	for (int i = 0; i < klNumOfVertexFlags; i++) {
 		if (kvVertexFlags[i] & mVertexFlags) {
 #if 0
@@ -290,7 +292,6 @@ iVertexBuffer *cVertexBufferOGL::CreateCopy(eVertexBufferUsageType aUsageType) {
 		}
 	}
 
-	// Copy indices to the new buffer
 	pVtxBuff->ResizeIndices(GetIndexNum());
 	memcpy(pVtxBuff->GetIndices(), GetIndices(), GetIndexNum() * sizeof(unsigned int));
 
@@ -507,4 +508,4 @@ void cVertexBufferOGL::SetVertexStates(tVertexFlag aFlags) {
 
 } // namespace hpl
 
-#endif // HPL1_USE_OPENGL
+#endif // defined(HPL1_USE_OPENGL) && !USE_FORCED_GLES2
