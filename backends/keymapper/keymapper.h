@@ -164,9 +164,12 @@ private:
 	Keymap::KeymapType _enabledKeymapType;
 
 	KeymapArray _keymaps;
+	Point _pendingMouseMotion;
 
 	bool _joystickAxisPreviouslyPressed[8]; // size should match the number of valid axis entries of defaultJoystickAxes (in hardware-input.cpp)
 
+	void getMappedActions(const Event &event, Keymap::ActionArray &actions) const;
+	void mapMouseMotion(const Event &event, List<Event> &mappedEvents);
 	Keymap::KeymapMatch getMappedActions(const Event &event, Keymap::ActionArray &actions, Keymap::KeymapType keymapType) const;
 	Event executeAction(const Action *act, const Event &incomingEvent);
 	EventType convertStartToEnd(EventType eventType);
