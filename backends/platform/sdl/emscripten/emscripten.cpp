@@ -26,6 +26,7 @@
 #include <emscripten.h>
 
 #include "backends/events/emscriptensdl/emscriptensdl-events.h"
+#include "backends/fs/emscripten/dragdrop-fs.h"
 #include "backends/fs/emscripten/emscripten-fs-factory.h"
 #include "backends/mixer/emscriptensdl/emscriptensdl-mixer.h"
 #include "backends/mutex/null/null-mutex.h"
@@ -33,6 +34,8 @@
 #include "backends/platform/sdl/emscripten/emscripten.h"
 #include "backends/timer/emscripten/emscripten-timer.h"
 #include "common/file.h"
+#include "common/fs.h"
+#include "common/translation.h"
 #ifdef USE_TTS
 #include "backends/text-to-speech/emscripten/emscripten-text-to-speech.h"
 #endif
@@ -118,6 +121,9 @@ void OSystem_Emscripten::initBackend() {
 
 	// Invoke parent implementation of this method
 	OSystem_POSIX::initBackend();
+
+	ConfMan.setPath("extrapath", Common::Path(Common::String::format("%s/extras/", getenv("HOME"))));
+
 }
 
 void OSystem_Emscripten::init() {
@@ -220,6 +226,25 @@ void OSystem_Emscripten::addSysArchivesToSearchSet(Common::SearchSet &s, int pri
 	}
 }
 
+bool OSystem_Emscripten::setGraphicsMode(int mode, uint flags) {
+	debug(3, "Removing drag & drop event listeners before setGraphicsMode");
+	DragDropFilesystemNode_removeDragEventListeners();
+	bool ok = OSystem_SDL::setGraphicsMode(mode, flags);
+	if (ok) {
+		debug(3, "Re-adding drag & drop event listeners after setGraphicsMode");
+		DragDropFilesystemNode_addDragEventListeners();
+	}
+	return ok;
+}
+
+void OSystem_Emscripten::applyBackendSettings() {
+	// Remove SDL3 drag-and-drop listeners and add our own.
+	// SDL3 default listeners don't support directories, are buggy (libsdl-org/SDL#13924) and
+	// load every file into memory after dropping
+	DragDropFilesystemNode_removeDragEventListeners();
+	DragDropFilesystemNode_addDragEventListeners();
+}
+
 void OSystem_Emscripten::delayMillis(uint msecs) {
 	static uint32 lastSleep = 0;
 	if (msecs == 0 && getMillis() - lastSleep < 20) {
@@ -232,6 +257,66 @@ void OSystem_Emscripten::delayMillis(uint msecs) {
 
 	((EmscriptenTimerManager *)_timerManager)->checkTimers();
 	lastSleep = getMillis();
+}
+
+void OSystem_Emscripten::importExtrasFile(const Common::FSNode &node) {
+	assert(!node.isDirectory());
+	assert(ConfMan.hasKey("extrapath") || ConfMan.hasDefault("extrapath"));
+	Common::Path extrapath = ConfMan.getPath("extrapath");
+	Common::Path readPath = node.getPath();
+	Common::String filename = readPath.getLastComponent().toString();
+
+	// Import Roland MT-32 and CM-32L ROM files
+	if (filename == "MT32_PCM.ROM" || filename == "MT32_CONTROL.ROM" ||
+		filename == "CM32L_PCM.ROM" || filename == "CM32L_CONTROL.ROM") {
+
+		Common::File readFile;
+		if (!readFile.open(node)) {
+			warning("OSystem_Emscripten::importExtrasFile - Could not open file %s", readPath.toString().c_str());
+			readFile.close();
+			return;
+		}
+		const Common::Path writePath(extrapath.appendComponent(filename.c_str()));
+		Common::DumpFile writeFile;
+		if (!writeFile.open(writePath)) {
+			writeFile.close();
+			readFile.close();
+			warning("OSystem_Emscripten::importExtrasFile - Could not open file %s", writePath.toString().c_str());
+			return;
+		}
+		byte *_buffer = new byte[readFile.size()];
+		uint32 readBytes = readFile.read(_buffer, readFile.size());
+		if (readBytes == readFile.size()) {
+			if (writeFile.write(_buffer, readBytes) != readBytes) {
+				warning("OSystem_Emscripten::importExtrasFile - unable to write all received bytes into output file");
+				writeFile.close();
+				readFile.close();
+				return;
+			}
+		} else {
+			writeFile.close();
+			readFile.close();
+			warning("OSystem_Emscripten::importExtrasFile - unable to read all bytes from input file");
+			return;
+		}
+		writeFile.close();
+		readFile.close();
+		debug(5, "OSystem_Emscripten::importExtrasFile - File copied %s -> %s", filename.c_str(), writePath.toString().c_str());
+
+		Common::FSNode mt32PcmNode = Common::FSNode(extrapath.appendComponent("MT32_PCM.ROM"));
+		Common::FSNode mt32ControlNode = Common::FSNode(extrapath.appendComponent("MT32_CONTROL.ROM"));
+		Common::FSNode cm32lPcmNode = Common::FSNode(extrapath.appendComponent("CM32L_PCM.ROM"));
+		Common::FSNode cm32lControlNode = Common::FSNode(extrapath.appendComponent("CM32L_CONTROL.ROM"));
+		const bool mt32Complete = mt32PcmNode.exists() && mt32ControlNode.exists();
+		const bool cm32Complete = cm32lPcmNode.exists() && cm32lControlNode.exists();
+		if ((filename.equals("MT32_PCM.ROM") || filename.equals("MT32_CONTROL.ROM")) && mt32Complete) {
+			g_system->displayMessageOnOSD(_("Roland MT-32 ROMs imported successfully"));
+			debug(5, "OSystem_Emscripten::importExtrasFile - Roland MT-32 ROMs imported successfully");
+		} else if ((filename.equals("CM32L_PCM.ROM") || filename.equals("CM32L_CONTROL.ROM")) && cm32Complete) {
+			g_system->displayMessageOnOSD(_("Roland CM-32L ROMs imported successfully"));
+			debug(5, "OSystem_Emscripten::importExtrasFile - Roland CM-32L ROMs imported successfully");
+		}
+	}
 }
 
 #ifdef USE_CLOUD
