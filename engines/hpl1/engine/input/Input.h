@@ -30,6 +30,7 @@
 
 #include "common/list.h"
 #include "hpl1/engine/game/Updateable.h"
+#include "hpl1/engine/math/MathTypes.h"
 #include "hpl1/engine/input/InputTypes.h"
 #include "hpl1/engine/system/SystemTypes.h"
 #include "common/stablemap.h"
@@ -37,6 +38,7 @@
 
 namespace hpl {
 
+class Gamepad;
 class Keyboard;
 class Mouse;
 class LowLevelInput;
@@ -106,6 +108,11 @@ public:
 	 * \return currently used mouse
 	 */
 	Mouse *GetMouse();
+	Gamepad *GetGamepad() { return mpGamepad; }
+	cVector2f GetRelativePointerMotion();
+	cVector2f GetPointerMotion(float timeStep);
+	cVector2f GetGamepadLookAxes() const;
+	cVector2f GetGamepadLookMotion(float timeStep) const;
 
 	/**
 	 * Get action from map.
@@ -141,6 +148,7 @@ private:
 
 	LowLevelInput *mpLowLevelInput;
 
+	Gamepad *mpGamepad;
 	Mouse *mpMouse;
 	Keyboard *mpKeyboard;
 };
