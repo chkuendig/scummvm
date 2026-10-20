@@ -3388,8 +3388,10 @@ EOF
 		append_var LDFLAGS "-s INITIAL_MEMORY=128MB -s STACK_SIZE=32MB -s ALLOW_MEMORY_GROWTH=1"
 		append_var LDFLAGS "-s FORCE_FILESYSTEM -lidbfs.js"
 		append_var LDFLAGS "-s ASYNCIFY=1 -s ASYNCIFY_STACK_SIZE=1048576"
+		append_var LDFLAGS "--js-library backends/fs/emscripten/emscripten-fs-factory.js"
 		append_var LDFLAGS "--js-library backends/networking/http/emscripten/networkreadstream-emscripten.js"
 		append_var LDFLAGS "--js-library backends/platform/sdl/emscripten/emscripten.js"
+		append_var LDFLAGS "--js-library backends/fs/emscripten/dragdrop-fs.js"
 		if test "$_tts" != "no" ; then
 			append_var LDFLAGS "--js-library backends/text-to-speech/emscripten/emscripten-text-to-speech.js"
 		fi
@@ -6260,11 +6262,10 @@ echo "$_libcurl"
 define_in_config_if_yes "$_libcurl" "USE_LIBCURL"
 
 echocheck "Network client"
-if test "$_backend" = "emscripten" && test "$_cloud" = "yes"; then
-	append_var LDFLAGS "-sFETCH"
+if test "$_backend" = "emscripten"; then
 	_basicnet=no
 	_http=yes
-	echo "Emscripten (HTTP only)"
+	echo "Fetch API (HTTP only)"
 elif test "$_backend" = "android"; then
 	_basicnet=yes
 	_http=yes
