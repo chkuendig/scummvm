@@ -28,8 +28,8 @@
 #         <the CI-parity flags used in .github/workflows>
 #
 #   The recorder dialog then offers a Download button to export a recorded
-#   session out of the browser's virtual filesystem. Plugin builds retain
-#   the full Asyncify import list in both debug and release configurations.
+#   session out of the browser's virtual filesystem. Plugin Asyncify imports
+#   use ["*"] in both release and debug builds.
 #
 
 
