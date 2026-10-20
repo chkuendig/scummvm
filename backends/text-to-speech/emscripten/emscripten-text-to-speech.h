@@ -31,6 +31,18 @@
 #include "common/text-to-speech.h"
 #include "common/ustr.h"
 
+// C API functions implemented in JavaScript
+extern "C" {
+char **ttsGetVoices();
+void ttsInit();
+bool ttsIsPaused();
+bool ttsIsSpeaking();
+void ttsPause();
+void ttsResume();
+bool ttsSay(const char *text, const char *voice_name, const char *voice_lang, int pitch, int rate, int volume, int action);
+void ttsStop();
+}
+
 class EmscriptenTextToSpeechManager final : public Common::TextToSpeechManager {
 public:
 	EmscriptenTextToSpeechManager();
