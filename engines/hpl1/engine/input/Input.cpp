@@ -25,10 +25,13 @@
  * This file is part of HPL1 Engine.
  */
 
+#include "common/config-manager.h"
+
 #include "hpl1/engine/input/Action.h"
 #include "hpl1/engine/input/ActionKeyboard.h"
 #include "hpl1/engine/input/ActionMouseButton.h"
 #include "hpl1/engine/input/Input.h"
+#include "hpl1/engine/input/Gamepad.h"
 #include "hpl1/engine/input/Keyboard.h"
 #include "hpl1/engine/input/LowLevelInput.h"
 #include "hpl1/engine/input/Mouse.h"
@@ -43,12 +46,15 @@ namespace hpl {
 
 cInput::cInput(LowLevelInput *apLowLevelInput) : iUpdateable("HPL_Input") {
 	mpLowLevelInput = apLowLevelInput;
+	ConfMan.registerDefault("joystick_deadzone", 3);
 
 	mpKeyboard = mpLowLevelInput->CreateKeyboard();
 	mpMouse = mpLowLevelInput->CreateMouse();
+	mpGamepad = mpLowLevelInput->CreateGamepad();
 
 	mlstInputDevices.push_back(mpMouse);
 	mlstInputDevices.push_back(mpKeyboard);
+	mlstInputDevices.push_back(mpGamepad);
 }
 
 //-----------------------------------------------------------------------
@@ -63,6 +69,8 @@ cInput::~cInput() {
 		hplDelete(mpKeyboard);
 	if (mpMouse)
 		hplDelete(mpMouse);
+	if (mpGamepad)
+		hplDelete(mpGamepad);
 
 	Log("--------------------------------------------------------\n\n");
 }
@@ -148,6 +156,25 @@ Keyboard *cInput::GetKeyboard() {
 
 Mouse *cInput::GetMouse() {
 	return mpMouse;
+}
+
+//-----------------------------------------------------------------------
+
+cVector2f cInput::GetRelativePointerMotion() {
+	return mpGamepad->GetRelativeMotion(mpMouse->GetRelPosition());
+}
+
+cVector2f cInput::GetGamepadLookAxes() const {
+	return mpGamepad->GetLookAxes(CLIP<int>(ConfMan.getInt("joystick_deadzone"), 0, 32) * 1000);
+}
+
+cVector2f cInput::GetGamepadLookMotion(float timeStep) const {
+	int deadZone = CLIP<int>(ConfMan.getInt("joystick_deadzone"), 0, 32) * 1000;
+	return mpGamepad->GetLookMotion(timeStep, deadZone);
+}
+
+cVector2f cInput::GetPointerMotion(float timeStep) {
+	return GetRelativePointerMotion() + GetGamepadLookAxes() * (600.f * timeStep);
 }
 
 //-----------------------------------------------------------------------
