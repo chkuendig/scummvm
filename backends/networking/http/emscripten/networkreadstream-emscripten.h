@@ -38,7 +38,7 @@ extern void NetworkReadStreamEmscripten_close(int fetchId);
 
 // Getter functions for fetch properties
 extern char *NetworkReadStreamEmscripten_getDataPtr(int fetchId);
-extern char *NetworkReadStreamEmscripten_getErr(int fetchId);
+extern char *NetworkReadStreamEmscripten_getError(int fetchId);
 extern uint32 NetworkReadStreamEmscripten_getNumBytes(int fetchId);
 extern char **NetworkReadStreamEmscripten_responseHeadersArray(int fetchId);
 extern unsigned short NetworkReadStreamEmscripten_status(int fetchId);

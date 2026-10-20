@@ -339,7 +339,7 @@ mergeInto(LibraryManager.library, {
         return !fetch.success;
     },
 
-    NetworkReadStreamEmscripten_getErr: function (fetchId) {
+    NetworkReadStreamEmscripten_getError: function (fetchId) {
         const fetch = window.scummvmFetches[fetchId];
         if (!fetch) return 0; // Return null pointer
 
