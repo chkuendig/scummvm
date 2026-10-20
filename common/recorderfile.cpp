@@ -29,7 +29,7 @@
 #include "graphics/managed_surface.h"
 #include "graphics/scaler.h"
 
-#define RECORD_VERSION 2
+#define RECORD_VERSION 3
 
 namespace Common {
 
@@ -137,6 +137,7 @@ bool PlaybackFile::checkPlaybackFileVersion() {
 	switch (_version) {
 	case 1:
 	case 2:
+	case 3:
 		break;
 	default:
 		warning("Unknown playback file version %d. Maximum supported version is %d.", _version, RECORD_VERSION);
@@ -441,6 +442,14 @@ void PlaybackFile::readEvent(RecorderEvent& event) {
 			event.time = _tmpPlaybackFile.readUint32BE();
 			event.customType = _tmpPlaybackFile.readUint32BE();
 			break;
+		case EVENT_CUSTOM_ENGINE_ACTION_AXIS:
+			event.time = _tmpPlaybackFile.readUint32BE();
+			event.customType = _tmpPlaybackFile.readUint32BE();
+			event.joystick.position = _tmpPlaybackFile.readSint16BE();
+			event.joystick.hasMouseMotion = _tmpPlaybackFile.readByte();
+			event.joystick.mouseMotion = _tmpPlaybackFile.readSint16BE();
+			event.joystick.mouseMotionEnd = _tmpPlaybackFile.readByte();
+			break;
 		case EVENT_JOYAXIS_MOTION:
 		case EVENT_JOYBUTTON_UP:
 		case EVENT_JOYBUTTON_DOWN:
@@ -448,6 +457,12 @@ void PlaybackFile::readEvent(RecorderEvent& event) {
 			event.joystick.axis = _tmpPlaybackFile.readByte();
 			event.joystick.button = _tmpPlaybackFile.readByte();
 			event.joystick.position = _tmpPlaybackFile.readSint16BE();
+			event.joystick.hasMouseMotion = false;
+			if (_version >= 3 && event.type == EVENT_JOYAXIS_MOTION) {
+				event.joystick.hasMouseMotion = _tmpPlaybackFile.readByte();
+				event.joystick.mouseMotion = _tmpPlaybackFile.readSint16BE();
+				event.joystick.mouseMotionEnd = _tmpPlaybackFile.readByte();
+			}
 			break;
 		default:
 			event.time = _tmpPlaybackFile.readUint32BE();
@@ -635,6 +650,14 @@ void PlaybackFile::writeEvent(const RecorderEvent &event) {
 			_tmpRecordFile.writeUint32BE(event.time);
 			_tmpRecordFile.writeUint32BE(event.customType);
 			break;
+		case EVENT_CUSTOM_ENGINE_ACTION_AXIS:
+			_tmpRecordFile.writeUint32BE(event.time);
+			_tmpRecordFile.writeUint32BE(event.customType);
+			_tmpRecordFile.writeSint16BE(event.joystick.position);
+			_tmpRecordFile.writeByte(event.joystick.hasMouseMotion);
+			_tmpRecordFile.writeSint16BE(event.joystick.mouseMotion);
+			_tmpRecordFile.writeByte(event.joystick.mouseMotionEnd);
+			break;
 		case EVENT_JOYAXIS_MOTION:
 		case EVENT_JOYBUTTON_UP:
 		case EVENT_JOYBUTTON_DOWN:
@@ -642,6 +665,11 @@ void PlaybackFile::writeEvent(const RecorderEvent &event) {
 			_tmpRecordFile.writeByte(event.joystick.axis);
 			_tmpRecordFile.writeByte(event.joystick.button);
 			_tmpRecordFile.writeSint16BE(event.joystick.position);
+			if (event.type == EVENT_JOYAXIS_MOTION) {
+				_tmpRecordFile.writeByte(event.joystick.hasMouseMotion);
+				_tmpRecordFile.writeSint16BE(event.joystick.mouseMotion);
+				_tmpRecordFile.writeByte(event.joystick.mouseMotionEnd);
+			}
 			break;
 		default:
 			_tmpRecordFile.writeUint32BE(event.time);
@@ -743,6 +771,11 @@ void PlaybackFile::updateHeader() {
 		readedSize = _readStream->read(_tmpBuffer.data(), kRecordBuffSize);
 		_writeStream->write(_tmpBuffer.data(), readedSize);
 	} while (readedSize != 0);
+	// Flush the compressed (gzip) stream, otherwise the final deflate block and
+	// gzip trailer are never written and the resulting file is a truncated
+	// archive that fails to load on playback. close() finalizes its own stream
+	// the same way.
+	_writeStream->finalize();
 	delete _writeStream;
 	_writeStream = NULL;
 	delete _readStream;

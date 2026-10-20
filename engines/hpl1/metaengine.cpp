@@ -28,6 +28,7 @@
 #include "graphics/scaler.h"
 #include "graphics/thumbnail.h"
 #include "hpl1/detection.h"
+#include "hpl1/engine/input/InputTypes.h"
 #include "hpl1/graphics.h"
 #include "hpl1/hpl1.h"
 
@@ -68,34 +69,86 @@ Common::Action *createMouseAction(const char *id, const Common::U32String &desc,
 	return act;
 }
 
+Common::Action *createGamepadAxisAction(const char *id, const Common::U32String &desc, const char *defaultMap, const Common::CustomEventType type) {
+	Common::Action *act = new Common::Action(id, desc);
+	act->setCustomEngineActionAxisEvent(type);
+	act->addDefaultInputMapping(defaultMap);
+	return act;
+}
+
 Common::Array<Common::Keymap *> Hpl1MetaEngine::initKeymaps(const char *target) const {
 	using Common::Keymap;
 	using namespace Hpl1;
 
+	Common::Action *act;
+
 	Keymap *movement = new Keymap(Keymap::kKeymapTypeGame, "HPL1_MOVEMENT", "Movement");
-	movement->addAction(createKeyBoardAction("FORWARD", _("Forward"), "w", Common::KEYCODE_w));
-	movement->addAction(createKeyBoardAction("BACKWARD", _("Backward"), "s", Common::KEYCODE_s));
-	movement->addAction(createKeyBoardAction("LEFT", _("Strafe left"), "a", Common::KEYCODE_a));
-	movement->addAction(createKeyBoardAction("RIGHT", _("Strafe right"), "d", Common::KEYCODE_d));
-	movement->addAction(createKeyBoardAction("LEAN_LEFT", _("Lean left"), "q", Common::KEYCODE_q));
-	movement->addAction(createKeyBoardAction("LEAN_RIGHT", _("Lean right"), "e", Common::KEYCODE_e));
-	movement->addAction(createKeyBoardAction("RUN", _("Run"), "LSHIFT", Common::KEYCODE_LSHIFT));
-	movement->addAction(createKeyBoardAction("JUMP", _("Jump"), "SPACE", Common::KEYCODE_SPACE));
-	movement->addAction(createKeyBoardAction("CROUCH", _("Crouch"), "LCTRL", Common::KEYCODE_LCTRL));
+	// Left analog stick: walk / strafe.
+	act = createKeyBoardAction("FORWARD", _("Forward"), "w", Common::KEYCODE_w);
+	act->addDefaultInputMapping("JOY_LEFT_STICK_Y-");
+	act->addDefaultInputMapping("JOY_UP");
+	movement->addAction(act);
+	act = createKeyBoardAction("BACKWARD", _("Backward"), "s", Common::KEYCODE_s);
+	act->addDefaultInputMapping("JOY_LEFT_STICK_Y+");
+	act->addDefaultInputMapping("JOY_DOWN");
+	movement->addAction(act);
+	act = createKeyBoardAction("LEFT", _("Strafe left"), "a", Common::KEYCODE_a);
+	act->addDefaultInputMapping("JOY_LEFT_STICK_X-");
+	act->addDefaultInputMapping("JOY_LEFT");
+	movement->addAction(act);
+	act = createKeyBoardAction("RIGHT", _("Strafe right"), "d", Common::KEYCODE_d);
+	act->addDefaultInputMapping("JOY_LEFT_STICK_X+");
+	act->addDefaultInputMapping("JOY_RIGHT");
+	movement->addAction(act);
+	act = createKeyBoardAction("LEAN_LEFT", _("Lean left"), "q", Common::KEYCODE_q);
+	movement->addAction(act);
+	act = createKeyBoardAction("LEAN_RIGHT", _("Lean right"), "e", Common::KEYCODE_e);
+	movement->addAction(act);
+	act = createKeyBoardAction("RUN", _("Run"), "LSHIFT", Common::KEYCODE_LSHIFT);
+	movement->addAction(act);
+	act = createKeyBoardAction("JUMP", _("Jump"), "SPACE", Common::KEYCODE_SPACE);
+	act->addDefaultInputMapping("JOY_X");
+	movement->addAction(act);
+	act = createKeyBoardAction("CROUCH", _("Crouch"), "LCTRL", Common::KEYCODE_LCTRL);
+	act->addDefaultInputMapping("JOY_Y");
+	movement->addAction(act);
+	// Right analog stick: native camera look.
+	movement->addAction(createGamepadAxisAction("LOOK_UP", _("Look up"), "JOY_RIGHT_STICK_Y-", hpl::eGamepadAction_LookUp));
+	movement->addAction(createGamepadAxisAction("LOOK_DOWN", _("Look down"), "JOY_RIGHT_STICK_Y+", hpl::eGamepadAction_LookDown));
+	movement->addAction(createGamepadAxisAction("LOOK_LEFT", _("Look left"), "JOY_RIGHT_STICK_X-", hpl::eGamepadAction_LookLeft));
+	movement->addAction(createGamepadAxisAction("LOOK_RIGHT", _("Look right"), "JOY_RIGHT_STICK_X+", hpl::eGamepadAction_LookRight));
 
 	Keymap *actions = new Keymap(Keymap::kKeymapTypeGame, "HPL1_ACTIONS", "Actions");
-	actions->addAction(createKeyBoardAction("INTERACTMODE", _("Interact mode"), "r", Common::KEYCODE_r));
-	actions->addAction(createMouseAction("LOOK_MODE", _("Look mode"), "MOUSE_MIDDLE", Common::EVENT_MBUTTONDOWN));
-	actions->addAction(createKeyBoardAction("HOLSTER", _("Holster"), "x", Common::KEYCODE_x));
-	actions->addAction(createMouseAction("EXAMINE", _("Examine"), "MOUSE_LEFT", Common::EVENT_LBUTTONDOWN));
-	actions->addAction(createMouseAction("INTERACT", _("Interact"), "MOUSE_RIGHT", Common::EVENT_RBUTTONDOWN));
+	act = createKeyBoardAction("INTERACTMODE", _("Interact mode"), "r", Common::KEYCODE_r);
+	actions->addAction(act);
+	act = createMouseAction("LOOK_MODE", _("Look mode"), "MOUSE_MIDDLE", Common::EVENT_MBUTTONDOWN);
+	actions->addAction(act);
+	act = createKeyBoardAction("HOLSTER", _("Holster"), "x", Common::KEYCODE_x);
+	actions->addAction(act);
+	act = createMouseAction("EXAMINE", _("Examine"), "MOUSE_LEFT", Common::EVENT_LBUTTONDOWN);
+	act->addDefaultInputMapping("JOY_A");
+	actions->addAction(act);
+	act = createMouseAction("INTERACT", _("Interact"), "MOUSE_RIGHT", Common::EVENT_RBUTTONDOWN);
+	act->addDefaultInputMapping("JOY_B");
+	actions->addAction(act);
 
 	Keymap *misc = new Keymap(Keymap::kKeymapTypeGame, "HPL1_MISC", "Misc");
-	misc->addAction(createKeyBoardAction("INVENTORY", _("Inventory"), "TAB", Common::KEYCODE_TAB));
-	misc->addAction(createKeyBoardAction("NOTEBOOK", _("Notebook"), "n", Common::KEYCODE_n));
+	act = createKeyBoardAction("INVENTORY", _("Inventory"), "TAB", Common::KEYCODE_TAB);
+	act->addDefaultInputMapping("JOY_RIGHT_SHOULDER");
+	misc->addAction(act);
+	act = createKeyBoardAction("NOTEBOOK", _("Notebook"), "n", Common::KEYCODE_n);
+	misc->addAction(act);
 	misc->addAction(createKeyBoardAction("PERSONAL_NOTES", _("Personal notes"), "p", Common::KEYCODE_p));
-	misc->addAction(createKeyBoardAction("FLASHLIGHT", _("Flashlight"), "f", Common::KEYCODE_f));
+	act = createKeyBoardAction("FLASHLIGHT", _("Flashlight"), "f", Common::KEYCODE_f);
+	act->addDefaultInputMapping("JOY_LEFT_SHOULDER");
+	misc->addAction(act);
 	misc->addAction(createKeyBoardAction("GLOWSTICK", _("Glowstick"), "g", Common::KEYCODE_g));
+	// Esc opens the in-game menu and skips the intro/cutscenes; it is read by the
+	// engine as a raw keyboard event. Expose it through the keymapper as well so a
+	// gamepad Start button can do the same.
+	act = createKeyBoardAction("MENU", _("Menu / Skip"), "ESCAPE", Common::KEYCODE_ESCAPE);
+	act->addDefaultInputMapping("JOY_START");
+	misc->addAction(act);
 
 	Common::Array<Common::Keymap *> keymaps(3);
 	keymaps[0] = movement;

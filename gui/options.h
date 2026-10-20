@@ -135,7 +135,17 @@ private:
 	//
 	bool _enableControlSettings;
 
-	CheckboxWidget *_touchpadCheckbox;
+	// On-screen touch controls (per-context touch mode presets), merged into
+	// the Control tab. Shown when the backend has kFeatureTouchMode.
+	CheckboxWidget *_onscreenControlCheckbox;
+	bool _initialOnscreenControlState;
+	StaticTextWidget *_touchModeMenusDesc;
+	PopUpWidget *_touchModeMenusPopUp;
+	StaticTextWidget *_touchMode2DGamesDesc;
+	PopUpWidget *_touchMode2DGamesPopUp;
+	StaticTextWidget *_touchMode3DGamesDesc;
+	PopUpWidget *_touchMode3DGamesPopUp;
+	uint32 _initialTouchModeTags[3];
 
 	StaticTextWidget *_kbdMouseSpeedDesc;
 	SliderWidget *_kbdMouseSpeedSlider;

@@ -23,6 +23,7 @@
 #define BACKENDS_PLATFORM_IOS7_IOS7_COMMON_H
 
 #include "graphics/surface.h"
+#include "common/touch-mode.h"
 
 
 enum InputEvent {
@@ -48,7 +49,8 @@ enum InputEvent {
 	kInputJoystickButtonDown,
 	kInputJoystickButtonUp,
 	kInputScreenChanged,
-	kInputTouchModeChanged
+	kInputTouchModeChanged,
+	kInputControllerChanged
 };
 
 enum ScreenOrientation {
@@ -64,10 +66,10 @@ enum DirectionalInput {
 	kDirectionalInputDpad,
 };
 
-enum TouchMode {
-	kTouchModeDirect,
-	kTouchModeTouchpad,
-};
+// Touch-mode presets are shared with the GUI and the SDL backend via
+// common/touch-mode.h. iOS spells the direct-pointer mode "direct" (mapped to
+// Common::kTouchModeMouse).
+typedef Common::TouchMode TouchMode;
 
 enum UIViewSwipeDirection {
 	kUIViewSwipeUp = 1,
@@ -107,6 +109,11 @@ void iOS7_main(int argc, char **argv);
 Common::String iOS7_getDocumentsDir();
 Common::String iOS7_getAppBundleDir();
 TouchMode iOS7_getCurrentTouchMode();
+// True when a physical game controller (i.e. not the on-screen virtual one) is
+// currently connected. Used to demote the on-screen gamepad touch mode.
+bool iOS7_isControllerConnected();
+bool iOS7_isVirtualControllerSupported();
+bool iOS7_isVirtualControllerAvailable();
 void iOS7_setSafeAreaInsets(int l, int r, int t, int b);
 
 #endif

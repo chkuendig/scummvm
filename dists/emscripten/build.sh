@@ -19,6 +19,18 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
+# Local / debug builds:
+#   Extra configure flags may be appended after the tasks, e.g. to enable the
+#   event recorder (a local-only debugging/QA aid that is NOT part of the CI
+#   build):
+#
+#     ./dists/emscripten/build.sh configure make --enable-eventrecorder \
+#         <the CI-parity flags used in .github/workflows>
+#
+#   The recorder dialog then offers a Download button to export a recorded
+#   session out of the browser's virtual filesystem. Plugin Asyncify imports
+#   use ["*"] in both release and debug builds.
+#
 
 
 
@@ -32,7 +44,7 @@ TASKS=()
 CONFIGURE_ARGS=()
 _bundle_games=()
 _verbose=false
-EMSDK_VERSION="${EMSDK_VERSION:-4.0.10}"
+EMSDK_VERSION="${EMSDK_VERSION:-6.0.13}"
 EMSCRIPTEN_VERSION="$EMSDK_VERSION"
 
 usage="\
@@ -135,11 +147,7 @@ for i in "$@"; do
   esac
 done
 
-TASKS="${TASKS:1}"
-if [[ -z "$TASKS" ]]; then
-  echo "$usage"
-  exit
-fi
+
 
 # print commands
 if [[ "$_verbose" = true ]]; then
@@ -174,6 +182,12 @@ if [[ $ret != 0 ]]; then
   ./emsdk activate ${EMSCRIPTEN_VERSION}
 fi
 
+TASKS="${TASKS:1}"
+if [[ -z "$TASKS" ]]; then
+  echo "$usage"
+  exit
+fi
+
 source "$DIST_FOLDER/emsdk-$EMSDK_VERSION/emsdk_env.sh"
 
 # export node_path - so we can use all node_modules bundled with emscripten (e.g. requests)
@@ -196,9 +210,10 @@ if [ "$_liba52" = true ]; then
   if [[ ! -f "$LIBS_FOLDER/build/lib/liba52.a" ]]; then
     echo "building a52dec-0.7.4"
     cd "$LIBS_FOLDER"
-    wget -nc "https://code.videolan.org/videolan/liba52/-/archive/0.7.4/liba52-0.7.4.tar.gz"
-    tar -xf liba52-0.7.4.tar.gz
-    cd "$LIBS_FOLDER/liba52-0.7.4/"
+    wget -nc "https://deb.debian.org/debian/pool/main/a/a52dec/a52dec_0.7.4.orig.tar.gz"
+    echo "a21d724ab3b3933330194353687df82c475b5dfb997513eef4c25de6c865ec33  a52dec_0.7.4.orig.tar.gz" | sha256sum -c -
+    tar -xf a52dec_0.7.4.orig.tar.gz
+    cd "$LIBS_FOLDER/a52dec-0.7.4/"
     autoreconf -i
     CFLAGS="-fPIC -Oz" emconfigure ./configure --host=wasm32-unknown-none --build=wasm32-unknown-none --prefix="$LIBS_FOLDER/build/"
     emmake make -j 5
@@ -257,8 +272,6 @@ if [ "$_libmad" = true ]; then
     wget -nc "https://downloads.sourceforge.net/mad/libmad-0.15.1b.tar.gz"
     tar -xf libmad-0.15.1b.tar.gz
     cd "$LIBS_FOLDER/libmad-0.15.1b/"
-    # libmad needs patching as -fforce-mem has been removed in GCC 4.3 and later
-    sed -i -e 's/-fforce-mem//g' configure
     CFLAGS="-Oz" emconfigure ./configure --host=wasm32-unknown-none --build=wasm32-unknown-none --prefix="$LIBS_FOLDER/build/" --with-pic --enable-fpm=no
     emmake make -j 5
     emmake make install
@@ -310,12 +323,12 @@ fi
 
 if [ "$_retrowave" = true ]; then
   if [[ ! -f "$LIBS_FOLDER/build/lib/libRetroWave.a" ]]; then
-    echo "build libRetroWave-e6bf60e"
+    echo "build libRetroWave-ddb5b34"
     cd "$LIBS_FOLDER"
-    wget -nc --content-disposition "https://github.com/SudoMaker/RetroWave/archive/e6bf60eed2d2bd1deff688d645be71a32bbf05bb.tar.gz"
-    tar -xf RetroWave-e6bf60eed2d2bd1deff688d645be71a32bbf05bb.tar.gz
-    cd "$LIBS_FOLDER/RetroWave-e6bf60eed2d2bd1deff688d645be71a32bbf05bb/"
-    CFLAGS="-fPIC -s USE_ZLIB=1 -Oz"  emcmake cmake -B "build/" -DRETROWAVE_BUILD_PLAYER=0  -DCMAKE_INSTALL_PREFIX="$LIBS_FOLDER/build/" -DCMAKE_INSTALL_LIBDIR="lib"
+    wget -nc --content-disposition "https://github.com/SudoMaker/RetroWave/archive/ddb5b34f25d23b075dec8fffe65dedb629a78e86.tar.gz"
+    tar -xf RetroWave-ddb5b34f25d23b075dec8fffe65dedb629a78e86.tar.gz
+    cd "$LIBS_FOLDER/RetroWave-ddb5b34f25d23b075dec8fffe65dedb629a78e86/"
+    CFLAGS="-fPIC -s USE_ZLIB=1 -Oz -DEMSCRIPTEN"  emcmake cmake -B "build/" -DRETROWAVE_BUILD_PLAYER=0  -DCMAKE_INSTALL_PREFIX="$LIBS_FOLDER/build/" -DCMAKE_INSTALL_LIBDIR="lib"
     cmake --build "build/"  
     cmake --install "build/"  
   fi
@@ -324,12 +337,12 @@ fi
 
 if [ "$_libtheoradec" = true ]; then
   if [[ ! -f "$LIBS_FOLDER/build/lib/libtheora.a" ]]; then
-    echo "build libtheora-1.1.1"
+    echo "build libtheora-1.2.0"
     cd "$LIBS_FOLDER"
-    wget -nc "https://downloads.xiph.org/releases/theora/libtheora-1.1.1.tar.xz"
-    tar -xf libtheora-1.1.1.tar.xz
-    cd "$LIBS_FOLDER/libtheora-1.1.1/"
-    CFLAGS="-fPIC -s USE_OGG=1 -Oz" emconfigure ./configure --host=wasm32-unknown-none --build=wasm32-unknown-none --prefix="$LIBS_FOLDER/build/" --disable-asm
+    wget -nc "https://downloads.xiph.org/releases/theora/libtheora-1.2.0.tar.xz"
+    tar -xf libtheora-1.2.0.tar.xz
+    cd "$LIBS_FOLDER/libtheora-1.2.0/"
+    CFLAGS="-fPIC -s USE_OGG=1 -Oz" emconfigure ./configure --host=wasm32-unknown-none --build=wasm32-unknown-none --prefix="$LIBS_FOLDER/build/" --disable-asm --disable-examples
     emmake make -j 5
     emmake make install
   fi
@@ -371,6 +384,7 @@ if [[ "make" =~ $(echo ^\(${TASKS}\)$) || "build" =~ $(echo ^\(${TASKS}\)$) ]]; 
   echo "Running make"
   num_cpus=$(nproc || grep -c ^processor /proc/cpuinfo || echo 1)
   emmake make -j ${num_cpus}
+
 fi
 
 #################################
