@@ -113,8 +113,6 @@ public:
 	static void removeFromConfig(const Common::String &keyPrefix);
 
 	Common::String getRootDirectoryId() override;
-
-	Common::String accessToken() const { return _token; }
 };
 
 } // End of namespace Box
