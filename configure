@@ -3386,6 +3386,7 @@ EOF
 		append_var LDFLAGS "-s ASYNCIFY=1 -s ASYNCIFY_STACK_SIZE=1048576"
 
 		append_var LDFLAGS "--js-library backends/fs/emscripten/emscripten-fs-factory.js"
+		append_var LDFLAGS "--js-library backends/fs/emscripten/dragdrop-fs.js"
 		append_var LDFLAGS "-s EXPORTED_FUNCTIONS=[_main,_malloc,_free,_raise]"
 		append_var LDFLAGS "-s EXPORTED_RUNTIME_METHODS=[ccall,lengthBytesUTF8,setValue,writeArrayToMemory]"
 		append_var LDFLAGS "--js-library backends/networking/http/emscripten/networkreadstream-emscripten.js"
