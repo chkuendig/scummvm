@@ -119,6 +119,7 @@ ifdef USE_TTS
 MODULE_OBJS += \
 	text-to-speech/emscripten/emscripten-text-to-speech.o
 endif
+MODULE_OBJS += printing/emscripten/emscripten-printman.o
 endif
 
 ifdef USE_SDL_NET

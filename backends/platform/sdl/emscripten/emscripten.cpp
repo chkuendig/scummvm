@@ -31,6 +31,7 @@
 #include "backends/mutex/null/null-mutex.h"
 #include "backends/fs/emscripten/emscripten-fs-factory.h"
 #include "backends/platform/sdl/emscripten/emscripten.h"
+#include "backends/printing/emscripten/emscripten-printman.h"
 #include "backends/timer/emscripten/emscripten-timer.h"
 #include "common/file.h"
 #ifdef USE_TTS
@@ -131,6 +132,8 @@ void OSystem_Emscripten::init() {
 	// Initialze File System Factory
 	EmscriptenFilesystemFactory *fsFactory = new EmscriptenFilesystemFactory();
 	_fsFactory = fsFactory;
+
+	_printingManager = createEmscriptenPrintingManager();
 
 	// Invoke parent implementation of this method
 	OSystem_SDL::init();
