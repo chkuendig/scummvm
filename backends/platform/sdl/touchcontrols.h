@@ -21,26 +21,10 @@
 
 // On-screen touch gamepad controls for the SDL backend (used by Emscripten).
 //
-// This implements the standard AAA touch-FPS layout in landscape:
-//   - a visible D-PAD (move) in the bottom-left, recentred under the finger and
-//     rendered as the gamepad.svg D-pad cell glyph; it emits the digital
-//     JOYSTICK_BUTTON_DPAD_UP/DOWN/LEFT/RIGHT buttons (8-way, diagonals fire two);
-//   - DRAG-TO-LOOK on the right half of the screen (the camera): an invisible
-//     region whose finger drag is turned into relative-mouse motion (mirrors the
-//     existing touchpad relmouse scaling), and a short tap there is turned into a
-//     left click;
-//   - a MULTI-TOUCH A/B/X/Y diamond in the bottom-right (each button its own
-//     independent hotspot so several can be held at once);
-//   - a compact secondary top-centre cluster reusing the gamepad.svg "system"
-//     cluster art (a diamond on a grouping circle): the GMM button (opens the
-//     Global Main Menu) on top, R1 on the right, Start at the bottom, L1 on left.
-//
-// The whole pad is hidden unless the on-screen gamepad is the active touch mode.
-//
-// Synthetic joystick / mouse events are pushed through the generic event
-// manager; the gamepad.svg asset is reused for the face-button and Start glyphs
-// (a missing asset is non-fatal), while the thumbstick ring/knob and the L1/R1
-// pills are drawn from primitives into spare regions of the same surface.
+// A floating digital D-pad, mouse-look region, independent A/B/X/Y buttons,
+// and a top cluster for the main menu, shoulders and Start. Buttons use the
+// keymapper; mouse-look retains its existing relative-motion response.
+// The pad is hidden outside gamepad touch mode.
 
 #ifndef BACKENDS_PLATFORM_SDL_TOUCHCONTROLS_H_
 #define BACKENDS_PLATFORM_SDL_TOUCHCONTROLS_H_
@@ -181,9 +165,7 @@ private:
 	// launcher and the GMM) keyboard-style from the on-screen pad.
 	static void keyDown(Common::KeyCode kc);
 	static void keyUp(Common::KeyCode kc);
-	static void axisMotion(Common::JoystickAxis axis, int16 value);
-	// Relative-mouse motion for drag-to-look (relX/relY in window pixels).
-	static void mouseRelative(int relX, int relY);
+	static void axisMotion(Common::JoystickAxis axis, int16 value, int16 mouseMotion, bool mouseMotionEnd);
 	// Synthetic left click at the current cursor position (tap-to-click).
 	static void mouseClick();
 	// Opens the ScummVM Global Main Menu (pushes EVENT_MAINMENU).
@@ -303,8 +285,8 @@ private:
 	};
 
 	// Drag-to-look: the right half of the screen, excluding the button/shoulder
-	// hotspots. Invisible (no widget). A drag becomes relative-mouse motion (the
-	// camera); a short tap becomes a left click.
+	// hotspots. Emits right-stick axes with the original mouse-emulation response
+	// for virtual-mouse mappings; a short tap becomes a left click.
 	struct FunctionLook : Function {
 		FunctionLook(const TouchControls *parent) :
 			Function(parent), prevX(0), prevY(0), hiresX(0), hiresY(0), maxTravel(0) {}
@@ -312,6 +294,7 @@ private:
 
 		bool isInside(int, int) override { return false; } // no widget, no zombie reuse
 		void touch(int, int, Action) override;
+		void emitAxes(int dX, int dY, int relX, int relY);
 		// Draws the ring/dot drag indicator while actively dragging.
 		void draw(uint8 baseAlpha, uint8 hlAlpha) override;
 
