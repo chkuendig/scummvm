@@ -27,7 +27,7 @@
 
 #include "hpl1/engine/impl/OcclusionQueryOGL.h"
 
-#ifdef HPL1_USE_OPENGL
+#if defined(HPL1_USE_OPENGL) && !USE_FORCED_GLES2
 
 namespace hpl {
 
@@ -81,4 +81,4 @@ unsigned int cOcclusionQueryOGL::GetSampleCount() {
 //-----------------------------------------------------------------------
 } // namespace hpl
 
-#endif // HL1_USE_OPENGL
+#endif // defined(HPL1_USE_OPENGL) && !USE_FORCED_GLES2
