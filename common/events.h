@@ -88,6 +88,7 @@ enum EventType {
 	EVENT_CUSTOM_BACKEND_ACTION_AXIS  = 34,
 	EVENT_CUSTOM_ENGINE_ACTION_START  = 20,
 	EVENT_CUSTOM_ENGINE_ACTION_END    = 21,
+	EVENT_CUSTOM_ENGINE_ACTION_AXIS   = 40,
 
 	EVENT_VIRTUAL_KEYBOARD = 22,
 
@@ -156,7 +157,16 @@ struct JoystickState {
 	 */
 	uint8 button;
 
-	JoystickState() : axis(0), position(0), button(0) {}
+	/** Optional mouse-emulation delta for software axes, in window pixels.
+	 * When set, mouse mappings use this delta instead of held-axis velocity.
+	 * Consecutive axis updates form one motion, terminated by mouseMotionEnd.
+	 * Native joystick mappings continue to use position.
+	 */
+	bool hasMouseMotion;
+	int16 mouseMotion;
+	bool mouseMotionEnd;
+
+	JoystickState() : axis(0), position(0), button(0), hasMouseMotion(false), mouseMotion(0), mouseMotionEnd(false) {}
 };
 
 /**

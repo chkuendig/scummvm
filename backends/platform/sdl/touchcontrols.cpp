@@ -584,21 +584,14 @@ void TouchControls::keyUp(Common::KeyCode kc) {
 	dynamic_cast<OSystem_SDL *>(g_system)->pushEvent(ev);
 }
 
-void TouchControls::axisMotion(Common::JoystickAxis axis, int16 value) {
+void TouchControls::axisMotion(Common::JoystickAxis axis, int16 value, int16 mouseMotion, bool mouseMotionEnd) {
 	Common::Event ev;
 	ev.type = Common::EVENT_JOYAXIS_MOTION;
 	ev.joystick.axis = axis;
 	ev.joystick.position = value;
-	dynamic_cast<OSystem_SDL *>(g_system)->pushEvent(ev);
-}
-
-void TouchControls::mouseRelative(int relX, int relY) {
-	Common::Event ev;
-	ev.type = Common::EVENT_MOUSEMOVE;
-	// Absolute position is kept at the current cursor; the engine (HPL1) reads
-	// the relative delta for the camera.
-	ev.mouse = g_system->getEventManager()->getMousePos();
-	ev.relMouse = Common::Point(relX, relY);
+	ev.joystick.hasMouseMotion = true;
+	ev.joystick.mouseMotion = mouseMotion;
+	ev.joystick.mouseMotionEnd = mouseMotionEnd;
 	dynamic_cast<OSystem_SDL *>(g_system)->pushEvent(ev);
 }
 
@@ -949,10 +942,12 @@ void TouchControls::FunctionLook::touch(int dX, int dY, Action action) {
 		prevY = currentY;
 		hiresX = hiresY = 0.0f;
 		maxTravel = 0;
+		emitAxes(0, 0, 0, 0);
 		return;
 	}
 
 	if (action == kActionCancel) {
+		emitAxes(0, 0, 0, 0);
 		return;
 	}
 
@@ -964,16 +959,14 @@ void TouchControls::FunctionLook::touch(int dX, int dY, Action action) {
 	}
 
 	if (action == kActionUp) {
+		emitAxes(0, 0, 0, 0);
 		if (maxTravel <= TAP_MAX_TRAVEL) {
 			mouseClick();
 		}
 		return;
 	}
 
-	// kActionMove: convert per-frame finger delta into relative-mouse motion,
-	// mirroring the touchpad relmouse scaling in sdl2-events.cpp, but with a
-	// higher base sensitivity and speed-based acceleration so fast flicks turn
-	// the camera disproportionately more than slow drags.
+	// Retain the original per-event mouse response for virtual-mouse mappings.
 	int ddX = (int)currentX - prevX;
 	int ddY = (int)currentY - prevY;
 	prevX = currentX;
@@ -982,7 +975,7 @@ void TouchControls::FunctionLook::touch(int dX, int dY, Action action) {
 	int kbdMouseSpeed = CLIP<int>(ConfMan.getInt("kbdmouse_speed"), 0, 7);
 	float speedFactor = (kbdMouseSpeed + 1) * 0.25f;
 
-	// Per-frame finger delta and travel magnitude, in window pixels.
+	// Finger delta and travel magnitude, in window pixels.
 	float dxPx = ddX / (float)SCALE_FACTOR_FXP;
 	float dyPx = ddY / (float)SCALE_FACTOR_FXP;
 	float fingerSpeed = sqrtf(dxPx * dxPx + dyPx * dyPx);
@@ -996,9 +989,20 @@ void TouchControls::FunctionLook::touch(int dX, int dY, Action action) {
 	hiresX -= relX;
 	hiresY -= relY;
 
-	if (relX || relY) {
-		mouseRelative(relX, relY);
+	emitAxes(dX, dY, relX, relY);
+}
+
+void TouchControls::FunctionLook::emitAxes(int dX, int dY, int relX, int relY) {
+	float radius = SVG_UNSCALED(LOOK_RING_RADIUS) * parent->_scale;
+	float x = dX / radius;
+	float y = dY / radius;
+	float magnitude = sqrtf(x * x + y * y);
+	if (magnitude > 1.f) {
+		x /= magnitude;
+		y /= magnitude;
 	}
+	axisMotion(Common::JOYSTICK_AXIS_RIGHT_STICK_X, x * Common::JOYAXIS_MAX, relX, false);
+	axisMotion(Common::JOYSTICK_AXIS_RIGHT_STICK_Y, y * Common::JOYAXIS_MAX, relY, true);
 }
 
 void TouchControls::FunctionLook::draw(uint8 baseAlpha, uint8 /*hlAlpha*/) {
