@@ -88,7 +88,6 @@ void OSystem_Emscripten::init() {
 
 	_printingManager = createEmscriptenPrintingManager();
 
-	// Invoke parent implementation of this method
 	OSystem_SDL::init();
 }
 
