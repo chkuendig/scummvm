@@ -14,7 +14,7 @@ APK_MAIN = ScummVM-debug.apk
 APK_MAIN_RELEASE = ScummVM-release-unsigned.apk
 AAB_MAIN_RELEASE = ScummVM-release.aab
 
-DIST_FILES_PLATFORM = $(PATH_DIST)/android-help.zip $(PATH_DIST)/gamepad.svg
+DIST_FILES_PLATFORM = $(PATH_DIST)/android-help.zip
 
 $(PATH_BUILD):
 	$(MKDIR) $(PATH_BUILD)
