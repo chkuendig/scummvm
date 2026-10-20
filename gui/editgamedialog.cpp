@@ -175,6 +175,11 @@ EditGameDialog::EditGameDialog(const Common::String &domain)
 
 	addGraphicControls(graphicsContainer, "GameOptions_Graphics_Container.");
 
+	if (g_system->hasFeature(OSystem::kFeatureTouchMode)) {
+		tab->addTab(_("Control"), "GameOptions_Control");
+		addControlControls(tab, "GameOptions_Control.");
+	}
+
 	//
 	// The Keymap tab
 	//
