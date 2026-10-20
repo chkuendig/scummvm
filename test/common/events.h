@@ -24,6 +24,47 @@
 
 class EventsTestSuite : public CxxTest::TestSuite {
 public:
+	void test_software_axis_data_does_not_leak_to_hardware_events() {
+		class Source : public Common::EventSource {
+			int _count = 0;
+		public:
+			bool pollEvent(Common::Event &event) override {
+				if (_count++ >= 2) {
+					return false;
+				}
+				event.type = Common::EVENT_JOYAXIS_MOTION;
+				event.joystick.axis = Common::JOYSTICK_AXIS_RIGHT_STICK_X;
+				event.joystick.position = 16000;
+				if (_count == 1) {
+					event.joystick.hasMouseMotion = true;
+					event.joystick.mouseMotion = 123;
+					event.joystick.mouseMotionEnd = true;
+				}
+				return true;
+			}
+		} source;
+		class Observer : public Common::EventObserver {
+		public:
+			Common::JoystickState states[2];
+			int count = 0;
+			bool notifyEvent(const Common::Event &event) override {
+				states[count++] = event.joystick;
+				return false;
+			}
+		} observer;
+		Common::EventDispatcher dispatcher;
+		dispatcher.registerSource(&source, false);
+		dispatcher.registerObserver(&observer, 0, false);
+		dispatcher.dispatch();
+		TS_ASSERT_EQUALS(observer.count, 2);
+		TS_ASSERT(observer.states[0].hasMouseMotion);
+		TS_ASSERT_EQUALS(observer.states[0].mouseMotion, 123);
+		TS_ASSERT(!observer.states[1].hasMouseMotion);
+		TS_ASSERT_EQUALS(observer.states[1].mouseMotion, 0);
+		TS_ASSERT(!observer.states[1].mouseMotionEnd);
+		TS_ASSERT_EQUALS(observer.states[1].position, 16000);
+	}
+
 	void test_hotspots_show_event() {
 		Common::Event event;
 		event.type = Common::EVENT_HOTSPOTS_SHOW;

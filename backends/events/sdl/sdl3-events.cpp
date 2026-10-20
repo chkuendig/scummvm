@@ -25,6 +25,7 @@
 
 #include "backends/events/sdl/sdl-events.h"
 #include "backends/platform/sdl/sdl.h"
+#include "backends/platform/sdl/touch-action.h"
 #include "backends/graphics/graphics.h"
 #include "common/config-manager.h"
 #include "common/textconsole.h"
@@ -614,6 +615,13 @@ void SdlEventSource::preprocessFingerMotion(SDL_Event *event) {
 }
 
 bool SdlEventSource::pollEvent(Common::Event &event) {
+	// Drain synthetic events (e.g. from the on-screen touch controls) first so
+	// they are routed through the keymapper like any other input event.
+	if (!_eventQueue.empty()) {
+		event = _eventQueue.pop();
+		return true;
+	}
+
 	finishSimulatedMouseClicks();
 
 	// In case we still need to send a key up event for a key down from a
@@ -653,7 +661,27 @@ bool SdlEventSource::pollEvent(Common::Event &event) {
 		// left mouse click: single finger short tap
 		// right mouse click: second finger short tap while first finger is still down
 		// pointer motion: single finger drag
-		if (ev.type == SDL_EVENT_FINGER_DOWN || ev.type == SDL_EVENT_FINGER_UP || ev.type == SDL_EVENT_FINGER_MOTION) {
+		if (ev.type == SDL_EVENT_FINGER_DOWN || ev.type == SDL_EVENT_FINGER_UP ||
+		    ev.type == SDL_EVENT_FINGER_MOTION || ev.type == SDL_EVENT_FINGER_CANCELED) {
+			{
+				int action = (ev.type == SDL_EVENT_FINGER_DOWN) ? kActionDown :
+				             (ev.type == SDL_EVENT_FINGER_UP) ? kActionUp :
+				             (ev.type == SDL_EVENT_FINGER_CANCELED) ? kActionCancel : kActionMove;
+				// On-screen mode-toggle button takes precedence over everything.
+				if (handleTouchToggle(action, ev.tfinger.touchID, ev.tfinger.fingerID, ev.tfinger.x, ev.tfinger.y)) {
+					continue;
+				}
+				// In gamepad mode (no physical controller — applyTouchSettings
+				// falls back otherwise), drive the on-screen gamepad and consume
+				// the finger, like the Android backend does from JNI.
+				OSystem_SDL *sdlSystem = dynamic_cast<OSystem_SDL *>(g_system);
+				if (sdlSystem && sdlSystem->isOnScreenGamepadActive()) {
+					Common::Point size = getTouchscreenSizePixels();
+					sdlSystem->getTouchControls().update((TouchAction)action,
+						(int)(ev.tfinger.fingerID & 0x7fffffff), (int)(ev.tfinger.x * size.x), (int)(ev.tfinger.y * size.y));
+					continue;
+				}
+			}
 			// front (0) or back (1) panel
 			SDL_TouchID port = ev.tfinger.touchID;
 			// touchpad_mouse_mode off: use only front panel for direct touch control of pointer
@@ -783,6 +811,9 @@ bool SdlEventSource::dispatchSDLEvent(SDL_Event &ev, Common::Event &event) {
 		}
 
 		case SDL_EVENT_WINDOW_FOCUS_LOST: {
+			_touchTogglePressed = false;
+			if (OSystem_SDL *system = dynamic_cast<OSystem_SDL *>(g_system))
+				system->getTouchControls().update(kActionCancel, 0, 0, 0);
 			// Always allow the display to turn off if ScummVM is out of focus
 			event.type = Common::EVENT_FOCUS_LOST;
 			SDL_EnableScreenSaver();
@@ -941,17 +972,33 @@ void SdlEventSource::closeJoystick() {
 }
 
 bool SdlEventSource::handleJoystickAdded(const SDL_JoyDeviceEvent &device, Common::Event &event) {
-	debug(5, "SdlEventSource: Received joystick added event for index '%d'", device.which);
+	debug(5, "SdlEventSource: Received joystick added event for instance id '%u'", device.which);
 
 	int joystick_num = ConfMan.getInt("joystick_num");
-	if (joystick_num != static_cast<int>(device.which)) {
+	if (joystick_num < 0)
+		return false;
+
+	// Unlike SDL2, SDL3 reports an instance ID here, not a device index.
+	// Resolve the configured index using the same list as openJoystick().
+	int numJoysticks = 0;
+	SDL_JoystickID *joystickIds = SDL_GetJoysticks(&numJoysticks);
+	const bool selected = joystickIds && joystick_num < numJoysticks &&
+	                      joystickIds[joystick_num] == device.which;
+	SDL_free(joystickIds);
+	if (!selected) {
 		return false;
 	}
 
-	debug(5, "SdlEventSource: Newly added joystick with index '%d' matches 'joysticky_num', trying to use it", device.which);
+	debug(5, "SdlEventSource: Newly added joystick with instance id '%u' matches configured index '%d', trying to use it", device.which, joystick_num);
 
 	closeJoystick();
 	openJoystick(joystick_num);
+
+	// The on-screen gamepad is only a fallback when no physical controller is
+	// connected, so re-evaluate the touch preset now that one was plugged in.
+	if (OSystem_SDL *sdlSystem = dynamic_cast<OSystem_SDL *>(g_system)) {
+		sdlSystem->applyTouchSettings();
+	}
 
 	event.type = Common::EVENT_INPUT_CHANGED;
 	return true;
@@ -978,6 +1025,12 @@ bool SdlEventSource::handleJoystickRemoved(const SDL_JoyDeviceEvent &device, Com
 	debug(5, "SdlEventSource: Newly removed joystick with instance id '%d' matches currently used joystick, closing current joystick", device.which);
 
 	closeJoystick();
+
+	// A physical controller went away; the on-screen gamepad fallback may now
+	// apply again, so re-evaluate the touch preset.
+	if (OSystem_SDL *sdlSystem = dynamic_cast<OSystem_SDL *>(g_system)) {
+		sdlSystem->applyTouchSettings();
+	}
 
 	event.type = Common::EVENT_INPUT_CHANGED;
 	return true;

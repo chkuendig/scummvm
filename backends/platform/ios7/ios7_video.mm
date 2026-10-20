@@ -82,6 +82,30 @@ bool iOS7_fetchEvent(InternalEvent *event) {
 	return fetched;
 }
 
+bool iOS7_isVirtualControllerSupported() {
+#if TARGET_OS_IOS && defined(__IPHONE_15_0)
+	if (@available(iOS 15.0, *))
+		return true;
+#endif
+	return false;
+}
+
+bool iOS7_isVirtualControllerAvailable() {
+	__block bool available = false;
+	execute_on_main_thread(^{
+		available = [[iOS7AppDelegate iPhoneView] isVirtualControllerAvailable];
+	});
+	return available;
+}
+
+bool iOS7_isControllerConnected() {
+	__block bool connected;
+	execute_on_main_thread(^{
+		connected = [[iOS7AppDelegate iPhoneView] isControllerConnected];
+	});
+	return connected;
+}
+
 @implementation iPhoneView {
 #if TARGET_OS_IOS
 	UIButton *_menuButton;
@@ -447,12 +471,14 @@ bool iOS7_fetchEvent(InternalEvent *event) {
 - (void)updateTouchMode {
 	UIImage *btnImage;
 	TouchMode currentTouchMode = iOS7_getCurrentTouchMode();
-	bool isEnabled = ConfMan.getBool("onscreen_control");
+	bool isEnabled = ConfMan.getBool(ONSCREEN_CONTROL_KEY);
 
-	if (currentTouchMode == kTouchModeDirect) {
+	if (currentTouchMode == Common::kTouchModeMouse) {
 		btnImage = [UIImage imageNamed:@"ic_action_mouse"];
-	} else if (currentTouchMode == kTouchModeTouchpad) {
+	} else if (currentTouchMode == Common::kTouchModeTouchpad) {
 		btnImage = [UIImage imageNamed:@"ic_action_touchpad"];
+	} else if (currentTouchMode == Common::kTouchModeGamepad) {
+		btnImage = [UIImage imageNamed:@"ic_action_gamepad"];
 	} else {
 		return;
 	}
@@ -493,18 +519,6 @@ bool iOS7_fetchEvent(InternalEvent *event) {
 	}
 
 	[self adjustViewFrameForSafeArea];
-#if TARGET_OS_IOS
-	// The virtual controller does not fit in portrait orientation on iPhones
-	// Make sure to disconnect the virtual controller in those cases
-	if (!iOS7_isBigDevice() &&
-		(_currentOrientation == UIInterfaceOrientationPortrait ||
-		 _currentOrientation == UIInterfaceOrientationPortraitUpsideDown)) {
-		[self virtualController:false];
-	} else {
-		// Connect or disconnect the virtual controller
-		[self virtualController:ConfMan.getBool("gamepad_controller")];
-	}
-#endif
 }
 
 #ifndef __has_builtin
@@ -619,6 +633,25 @@ bool iOS7_fetchEvent(InternalEvent *event) {
 			}
 		}
 	}
+}
+
+- (BOOL)isVirtualControllerAvailable {
+#if TARGET_OS_IOS
+	const bool portrait = _currentOrientation == UIInterfaceOrientationPortrait ||
+	                      _currentOrientation == UIInterfaceOrientationPortraitUpsideDown;
+	return iOS7_isVirtualControllerSupported() && (iOS7_isBigDevice() || !portrait);
+#else
+	return NO;
+#endif
+}
+
+- (BOOL)isControllerConnected {
+	for (GameController *c : _controllers) {
+		if ([c isKindOfClass:GamepadController.class]) {
+			return [(GamepadController*)c isPhysicalControllerConnected];
+		}
+	}
+	return NO;
 }
 
 #if TARGET_OS_IOS

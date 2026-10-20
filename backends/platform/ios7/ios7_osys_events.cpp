@@ -148,6 +148,11 @@ bool OSystem_iOS7::pollEvent(Common::Event &event) {
 
 		case kInputTouchModeChanged:
 			handleEvent_touchModeChanged();
+			return false;
+
+		case kInputControllerChanged:
+			dynamic_cast<iOSGraphicsManager *>(_graphicsManager)->applyTouchSettings();
+			event.type = Common::EVENT_INPUT_CHANGED;
 			break;
 
 		default:
@@ -163,7 +168,7 @@ bool OSystem_iOS7::handleEvent_touchBegan(Common::Event &event, int x, int y) {
 	_lastPadX = x;
 	_lastPadY = y;
 
-	if (_currentTouchMode == kTouchModeDirect) {
+	if (_currentTouchMode == Common::kTouchModeMouse) {
 		Common::Point mouse(x, y);
 		dynamic_cast<iOSGraphicsManager *>(_graphicsManager)->notifyMousePosition(mouse);
 	}
@@ -177,7 +182,7 @@ bool OSystem_iOS7::handleEvent_touchMoved(Common::Event &event, int x, int y) {
 	_lastPadX = x;
 	_lastPadY = y;
 
-	if (_currentTouchMode == kTouchModeTouchpad) {
+	if (_currentTouchMode == Common::kTouchModeTouchpad) {
 		handleEvent_mouseDelta(event, deltaX, deltaY);
 	} else {
 		// Update mouse position
@@ -243,17 +248,7 @@ void  OSystem_iOS7::handleEvent_orientationChanged(int orientation) {
 }
 
 void OSystem_iOS7::handleEvent_touchModeChanged() {
-	switch (_currentTouchMode) {
-	case kTouchModeDirect:
-		_currentTouchMode = kTouchModeTouchpad;
-		break;
-	case kTouchModeTouchpad:
-	default:
-		_currentTouchMode = kTouchModeDirect;
-		break;
-	}
-
-	updateTouchMode();
+	rememberTouchMode(Common::nextTouchMode(_currentTouchMode, _touchContext, isOnScreenGamepadAvailable()));
 }
 
 void OSystem_iOS7::rebuildSurface() {
@@ -332,15 +327,15 @@ bool OSystem_iOS7::handleEvent_swipe(Common::Event &event, int direction, int to
 
 		case kUIViewSwipeRight: {
 			// Swipe right
-			if (_currentTouchMode == kTouchModeDirect) {
-				_currentTouchMode = kTouchModeTouchpad;
+			if (_currentTouchMode == Common::kTouchModeMouse) {
+				_currentTouchMode = Common::kTouchModeTouchpad;
 			} else {
-				_currentTouchMode = kTouchModeDirect;
+				_currentTouchMode = Common::kTouchModeMouse;
 			}
-			updateTouchMode();
+			rememberTouchMode(_currentTouchMode);
 
 			Common::U32String dialogMsg;
-			if (_currentTouchMode == kTouchModeTouchpad)
+			if (_currentTouchMode == Common::kTouchModeTouchpad)
 				dialogMsg = _("Touchpad emulation");
 			else
 				dialogMsg = _("Direct mouse");
@@ -351,10 +346,10 @@ bool OSystem_iOS7::handleEvent_swipe(Common::Event &event, int direction, int to
 
 		case kUIViewSwipeLeft: {
 			// Swipe left
-			bool connect = !ConfMan.getBool("gamepad_controller");
-			ConfMan.setBool("gamepad_controller", connect);
-			ConfMan.flushToDisk();
-			virtualController(connect);
+			if (_currentTouchMode == Common::kTouchModeGamepad)
+				rememberTouchMode(Common::kTouchModeTouchpad);
+			else if (_touchContext != Common::kTouchContextMenus && isOnScreenGamepadAvailable())
+				rememberTouchMode(Common::kTouchModeGamepad);
 			return false;
 		}
 

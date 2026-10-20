@@ -92,7 +92,7 @@ OSystem_iOS7::OSystem_iOS7() :
 	_screenOrientation(kScreenOrientationAuto),
 	_runningTasks(0) {
 	_queuedInputEvent.type = Common::EVENT_INVALID;
-	_currentTouchMode = kTouchModeTouchpad;
+	_currentTouchMode = Common::kTouchModeTouchpad;
 
 	_chrootBasePath = iOS7_getDocumentsDir();
 	ChRootFilesystemFactory *chFsFactory = new ChRootFilesystemFactory(_chrootBasePath);
@@ -154,6 +154,9 @@ int OSystem_iOS7::timerHandler(int t) {
 }
 
 void OSystem_iOS7::initBackend() {
+	registerDefaultSettings(Common::ConfigManager::kApplicationDomain);
+	if (!ConfMan.getActiveDomainName().empty())
+		registerDefaultSettings(ConfMan.getActiveDomainName());
 	_eventManager = new DefaultEventManager(this);
 
 	_savefileManager = new SandboxedSaveFileManager(Common::Path(_chrootBasePath, Common::Path::kNativeSeparator), "/Savegames");
@@ -191,11 +194,16 @@ bool OSystem_iOS7::hasFeature(Feature f) {
 	case kFeatureNoQuit:
 	case kFeatureKbdMouseSpeed:
 	case kFeatureTouchscreen:
+#if TARGET_OS_IOS
+	case kFeatureTouchMode:
+#endif
 #ifdef SCUMMVM_NEON
 	case kFeatureCpuNEON:
 #endif
 		return true;
 
+	case kFeatureOnScreenGamepad:
+		return iOS7_isVirtualControllerSupported();
 	default:
 		return ModularGraphicsBackend::hasFeature(f);
 	}
@@ -437,7 +445,7 @@ TouchMode iOS7_getCurrentTouchMode() {
 	if (!sys) {
 		// If the system has not finished loading, just return a
 		// default value.
-		return kTouchModeDirect;
+		return Common::kTouchModeMouse;
 	}
 	return sys->getCurrentTouchMode();
 }
