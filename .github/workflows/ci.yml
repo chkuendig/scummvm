@@ -4,6 +4,9 @@ on: [push, pull_request]
 #    - cron: '0 0-23/4 * * *'
 permissions:
   contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   emscripten:
     name: Emscripten
